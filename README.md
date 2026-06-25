@@ -203,11 +203,8 @@ estado = cliente.obtener_ultimo_estado_local()
 resumen_red = cliente.obtener_resumen_red()
 ```
 
-<<<<<<< ours
-=======
 Si el puerto escrito no esta disponible al crear servidor desde `Play`, la interfaz prueba puertos alternativos cercanos y actualiza el campo `Puerto` con el que debe usar el segundo jugador.
 
->>>>>>> theirs
 El servidor envia en `datos` campos estandar para facilitar la interfaz:
 
 - `fase_actual`: `esperando_jugadores`, `preparacion`, `combate` o `finalizada`.

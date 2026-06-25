@@ -1,5 +1,5 @@
 #=======================================#
-# Archivo para iniciar sesion antes de jugar
+# Archivo para jugar
 #=======================================#
 
 import os
@@ -182,10 +182,6 @@ def play(root, GoMain, *argumentos):
         detener_servidor_local()
         window2.destroy()
         GoMain()
-
-    def GoMapaR():
-        window2.destroy()
-        GoMapa()
 
     boton_volver = tk.Button(
         window2, text="Volver", font=("Arial", 12, "bold"), width=10,
@@ -686,7 +682,6 @@ def play(root, GoMain, *argumentos):
         except ValueError:
             messagebox.showwarning("Posicion invalida", "Fila y columna deben ser numeros enteros.")
             return
-
         exito, mensaje = adaptador.cliente.comprar_unidad(variable_tipo_unidad.get(), fila, columna)
         agregar_evento(mensaje)
         if not exito:
