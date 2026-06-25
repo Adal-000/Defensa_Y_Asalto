@@ -26,11 +26,16 @@ Defensa_Y_Asalto/
 │   ├── partida.py        # Rondas, dinero y victoria
 │   ├── ranking.py        # Top 5 defensores y atacantes
 │   └── app.py            # Funciones públicas para Tkinter
+├── Red/                  # Cliente-servidor para dos computadoras
+│   ├── protocolo.py      # Mensajes JSON por sockets
+│   ├── servidor.py       # Servidor con la partida oficial
+│   └── cliente.py        # Cliente para conectar la interfaz
 ├── datos/
 │   ├── .gitkeep
 │   └── jugadores.json    # Se crea/actualiza en ejecución
 ├── pruebas/
-│   └── test_logica.py    # Pruebas unitarias de la lógica
+│   ├── test_logica.py    # Pruebas unitarias de la lógica
+│   └── test_red.py       # Pruebas del protocolo de red
 └── demo_consola.py       # Simulación por consola, sin Tkinter
 ```
 
@@ -110,12 +115,98 @@ Unidades:
 - `explorador`: aumento de velocidad.
 - `demoledor`: daño extra contra torres.
 
+
+## Modo multijugador en dos computadoras
+
+El modo de red usa una arquitectura cliente-servidor:
+
+```text
+Computadora servidor
+└── Mantiene la unica Partida real
+
+Computadora defensor
+└── Envia acciones al servidor y recibe estados
+
+Computadora atacante
+└── Envia acciones al servidor y recibe estados
+```
+
+La partida no se duplica en las dos computadoras. El servidor controla
+el estado oficial, valida las compras y ejecuta el combate en tiempo real.
+
+### Ejecutar servidor
+
+En la computadora que sera anfitriona:
+
+```bash
+python Red/servidor.py
+```
+
+El servidor mostrara una IP parecida a esta:
+
+```text
+Servidor iniciado en 192.168.1.25:5000
+Esperando jugadores...
+```
+
+### Ejecutar clientes de prueba por consola
+
+En la computadora del defensor:
+
+```bash
+python Red/cliente.py 192.168.1.25 daniel defensor
+```
+
+En la computadora del atacante:
+
+```bash
+python Red/cliente.py 192.168.1.25 mario atacante
+```
+
+Cambie `192.168.1.25` por la IP mostrada por el servidor. Ambas
+computadoras deben estar en la misma red o tener permiso de firewall.
+
+### Comandos disponibles en el cliente de consola
+
+```text
+torre arquera 2 2
+muro 5 1
+unidad soldado 10 2
+iniciar
+pausar
+estado
+salir
+```
+
+Para tiempo real, se usa `iniciar`. Desde ese momento el servidor ejecuta
+un turno de combate automaticamente cada segundo y envia el estado
+actualizado a ambos clientes.
+
+### Conexion futura con Tkinter
+
+La interfaz no debe llamar directamente a `Partida` cuando se juegue en
+dos computadoras. Debe crear un `ClientePartida` y usar metodos como:
+
+```python
+cliente.conectar(ip_servidor, usuario, rol="defensor")
+cliente.comprar_torre("arquera", fila, columna)
+cliente.comprar_muro(fila, columna)
+cliente.comprar_unidad("soldado", fila, columna)
+cliente.iniciar_combate()
+cliente.pausar_combate()
+estado = cliente.obtener_ultimo_estado_local()
+```
+
+El siguiente paso del proyecto es tomar ese `estado` y dibujarlo en
+`play.py` con botones, tablero, torres, muros, unidades y barra de vida
+de la base.
+
 ## Cómo ejecutar las pruebas
 
 Desde la raíz del repositorio:
 
 ```bash
-python -m unittest pruebas.test_logica -v
+python -m unittest pruebas.test_logica pruebas.test_red -v
 ```
 
 Actualmente las pruebas cubren:
@@ -133,6 +224,9 @@ Actualmente las pruebas cubren:
 - Condiciones de victoria.
 - Recompensas de dinero por combate.
 - Ranking.
+- Protocolo JSON de red.
+- Cliente sin conexion.
+- Asignacion basica de roles del servidor.
 
 ## Cómo ejecutar la demo de consola
 
