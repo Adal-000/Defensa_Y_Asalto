@@ -55,7 +55,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             "jugador": campo_usuario.get().strip() or obtener_usuario_actual() or "Invitado",
             "contrincante": "Contrincante",
             "faccion": faccion_confirmada.get(),
-            "rol": campo_rol.get().strip(),
+            "rol": rol_seleccionado.get(),
         })
         window2.destroy()
         GoMapa()
@@ -66,41 +66,59 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     )
     boton_volver.place(x=20, y=20)
 
-    titulo = tk.Label(window2, text="Play", font=("Arial", 28, "bold"))
-    titulo.place(relx=0.5, y=45, anchor="center")
+    titulo = tk.Label(window2, text="Play en red", font=("Arial", 28, "bold"))
+    titulo.place(relx=0.5, y=52, anchor="center")
 
-    # --- Datos de conexión: se conserva la franja superior ---------------
+    # --- Datos de conexión: se conserva la franja superior original -------
 
-    panel_conexion = tk.Frame(window2, relief="solid", bd=2, padx=12, pady=10)
-    panel_conexion.place(relx=0.5, y=115, anchor="center")
+    modo_partida = tk.StringVar(value="crear")
+    rol_seleccionado = tk.StringVar(value="defensor")
 
-    campos_conexion = [
-        ("IP", "127.0.0.1"),
-        ("Usuario", obtener_usuario_actual() or "Invitado"),
-        ("Rol", "defensor"),
-        ("Puerto", str(PUERTO_PREDETERMINADO)),
-    ]
-    entradas = {}
+    etiqueta_modo = tk.Label(window2, text="Modo:", font=("Arial", 11, "bold"))
+    etiqueta_modo.place(x=175, y=92)
 
-    for indice, (nombre_campo, valor_inicial) in enumerate(campos_conexion):
-        etiqueta = tk.Label(panel_conexion, text=nombre_campo, font=("Arial", 11, "bold"))
-        etiqueta.grid(row=0, column=indice, padx=8, pady=(0, 4))
+    radio_crear = tk.Radiobutton(
+        window2, text="Crear servidor", variable=modo_partida, value="crear",
+        font=("Arial", 9)
+    )
+    radio_crear.place(x=230, y=88)
 
-        campo = tk.Entry(panel_conexion, font=("Arial", 11), width=16, justify="center")
-        campo.insert(0, valor_inicial)
-        campo.grid(row=1, column=indice, padx=8)
-        entradas[nombre_campo] = campo
+    radio_unirse = tk.Radiobutton(
+        window2, text="Unirse a partida", variable=modo_partida, value="unirse",
+        font=("Arial", 9)
+    )
+    radio_unirse.place(x=365, y=88)
 
-    campo_ip = entradas["IP"]
-    campo_usuario = entradas["Usuario"]
-    campo_rol = entradas["Rol"]
-    campo_puerto = entradas["Puerto"]
+    etiqueta_ip = tk.Label(window2, text="IP servidor:", font=("Arial", 10))
+    etiqueta_ip.place(x=145, y=122)
+    campo_ip = tk.Entry(window2, font=("Arial", 10), width=16)
+    campo_ip.insert(0, "192.168.0.9")
+    campo_ip.place(x=228, y=117)
+
+    etiqueta_usuario = tk.Label(window2, text="Usuario:", font=("Arial", 10))
+    etiqueta_usuario.place(x=395, y=122)
+    campo_usuario = tk.Entry(window2, font=("Arial", 10), width=16)
+    campo_usuario.insert(0, obtener_usuario_actual() or "Invitado")
+    campo_usuario.config(state="disabled")
+    campo_usuario.place(x=491, y=117)
+
+    etiqueta_rol = tk.Label(window2, text="Rol:", font=("Arial", 10))
+    etiqueta_rol.place(x=620, y=122)
+    menu_rol = tk.OptionMenu(window2, rol_seleccionado, "defensor", "atacante")
+    menu_rol.config(font=("Arial", 9), width=9, height=1)
+    menu_rol.place(x=657, y=112)
+
+    etiqueta_puerto = tk.Label(window2, text="Puerto:", font=("Arial", 10))
+    etiqueta_puerto.place(x=762, y=122)
+    campo_puerto = tk.Entry(window2, font=("Arial", 10), width=7)
+    campo_puerto.insert(0, "5003")
+    campo_puerto.place(x=820, y=117)
 
     estado_conexion = tk.Label(
-        panel_conexion, text="Sin conexión", font=("Arial", 11, "bold"),
+        window2, text="Sin conexión", font=("Arial", 11, "bold"),
         fg="red", width=24
     )
-    estado_conexion.grid(row=1, column=5, padx=8)
+    estado_conexion.place(relx=0.5, y=154, anchor="center")
 
     def actualizar_desde_red(mensaje):
         datos = mensaje.get("datos", {}) if isinstance(mensaje, dict) else {}
@@ -108,8 +126,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             return
         jugadores_conectados.set(int(datos.get("jugadores_conectados", jugadores_conectados.get()) or 0))
         if datos.get("rol_cliente"):
-            campo_rol.delete(0, tk.END)
-            campo_rol.insert(0, datos["rol_cliente"])
+            rol_seleccionado.set(datos["rol_cliente"])
         ocupadas = datos.get("facciones_ocupadas", [])
         if isinstance(ocupadas, list):
             facciones_ocupadas.clear()
@@ -125,18 +142,19 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             estado_conexion.config(text="Puerto inválido", fg="red")
             return
         exito, mensaje = cliente_red.conectar(
-            campo_ip.get().strip(), campo_usuario.get().strip(), puerto, campo_rol.get().strip()
+            campo_ip.get().strip(), campo_usuario.get().strip(), puerto, rol_seleccionado.get()
         )
-        estado_conexion.config(text=mensaje[:24], fg="green" if exito else "red")
+        texto_estado = "Conectado al servidor." if exito else mensaje[:24]
+        estado_conexion.config(text=texto_estado, fg="green" if exito else "red")
         if exito:
             jugadores_conectados.set(max(jugadores_conectados.get(), 1))
             cliente_red.obtener_estado()
 
     boton_conectar = tk.Button(
-        panel_conexion, text="Conectar", font=("Arial", 11, "bold"),
-        width=12, bg="lightgreen", command=conectar_click
+        window2, text="Continuar", font=("Arial", 11, "bold"),
+        width=10, bg="lightgreen", command=conectar_click
     )
-    boton_conectar.grid(row=1, column=4, padx=(16, 8))
+    boton_conectar.place(x=892, y=109)
 
     # --- Selección de facción -------------------------------------------
 
