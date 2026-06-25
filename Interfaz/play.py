@@ -2,7 +2,6 @@
 # Archivo para iniciar sesion antes de jugar
 #=======================================#
 
-<<<<<<< HEAD
 import os
 import queue
 import socket
@@ -22,45 +21,156 @@ for ruta in (RUTA_LOGICA, RUTA_RED):
 import app
 from cliente import ClientePartida, PUERTO_PREDETERMINADO
 from servidor import ServidorPartida
-=======
-import tkinter as tk
->>>>>>> origin/feature/interfaz
 
 
 FACCIONES = ["España", "Inglaterra", "Alemania", "Rusia", "Italia", "EE.UU"]
+TIPOS_TORRE = [torre["clave"] for torre in app.obtener_catalogo_torres()]
+TIPOS_UNIDAD = [unidad["clave"] for unidad in app.obtener_catalogo_unidades()]
+CANTIDAD_FILAS_TABLERO = 11
+CANTIDAD_COLUMNAS_TABLERO = 6
 
 
-def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_actual):
+class AdaptadorClienteTkinter:
     """
-    Descripción:
-        Crea la ventana Play. Esta pantalla contiene los datos básicos
-        de conexión y el esqueleto para elegir una facción antes de
-        pasar a la ventana del mapa.
+    Descripcion:
+        Encapsula el ClientePartida de red para que la ventana de
+        Tkinter pueda enviar acciones al servidor sin mezclar la
+        logica de combate con la interfaz grafica.
 
     Entradas:
-        root: ventana raíz oculta.
-        GoMain: función para volver al menú principal.
-        GoMapa: función para abrir la ventana de mapa.
-        cerrar_todo: función para cerrar completamente el programa.
-        configurar_ventana: función que centra y configura la ventana.
-        obtener_usuario_actual: función que devuelve el usuario actual.
+        cola_mensajes (queue.Queue): Cola donde se guardan los
+            mensajes recibidos desde el hilo del cliente.
 
     Salidas:
-        No retorna ningún valor.
+        No retorna nada. Crea un adaptador listo para conectar.
 
     Restricciones:
-        Solo se puede confirmar una facción a la vez. Después de elegirla,
-        no se puede cambiar hasta presionar Cambiar facción.
+        - La cola debe existir antes de crear el adaptador.
+        - Los widgets de Tkinter no deben modificarse directamente
+          desde el hilo de red.
     """
 
-    window2 = tk.Toplevel(root)
-    configurar_ventana(window2, "Play")
+    def __init__(self, cola_mensajes):
+        self.cola_mensajes = cola_mensajes
+        self.cliente = ClientePartida(callback_mensaje=self._recibir_mensaje)
 
-<<<<<<< HEAD
+    def _recibir_mensaje(self, mensaje):
+        """
+        Descripcion:
+            Guarda en una cola segura los mensajes recibidos del
+            servidor para que Tkinter los procese con after().
+
+        Entradas:
+            mensaje (dict): Mensaje recibido desde el servidor.
+
+        Salidas:
+            None: Agrega el mensaje a la cola.
+
+        Restricciones:
+            - No debe modificar widgets directamente.
+        """
+        self.cola_mensajes.put(mensaje)
+
+    def conectar(self, host, usuario, rol, puerto):
+        """
+        Descripcion:
+            Conecta el cliente de red con el servidor de partida.
+
+        Entradas:
+            host (str): IP o nombre del servidor.
+            usuario (str): Nombre del jugador.
+            rol (str): Rol solicitado, defensor o atacante.
+            puerto (int): Puerto TCP del servidor.
+
+        Salidas:
+            tuple[bool, str]: Resultado de la conexion y mensaje.
+
+        Restricciones:
+            - host y usuario no deben estar vacios.
+            - rol debe ser compatible con el servidor.
+        """
+        return self.cliente.conectar(host, usuario, puerto=puerto, rol=rol)
+
+    def cerrar(self):
+        """
+        Descripcion:
+            Cierra la conexion con el servidor si existe.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            None: Cierra el socket del cliente.
+
+        Restricciones:
+            Ninguna.
+        """
+        self.cliente.cerrar()
+
+
+def play(root, GoMain, *argumentos):
+    """
+    Descripcion:
+        Crea la ventana de juego conectada al modo cliente-servidor.
+        La interfaz solo muestra el estado recibido, dibuja un tablero
+        simple, permite elegir una faccion visual del jugador y envia
+<<<<<<< ours
+        acciones al servidor mediante ClientePartida.
+=======
+        acciones al servidor mediante ClientePartida. Acepta tanto la
+        llamada nueva con GoMapa como la llamada anterior sin GoMapa
+        para mantener compatibilidad entre versiones de root.py.
+>>>>>>> theirs
+
+    Entradas:
+        root: ventana raiz oculta.
+        GoMain: funcion para volver al menu principal.
+<<<<<<< ours
+        cerrar_todo: funcion para cerrar completamente el programa.
+        configurar_ventana: funcion que centra y configura la ventana.
+        obtener_usuario_actual: funcion que devuelve el nombre del
+            jugador que inicio sesion.
+=======
+        argumentos (tuple): Puede contener cerrar_todo, configurar_ventana
+            y obtener_usuario_actual; o GoMapa, cerrar_todo,
+            configurar_ventana y obtener_usuario_actual.
+>>>>>>> theirs
+
+    Salidas:
+        No retorna ningun valor.
+
+    Restricciones:
+        - Debe existir un servidor ejecutandose para jugar en red.
+        - La logica de dinero, combate y victoria vive en el servidor.
+        - La faccion es una seleccion visual local para la interfaz.
+<<<<<<< ours
+=======
+        - La firma recibida debe tener 3 o 4 argumentos adicionales.
+>>>>>>> theirs
+    """
+
+    if len(argumentos) == 3:
+        GoMapa = None
+        cerrar_todo, configurar_ventana, obtener_usuario_actual = argumentos
+    elif len(argumentos) == 4:
+        GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_actual = argumentos
+    else:
+        raise TypeError(
+            "play() debe recibir root, GoMain y luego "
+            "cerrar_todo/configurar_ventana/obtener_usuario_actual "
+            "o GoMapa/cerrar_todo/configurar_ventana/obtener_usuario_actual"
+        )
+
+    window2 = tk.Toplevel(root)
+    configurar_ventana(window2, "Play en red")
+
     cola_mensajes = queue.Queue()
     adaptador = AdaptadorClienteTkinter(cola_mensajes)
     estado_actual = {"datos": None, "mensaje_final_mostrado": False}
     servidor_local = {"instancia": None, "hilo": None}
+    faccion_temporal = tk.StringVar(value=FACCIONES[0])
+    faccion_confirmada = tk.StringVar(value="")
+    seleccion_faccion_bloqueada = tk.BooleanVar(value=False)
 
     def detener_servidor_local():
         """
@@ -84,13 +194,6 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     def GoMainR():
         adaptador.cerrar()
         detener_servidor_local()
-=======
-    faccion_temporal = tk.StringVar(value="")
-    faccion_confirmada = tk.StringVar(value="")
-    seleccion_bloqueada = tk.BooleanVar(value=False)
-
-    def GoMainR():
->>>>>>> origin/feature/interfaz
         window2.destroy()
         GoMain()
 
@@ -99,26 +202,17 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         GoMapa()
 
     boton_volver = tk.Button(
-        window2,
-        text="Volver",
-        font=("Arial", 12, "bold"),
-        width=10,
-        height=2,
-        bg="red",
-        command=GoMainR
+        window2, text="Volver", font=("Arial", 12, "bold"), width=10,
+        height=2, bg="red", command=GoMainR
     )
     boton_volver.place(x=20, y=20)
 
-    titulo = tk.Label(
-        window2,
-        text="Play",
-        font=("Arial", 28, "bold")
-    )
-    titulo.place(relx=0.5, y=45, anchor="center")
+    titulo = tk.Label(window2, text="Play en red", font=("Arial", 28, "bold"))
+    titulo.place(relx=0.5, rely=0.06, anchor="center")
 
-    # --- Datos de conexión ----------------------------------------------
+    panel_conexion = tk.Frame(window2)
+    panel_conexion.place(relx=0.5, rely=0.15, anchor="center")
 
-<<<<<<< HEAD
     variable_modo_conexion = tk.StringVar(value="crear_servidor")
     tk.Label(panel_conexion, text="Modo:", font=("Arial", 11, "bold")).grid(row=0, column=0, padx=4, sticky="e")
     tk.Radiobutton(
@@ -152,118 +246,330 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     campo_puerto = tk.Entry(panel_conexion, font=("Arial", 11), width=7)
     campo_puerto.insert(0, str(PUERTO_PREDETERMINADO))
     campo_puerto.grid(row=1, column=7, padx=4)
-=======
-    panel_conexion = tk.Frame(window2, relief="solid", bd=2, padx=12, pady=10)
-    panel_conexion.place(relx=0.5, y=115, anchor="center")
 
-    campos_conexion = [
-        ("IP", "127.0.0.1"),
-        ("Usuario", obtener_usuario_actual() or "Invitado"),
-        ("Rol", "Sin rol"),
-        ("Puerto", "0000")
-    ]
+    etiqueta_conexion = tk.Label(window2, text="Sin conexion.", font=("Arial", 12, "bold"), fg="red")
+    etiqueta_conexion.place(relx=0.5, rely=0.21, anchor="center")
 
-    for indice, (nombre_campo, valor_inicial) in enumerate(campos_conexion):
-        etiqueta = tk.Label(
-            panel_conexion,
-            text=nombre_campo,
-            font=("Arial", 11, "bold")
-        )
-        etiqueta.grid(row=0, column=indice, padx=8, pady=(0, 4))
+    panel_faccion = tk.Frame(window2, relief="solid", bd=1, padx=8, pady=5)
+    panel_faccion.place(relx=0.5, rely=0.255, anchor="center")
 
-        campo = tk.Entry(panel_conexion, font=("Arial", 11), width=16, justify="center")
-        campo.insert(0, valor_inicial)
-        campo.grid(row=1, column=indice, padx=8)
->>>>>>> origin/feature/interfaz
+    tk.Label(panel_faccion, text="Faccion:", font=("Arial", 10, "bold")).grid(row=0, column=0, padx=4)
+    menu_facciones = tk.OptionMenu(panel_faccion, faccion_temporal, *FACCIONES)
+    menu_facciones.config(width=12)
+    menu_facciones.grid(row=0, column=1, padx=4)
 
-    boton_conectar = tk.Button(
-        panel_conexion,
-        text="Conectar",
-        font=("Arial", 11, "bold"),
-        width=12,
-        bg="lightgreen"
-    )
-    boton_conectar.grid(row=1, column=4, padx=(16, 8))
-
-    estado_conexion = tk.Label(
-        panel_conexion,
-        text="Sin conexión",
-        font=("Arial", 11, "bold"),
+    etiqueta_faccion = tk.Label(
+        panel_faccion,
+        text="Faccion sin confirmar",
+        font=("Arial", 10, "bold"),
         fg="red",
-        width=14
+        width=22,
     )
-    estado_conexion.grid(row=1, column=5, padx=8)
+    etiqueta_faccion.grid(row=0, column=2, padx=4)
 
-    # --- Selección de facción -------------------------------------------
+    def elegir_faccion_click():
+        """
+        Descripcion:
+            Confirma la faccion elegida por el jugador en la interfaz.
+            Esta seleccion es visual y no calcula reglas de combate.
 
-    etiqueta_facciones = tk.Label(
-        window2,
-        text="Selecciona una facción",
-        font=("Arial", 18, "bold")
-    )
-    etiqueta_facciones.place(relx=0.5, y=185, anchor="center")
+        Entradas:
+            Ninguna.
 
-    panel_facciones = tk.Frame(window2)
-    panel_facciones.place(relx=0.5, y=360, anchor="center")
+        Salidas:
+            None: Actualiza el estado visual de la faccion.
 
-    botones_faccion = {}
+        Restricciones:
+            - Debe existir una faccion seleccionada en el menu.
+            - No envia reglas de combate al servidor.
+        """
+        if not faccion_temporal.get():
+            etiqueta_faccion.config(text="Elige una faccion", fg="red")
+            return
+        faccion_confirmada.set(faccion_temporal.get())
+        seleccion_faccion_bloqueada.set(True)
+        etiqueta_faccion.config(text=f"Faccion: {faccion_confirmada.get()}", fg="green")
+        menu_facciones.config(state="disabled")
 
-    def refrescar_botones():
-        for nombre_faccion, boton in botones_faccion.items():
-            if nombre_faccion == faccion_temporal.get():
-                boton.config(relief="sunken", bg="#b7d7ff")
-            else:
-                boton.config(relief="raised", bg="SystemButtonFace")
+    def cambiar_faccion_click():
+        """
+        Descripcion:
+            Permite cambiar nuevamente la faccion local antes o durante
+            la partida sin modificar la logica del servidor.
 
-    def seleccionar_faccion(nombre_faccion):
-        if seleccion_bloqueada.get():
-            texto_faccion.config(text="Facción elegida")
+        Entradas:
+            Ninguna.
+<<<<<<< ours
+
+        Salidas:
+            None: Desbloquea el selector de facciones.
+
+        Restricciones:
+            - Solo modifica datos visuales de la interfaz.
+        """
+        seleccion_faccion_bloqueada.set(False)
+        faccion_confirmada.set("")
+        etiqueta_faccion.config(text="Faccion sin confirmar", fg="red")
+        menu_facciones.config(state="normal")
+
+    tk.Button(
+        panel_faccion,
+        text="Elegir",
+        font=("Arial", 10, "bold"),
+        bg="lightgreen",
+        command=elegir_faccion_click,
+    ).grid(row=0, column=3, padx=4)
+    tk.Button(
+        panel_faccion,
+        text="Cambiar",
+        font=("Arial", 10, "bold"),
+        bg="#ffd36b",
+        command=cambiar_faccion_click,
+    ).grid(row=0, column=4, padx=4)
+
+    texto_estado = tk.Label(window2, text="Conectate a un servidor para comenzar.", font=("Arial", 12), justify="left")
+    texto_estado.place(relx=0.20, rely=0.33, anchor="n")
+
+    marco_tablero = tk.Frame(window2, bd=2, relief="solid")
+    marco_tablero.place(relx=0.50, rely=0.33, anchor="n")
+    celdas_tablero = []
+    for fila in range(CANTIDAD_FILAS_TABLERO):
+        fila_celdas = []
+        for columna in range(CANTIDAD_COLUMNAS_TABLERO):
+            celda = tk.Label(marco_tablero, text="", width=4, height=2, relief="ridge", bg="white")
+            celda.grid(row=fila, column=columna)
+            fila_celdas.append(celda)
+        celdas_tablero.append(fila_celdas)
+
+    caja_eventos = tk.Listbox(window2, font=("Consolas", 9), width=48, height=17)
+    caja_eventos.place(relx=0.79, rely=0.33, anchor="n")
+
+    def agregar_evento(texto):
+        """
+        Descripcion:
+            Agrega un mensaje al cuadro de eventos de la interfaz.
+
+        Entradas:
+            texto (str): Mensaje que se desea mostrar.
+
+        Salidas:
+            None: Modifica el Listbox de eventos.
+
+        Restricciones:
+            - Debe llamarse desde el hilo principal de Tkinter.
+        """
+        if texto:
+            caja_eventos.insert(tk.END, texto)
+            caja_eventos.yview(tk.END)
+
+    def dibujar_tablero(estado):
+        """
+        Descripcion:
+            Dibuja una vista simple del tablero usando el estado
+            oficial recibido desde el servidor.
+
+        Entradas:
+            estado (dict): Estado de partida devuelto por el servidor.
+
+        Salidas:
+            None: Actualiza colores y textos de las celdas.
+
+        Restricciones:
+            - El estado debe contener listas de torres, muros y
+              unidades con fila y columna.
+        """
+        for fila in range(CANTIDAD_FILAS_TABLERO):
+            for columna in range(CANTIDAD_COLUMNAS_TABLERO):
+                texto = "B" if fila == 0 else ""
+                color = "lightgreen" if fila == 0 else "white"
+                celdas_tablero[fila][columna].config(text=texto, bg=color)
+
+        for torre in estado.get("torres", []):
+            celdas_tablero[torre["fila"]][torre["columna"]].config(text="T", bg="lightblue")
+        for muro in estado.get("muros", []):
+            celdas_tablero[muro["fila"]][muro["columna"]].config(text="M", bg="gray80")
+        for unidad in estado.get("unidades", []):
+            celdas_tablero[unidad["fila"]][unidad["columna"]].config(text="U", bg="salmon")
+
+    def refrescar_estado(estado):
+        """
+        Descripcion:
+            Actualiza etiquetas y tablero con el estado oficial de la
+            partida recibido por red.
+
+        Entradas:
+            estado (dict): Estado actual de la partida.
+
+        Salidas:
+            None: Modifica widgets de la ventana.
+
+        Restricciones:
+            - Debe llamarse desde Tkinter usando after() o eventos de
+              la ventana.
+        """
+=======
+
+        Salidas:
+            None: Desbloquea el selector de facciones.
+
+        Restricciones:
+            - Solo modifica datos visuales de la interfaz.
+        """
+        seleccion_faccion_bloqueada.set(False)
+        faccion_confirmada.set("")
+        etiqueta_faccion.config(text="Faccion sin confirmar", fg="red")
+        menu_facciones.config(state="normal")
+
+    tk.Button(
+        panel_faccion,
+        text="Elegir",
+        font=("Arial", 10, "bold"),
+        bg="lightgreen",
+        command=elegir_faccion_click,
+    ).grid(row=0, column=3, padx=4)
+    tk.Button(
+        panel_faccion,
+        text="Cambiar",
+        font=("Arial", 10, "bold"),
+        bg="#ffd36b",
+        command=cambiar_faccion_click,
+    ).grid(row=0, column=4, padx=4)
+
+    texto_estado = tk.Label(window2, text="Conectate a un servidor para comenzar.", font=("Arial", 12), justify="left")
+    texto_estado.place(relx=0.20, rely=0.33, anchor="n")
+
+    marco_tablero = tk.Frame(window2, bd=2, relief="solid")
+    marco_tablero.place(relx=0.50, rely=0.33, anchor="n")
+    celdas_tablero = []
+    for fila in range(CANTIDAD_FILAS_TABLERO):
+        fila_celdas = []
+        for columna in range(CANTIDAD_COLUMNAS_TABLERO):
+            celda = tk.Label(marco_tablero, text="", width=4, height=2, relief="ridge", bg="white")
+            celda.grid(row=fila, column=columna)
+            fila_celdas.append(celda)
+        celdas_tablero.append(fila_celdas)
+
+    caja_eventos = tk.Listbox(window2, font=("Consolas", 9), width=48, height=17)
+    caja_eventos.place(relx=0.79, rely=0.33, anchor="n")
+
+    def agregar_evento(texto):
+        """
+        Descripcion:
+            Agrega un mensaje al cuadro de eventos de la interfaz.
+
+        Entradas:
+            texto (str): Mensaje que se desea mostrar.
+
+        Salidas:
+            None: Modifica el Listbox de eventos.
+
+        Restricciones:
+            - Debe llamarse desde el hilo principal de Tkinter.
+        """
+        if texto:
+            caja_eventos.insert(tk.END, texto)
+            caja_eventos.yview(tk.END)
+
+    def dibujar_tablero(estado):
+        """
+        Descripcion:
+            Dibuja una vista simple del tablero usando el estado
+            oficial recibido desde el servidor.
+
+        Entradas:
+            estado (dict): Estado de partida devuelto por el servidor.
+
+        Salidas:
+            None: Actualiza colores y textos de las celdas.
+
+        Restricciones:
+            - El estado debe contener listas de torres, muros y
+              unidades con fila y columna.
+        """
+        for fila in range(CANTIDAD_FILAS_TABLERO):
+            for columna in range(CANTIDAD_COLUMNAS_TABLERO):
+                texto = "B" if fila == 0 else ""
+                color = "lightgreen" if fila == 0 else "white"
+                celdas_tablero[fila][columna].config(text=texto, bg=color)
+
+        for torre in estado.get("torres", []):
+            celdas_tablero[torre["fila"]][torre["columna"]].config(text="T", bg="lightblue")
+        for muro in estado.get("muros", []):
+            celdas_tablero[muro["fila"]][muro["columna"]].config(text="M", bg="gray80")
+        for unidad in estado.get("unidades", []):
+            celdas_tablero[unidad["fila"]][unidad["columna"]].config(text="U", bg="salmon")
+
+    def refrescar_estado(estado):
+        """
+        Descripcion:
+            Actualiza etiquetas y tablero con el estado oficial de la
+            partida recibido por red.
+
+        Entradas:
+            estado (dict): Estado actual de la partida.
+
+        Salidas:
+            None: Modifica widgets de la ventana.
+
+        Restricciones:
+            - Debe llamarse desde Tkinter usando after() o eventos de
+              la ventana.
+        """
+>>>>>>> theirs
+        estado_actual["datos"] = estado
+
+        if not estado:
+            texto_estado.config(text="Esperando al segundo jugador o al estado del servidor.")
             return
 
-        faccion_temporal.set(nombre_faccion)
-        texto_faccion.config(text=f"Facción {nombre_faccion}")
-        refrescar_botones()
+        texto_estado.config(text=(
+            f"Ronda: {estado['numero_ronda']}\n"
+            f"Defensor: {estado['nombre_defensor']} (dinero: {estado['dinero_defensor']})\n"
+            f"Atacante: {estado['nombre_atacante']} (dinero: {estado['dinero_atacante']})\n"
+            f"Marcador: {estado['rondas_ganadas_defensor']} - {estado['rondas_ganadas_atacante']}\n"
+            f"Base: {estado['vida_base']}/{estado['vida_maxima_base']}\n"
+            f"Torres: {len(estado['torres'])} | Muros: {len(estado.get('muros', []))}\n"
+            f"Unidades: {len(estado['unidades'])}\n"
+            f"Faccion: {faccion_confirmada.get() or 'Sin confirmar'}\n"
+            f"Finalizada: {'Si' if estado['partida_finalizada'] else 'No'}"
+        ))
+        dibujar_tablero(estado)
 
-    for indice, nombre_faccion in enumerate(FACCIONES):
-        fila = indice // 3
-        columna = indice % 3
+        if estado.get("partida_finalizada") and not estado_actual["mensaje_final_mostrado"]:
+            estado_actual["mensaje_final_mostrado"] = True
+            messagebox.showinfo(
+                "Partida finalizada",
+                f"{estado['ganador_partida']} gano la partida como {estado['rol_ganador_partida']}.",
+            )
 
-        boton_faccion = tk.Button(
-            panel_facciones,
-            text=f"\n[ Espacio bandera ]\n\n{nombre_faccion}",
-            font=("Arial", 13, "bold"),
-            width=20,
-            height=6,
-            command=lambda faccion=nombre_faccion: seleccionar_faccion(faccion)
-        )
-        boton_faccion.grid(row=fila, column=columna, padx=18, pady=14)
-        botones_faccion[nombre_faccion] = boton_faccion
+    def procesar_mensajes_red():
+        """
+        Descripcion:
+            Procesa mensajes pendientes recibidos del servidor y
+            actualiza la interfaz desde el hilo principal de Tkinter.
 
-    # --- Acciones inferiores --------------------------------------------
+        Entradas:
+            Ninguna.
+<<<<<<< ours
 
-    texto_soldado = tk.Label(
-        window2,
-        text="Soldado no elegido",
-        font=("Arial", 13, "bold"),
-        width=24,
-        height=2,
-        relief="solid",
-        bd=2
-    )
-    texto_soldado.place(x=325, y=625, anchor="center")
+        Salidas:
+            None: Consume la cola de mensajes de red.
 
-    texto_faccion = tk.Label(
-        window2,
-        text="Facción sin elegir",
-        font=("Arial", 13, "bold"),
-        width=24,
-        height=2,
-        relief="solid",
-        bd=2
-    )
-    texto_faccion.place(x=575, y=625, anchor="center")
+=======
 
-<<<<<<< HEAD
+        Salidas:
+            None: Consume la cola de mensajes de red.
+
+>>>>>>> theirs
+        Restricciones:
+            - Debe programarse periodicamente con after().
+        """
+        while not cola_mensajes.empty():
+            mensaje = cola_mensajes.get()
+            texto_mensaje = mensaje.get("mensaje", "")
+            if texto_mensaje:
+                agregar_evento(texto_mensaje)
+
             datos = mensaje.get("datos", {})
             if isinstance(datos, dict):
                 resultado = datos.get("resultado_combate")
@@ -422,66 +728,121 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             return
 
         conectar_cliente(host, usuario, rol, puerto)
+<<<<<<< ours
 
     boton_conectar = tk.Button(panel_conexion, text="Continuar", font=("Arial", 11, "bold"), bg="lightgreen", command=conectar_click)
     boton_conectar.grid(row=1, column=8, padx=8)
+
 =======
-    def elegir_faccion_click():
-        if not faccion_temporal.get():
-            texto_faccion.config(text="Elige una facción antes")
+
+    boton_conectar = tk.Button(panel_conexion, text="Continuar", font=("Arial", 11, "bold"), bg="lightgreen", command=conectar_click)
+    boton_conectar.grid(row=1, column=8, padx=8)
+
+>>>>>>> theirs
+    panel_compras = tk.Frame(window2)
+    panel_compras.place(relx=0.50, rely=0.82, anchor="n")
+
+    variable_tipo_torre = tk.StringVar(value=TIPOS_TORRE[0])
+    variable_tipo_unidad = tk.StringVar(value=TIPOS_UNIDAD[0])
+
+    tk.Label(panel_compras, text="Defensa", font=("Arial", 11, "bold")).grid(row=0, column=0, columnspan=5)
+    tk.OptionMenu(panel_compras, variable_tipo_torre, *TIPOS_TORRE).grid(row=1, column=0, padx=3)
+    campo_fila_defensa = tk.Entry(panel_compras, width=5)
+    campo_fila_defensa.insert(0, "3")
+    campo_fila_defensa.grid(row=1, column=1, padx=3)
+    campo_columna_defensa = tk.Entry(panel_compras, width=5)
+    campo_columna_defensa.insert(0, "2")
+    campo_columna_defensa.grid(row=1, column=2, padx=3)
+
+    def obtener_posicion_defensa():
+        """
+        Descripcion:
+            Lee la fila y columna de defensa desde los campos de texto.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            tuple[int, int]: Fila y columna ingresadas.
+            None: Si algun valor no es entero.
+
+        Restricciones:
+            - Los campos deben contener numeros enteros.
+        """
+        try:
+            return int(campo_fila_defensa.get()), int(campo_columna_defensa.get())
+        except ValueError:
+            messagebox.showwarning("Posicion invalida", "Fila y columna deben ser numeros enteros.")
+            return None
+
+    def comprar_torre_click():
+        posicion = obtener_posicion_defensa()
+        if posicion is not None:
+            exito, mensaje = adaptador.cliente.comprar_torre(variable_tipo_torre.get(), posicion[0], posicion[1])
+            agregar_evento(mensaje)
+            if not exito:
+                messagebox.showwarning("No se pudo enviar", mensaje)
+
+    def comprar_muro_click():
+        posicion = obtener_posicion_defensa()
+        if posicion is not None:
+            exito, mensaje = adaptador.cliente.comprar_muro(posicion[0], posicion[1])
+            agregar_evento(mensaje)
+            if not exito:
+                messagebox.showwarning("No se pudo enviar", mensaje)
+
+    tk.Button(panel_compras, text="Comprar torre", bg="lightblue", command=comprar_torre_click).grid(row=1, column=3, padx=3)
+    tk.Button(panel_compras, text="Comprar muro", bg="lightgray", command=comprar_muro_click).grid(row=1, column=4, padx=3)
+
+    tk.Label(panel_compras, text="Ataque", font=("Arial", 11, "bold")).grid(row=2, column=0, columnspan=5, pady=(10, 0))
+    tk.OptionMenu(panel_compras, variable_tipo_unidad, *TIPOS_UNIDAD).grid(row=3, column=0, padx=3)
+    campo_fila_unidad = tk.Entry(panel_compras, width=5)
+    campo_fila_unidad.insert(0, "10")
+    campo_fila_unidad.grid(row=3, column=1, padx=3)
+    campo_columna_unidad = tk.Entry(panel_compras, width=5)
+    campo_columna_unidad.insert(0, "2")
+    campo_columna_unidad.grid(row=3, column=2, padx=3)
+
+    def comprar_unidad_click():
+        """
+        Descripcion:
+            Envia al servidor una solicitud para comprar unidad con la
+            posicion escrita en la interfaz.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            None: Envia la accion por red o muestra un error.
+
+        Restricciones:
+            - La fila y columna deben ser enteros.
+        """
+        host = campo_ip.get().strip()
+        usuario = campo_usuario.get().strip()
+        rol = variable_rol.get().strip()
+        modo_conexion = variable_modo_conexion.get()
+        try:
+            puerto = int(campo_puerto.get())
+        except ValueError:
+            messagebox.showwarning("Posicion invalida", "Fila y columna deben ser numeros enteros.")
             return
+        exito, mensaje = adaptador.cliente.comprar_unidad(variable_tipo_unidad.get(), fila, columna)
+        agregar_evento(mensaje)
+        if not exito:
+            messagebox.showwarning("No se pudo enviar", mensaje)
 
-        faccion_confirmada.set(faccion_temporal.get())
-        seleccion_bloqueada.set(True)
-        texto_faccion.config(text="Facción elegida")
+    tk.Button(panel_compras, text="Comprar unidad", bg="salmon", command=comprar_unidad_click).grid(row=3, column=3, padx=3)
 
-    def cambiar_faccion_click():
-        seleccion_bloqueada.set(False)
-        faccion_confirmada.set("")
-        if faccion_temporal.get():
-            texto_faccion.config(text=f"Facción {faccion_temporal.get()}")
-        else:
-            texto_faccion.config(text="Facción sin elegir")
->>>>>>> origin/feature/interfaz
+    panel_combate = tk.Frame(window2)
+    panel_combate.place(relx=0.20, rely=0.82, anchor="n")
 
-    def iniciar_combate_click():
-        if not faccion_confirmada.get():
-            texto_faccion.config(text="Elige una facción antes")
-            return
-        GoMapaR()
+    def enviar_accion_simple(funcion_cliente):
+        """
+        Descripcion:
+            Ejecuta una accion simple del cliente y muestra el
+            resultado del envio en la lista de eventos.
 
-    boton_cambiar_faccion = tk.Button(
-        window2,
-        text="Cambiar facción",
-        font=("Arial", 12, "bold"),
-        width=16,
-        bg="#ffd36b",
-        command=cambiar_faccion_click
-    )
-    boton_cambiar_faccion.place(x=85, y=575)
-
-    boton_elegir_faccion = tk.Button(
-        window2,
-        text="Elegir facción",
-        font=("Arial", 12, "bold"),
-        width=16,
-        bg="lightgreen",
-        command=elegir_faccion_click
-    )
-    boton_elegir_faccion.place(x=85, y=635)
-
-    boton_iniciar_combate = tk.Button(
-        window2,
-        text="Iniciar combate",
-        font=("Arial", 13, "bold"),
-        width=18,
-        height=2,
-        bg="orange",
-        command=iniciar_combate_click
-    )
-    boton_iniciar_combate.place(x=875, y=610)
-
-<<<<<<< HEAD
         Entradas:
             funcion_cliente (function): Metodo sin parametros del
                 cliente de red.
@@ -509,6 +870,3 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
 
     window2.after(300, procesar_mensajes_red)
     window2.protocol("WM_DELETE_WINDOW", cerrar_ventana)
-=======
-    window2.protocol("WM_DELETE_WINDOW", cerrar_todo)
->>>>>>> origin/feature/interfaz
