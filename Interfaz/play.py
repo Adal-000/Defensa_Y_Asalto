@@ -2,294 +2,473 @@
 # Archivo para jugar
 #=======================================#
 
+import os
+import queue
+import sys
 import tkinter as tk
 from tkinter import messagebox
 
+RUTA_PROYECTO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+RUTA_LOGICA = os.path.join(RUTA_PROYECTO, "Logica")
+RUTA_RED = os.path.join(RUTA_PROYECTO, "Red")
+
+for ruta in (RUTA_LOGICA, RUTA_RED):
+    if ruta not in sys.path:
+        sys.path.append(ruta)
+
 import app
+from cliente import ClientePartida, PUERTO_PREDETERMINADO
 
 
-TIPOS_TORRE = ["arquera", "cañon", "hielo", "soporte"]
-TIPOS_UNIDAD = ["soldado", "escudero", "explorador", "demoledor"]
+TIPOS_TORRE = [torre["clave"] for torre in app.obtener_catalogo_torres()]
+TIPOS_UNIDAD = [unidad["clave"] for unidad in app.obtener_catalogo_unidades()]
+CANTIDAD_FILAS_TABLERO = 11
+CANTIDAD_COLUMNAS_TABLERO = 6
+
+
+class AdaptadorClienteTkinter:
+    """
+    Descripcion:
+        Encapsula el ClientePartida de red para que la ventana de
+        Tkinter pueda enviar acciones al servidor sin mezclar la
+        logica de combate con la interfaz grafica.
+
+    Entradas:
+        cola_mensajes (queue.Queue): Cola donde se guardan los
+            mensajes recibidos desde el hilo del cliente.
+
+    Salidas:
+        No retorna nada. Crea un adaptador listo para conectar.
+
+    Restricciones:
+        - La cola debe existir antes de crear el adaptador.
+        - Los widgets de Tkinter no deben modificarse directamente
+          desde el hilo de red.
+    """
+
+    def __init__(self, cola_mensajes):
+        self.cola_mensajes = cola_mensajes
+        self.cliente = ClientePartida(callback_mensaje=self._recibir_mensaje)
+
+    def _recibir_mensaje(self, mensaje):
+        """
+        Descripcion:
+            Guarda en una cola segura los mensajes recibidos del
+            servidor para que Tkinter los procese con after().
+
+        Entradas:
+            mensaje (dict): Mensaje recibido desde el servidor.
+
+        Salidas:
+            None: Agrega el mensaje a la cola.
+
+        Restricciones:
+            - No debe modificar widgets directamente.
+        """
+        self.cola_mensajes.put(mensaje)
+
+    def conectar(self, host, usuario, rol, puerto):
+        """
+        Descripcion:
+            Conecta el cliente de red con el servidor de partida.
+
+        Entradas:
+            host (str): IP o nombre del servidor.
+            usuario (str): Nombre del jugador.
+            rol (str): Rol solicitado, defensor o atacante.
+            puerto (int): Puerto TCP del servidor.
+
+        Salidas:
+            tuple[bool, str]: Resultado de la conexion y mensaje.
+
+        Restricciones:
+            - host y usuario no deben estar vacios.
+            - rol debe ser compatible con el servidor.
+        """
+        return self.cliente.conectar(host, usuario, puerto=puerto, rol=rol)
+
+    def cerrar(self):
+        """
+        Descripcion:
+            Cierra la conexion con el servidor si existe.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            None: Cierra el socket del cliente.
+
+        Restricciones:
+            Ninguna.
+        """
+        self.cliente.cerrar()
 
 
 def play(root, GoMain, cerrar_todo, configurar_ventana, obtener_usuario_actual):
     """
-    Descripción:
-        Crea la ventana de juego. Permite crear una partida contra
-        otro jugador, comprar torres y unidades, ejecutar turnos de
-        combate y ver el estado actual de la partida en tiempo real.
+    Descripcion:
+        Crea la ventana de juego conectada al modo cliente-servidor.
+        La interfaz solo muestra el estado recibido, dibuja un tablero
+        simple y envia acciones al servidor mediante ClientePartida.
 
     Entradas:
-        root: ventana raíz oculta.
-        GoMain: función para volver al menú principal.
-        cerrar_todo: función para cerrar completamente el programa.
-        configurar_ventana: función que centra y configura la ventana.
-        obtener_usuario_actual: función que devuelve el nombre del
-            jugador que inició sesión (jugará como defensor).
+        root: ventana raiz oculta.
+        GoMain: funcion para volver al menu principal.
+        cerrar_todo: funcion para cerrar completamente el programa.
+        configurar_ventana: funcion que centra y configura la ventana.
+        obtener_usuario_actual: funcion que devuelve el nombre del
+            jugador que inicio sesion.
 
     Salidas:
-        No retorna ningún valor.
+        No retorna ningun valor.
 
     Restricciones:
-        El botón Volver destruye esta ventana y abre nuevamente el menú principal.
-        Debe haber un usuario con sesión iniciada para crear una partida.
+        - Debe existir un servidor ejecutandose para jugar en red.
+        - La logica de dinero, combate y victoria vive en el servidor.
     """
 
     window2 = tk.Toplevel(root)
-    configurar_ventana(window2, "Play")
+    configurar_ventana(window2, "Play en red")
+
+    cola_mensajes = queue.Queue()
+    adaptador = AdaptadorClienteTkinter(cola_mensajes)
+    estado_actual = {"datos": None, "mensaje_final_mostrado": False}
 
     def GoMainR():
+        adaptador.cerrar()
         window2.destroy()
         GoMain()
 
     boton_volver = tk.Button(
-        window2,
-        text="Volver",
-        font=("Arial", 12, "bold"),
-        width=10,
-        height=2,
-        bg="red",
-        command=GoMainR
+        window2, text="Volver", font=("Arial", 12, "bold"), width=10,
+        height=2, bg="red", command=GoMainR
     )
     boton_volver.place(x=20, y=20)
 
-    titulo = tk.Label(
-        window2,
-        text="Play",
-        font=("Arial", 28, "bold")
-    )
-    titulo.place(relx=0.5, rely=0.07, anchor="center")
+    titulo = tk.Label(window2, text="Play en red", font=("Arial", 28, "bold"))
+    titulo.place(relx=0.5, rely=0.06, anchor="center")
 
-    # --- Panel de creación de partida -----------------------------------
+    panel_conexion = tk.Frame(window2)
+    panel_conexion.place(relx=0.5, rely=0.15, anchor="center")
 
-    panel_creacion = tk.Frame(window2)
-    panel_creacion.place(relx=0.5, rely=0.16, anchor="center")
+    tk.Label(panel_conexion, text="IP servidor:", font=("Arial", 11)).grid(row=0, column=0, padx=4)
+    campo_ip = tk.Entry(panel_conexion, font=("Arial", 11), width=15)
+    campo_ip.insert(0, "127.0.0.1")
+    campo_ip.grid(row=0, column=1, padx=4)
 
-    etiqueta_rival = tk.Label(panel_creacion, text="Usuario rival (atacante):",
-                               font=("Arial", 12))
-    etiqueta_rival.grid(row=0, column=0, padx=8)
+    tk.Label(panel_conexion, text="Usuario:", font=("Arial", 11)).grid(row=0, column=2, padx=4)
+    campo_usuario = tk.Entry(panel_conexion, font=("Arial", 11), width=14)
+    campo_usuario.insert(0, obtener_usuario_actual() or "")
+    campo_usuario.grid(row=0, column=3, padx=4)
 
-    campo_rival = tk.Entry(panel_creacion, font=("Arial", 12), width=18)
-    campo_rival.grid(row=0, column=1, padx=8)
+    tk.Label(panel_conexion, text="Rol:", font=("Arial", 11)).grid(row=0, column=4, padx=4)
+    variable_rol = tk.StringVar(value="defensor")
+    tk.OptionMenu(panel_conexion, variable_rol, "defensor", "atacante").grid(row=0, column=5, padx=4)
 
-    # --- Panel de estado de la partida -----------------------------------
+    tk.Label(panel_conexion, text="Puerto:", font=("Arial", 11)).grid(row=0, column=6, padx=4)
+    campo_puerto = tk.Entry(panel_conexion, font=("Arial", 11), width=7)
+    campo_puerto.insert(0, str(PUERTO_PREDETERMINADO))
+    campo_puerto.grid(row=0, column=7, padx=4)
 
-    texto_estado = tk.Label(
-        window2,
-        text="Crea una partida para comenzar.",
-        font=("Arial", 13),
-        justify="left"
-    )
-    texto_estado.place(relx=0.27, rely=0.30, anchor="n")
+    etiqueta_conexion = tk.Label(window2, text="Sin conexion.", font=("Arial", 12, "bold"), fg="red")
+    etiqueta_conexion.place(relx=0.5, rely=0.21, anchor="center")
 
-    caja_eventos = tk.Listbox(window2, font=("Consolas", 10), width=55, height=14)
-    caja_eventos.place(relx=0.73, rely=0.30, anchor="n")
+    texto_estado = tk.Label(window2, text="Conectate a un servidor para comenzar.", font=("Arial", 12), justify="left")
+    texto_estado.place(relx=0.20, rely=0.29, anchor="n")
 
-    def refrescar_estado():
+    marco_tablero = tk.Frame(window2, bd=2, relief="solid")
+    marco_tablero.place(relx=0.50, rely=0.29, anchor="n")
+    celdas_tablero = []
+    for fila in range(CANTIDAD_FILAS_TABLERO):
+        fila_celdas = []
+        for columna in range(CANTIDAD_COLUMNAS_TABLERO):
+            celda = tk.Label(marco_tablero, text="", width=4, height=2, relief="ridge", bg="white")
+            celda.grid(row=fila, column=columna)
+            fila_celdas.append(celda)
+        celdas_tablero.append(fila_celdas)
+
+    caja_eventos = tk.Listbox(window2, font=("Consolas", 9), width=48, height=17)
+    caja_eventos.place(relx=0.79, rely=0.29, anchor="n")
+
+    def agregar_evento(texto):
         """
-        Descripción:
-            Consulta el estado actual de la partida y actualiza la
-            etiqueta de estado en pantalla.
+        Descripcion:
+            Agrega un mensaje al cuadro de eventos de la interfaz.
+
+        Entradas:
+            texto (str): Mensaje que se desea mostrar.
+
+        Salidas:
+            None: Modifica el Listbox de eventos.
+
+        Restricciones:
+            - Debe llamarse desde el hilo principal de Tkinter.
         """
-        estado = app.obtener_estado_partida()
+        if texto:
+            caja_eventos.insert(tk.END, texto)
+            caja_eventos.yview(tk.END)
+
+    def dibujar_tablero(estado):
+        """
+        Descripcion:
+            Dibuja una vista simple del tablero usando el estado
+            oficial recibido desde el servidor.
+
+        Entradas:
+            estado (dict): Estado de partida devuelto por el servidor.
+
+        Salidas:
+            None: Actualiza colores y textos de las celdas.
+
+        Restricciones:
+            - El estado debe contener listas de torres, muros y
+              unidades con fila y columna.
+        """
+        for fila in range(CANTIDAD_FILAS_TABLERO):
+            for columna in range(CANTIDAD_COLUMNAS_TABLERO):
+                texto = "B" if fila == 0 else ""
+                color = "lightgreen" if fila == 0 else "white"
+                celdas_tablero[fila][columna].config(text=texto, bg=color)
+
+        for torre in estado.get("torres", []):
+            celdas_tablero[torre["fila"]][torre["columna"]].config(text="T", bg="lightblue")
+        for muro in estado.get("muros", []):
+            celdas_tablero[muro["fila"]][muro["columna"]].config(text="M", bg="gray80")
+        for unidad in estado.get("unidades", []):
+            celdas_tablero[unidad["fila"]][unidad["columna"]].config(text="U", bg="salmon")
+
+    def refrescar_estado(estado):
+        """
+        Descripcion:
+            Actualiza etiquetas y tablero con el estado oficial de la
+            partida recibido por red.
+
+        Entradas:
+            estado (dict): Estado actual de la partida.
+
+        Salidas:
+            None: Modifica widgets de la ventana.
+
+        Restricciones:
+            - Debe llamarse desde Tkinter usando after() o eventos de
+              la ventana.
+        """
+        estado_actual["datos"] = estado
 
         if not estado:
-            texto_estado.config(text="No hay una partida activa.")
+            texto_estado.config(text="Esperando al segundo jugador o al estado del servidor.")
             return
 
         texto_estado.config(text=(
             f"Ronda: {estado['numero_ronda']}\n"
-            f"Defensor: {estado['nombre_defensor']} "
-            f"(dinero: {estado['dinero_defensor']})\n"
-            f"Atacante: {estado['nombre_atacante']} "
-            f"(dinero: {estado['dinero_atacante']})\n"
-            f"Marcador: {estado['rondas_ganadas_defensor']} - "
-            f"{estado['rondas_ganadas_atacante']}\n"
-            f"Vida de la base: {estado['vida_base']}/{estado['vida_maxima_base']}\n"
-            f"Torres en juego: {len(estado['torres'])}\n"
-            f"Unidades en juego: {len(estado['unidades'])}\n"
-            f"Partida finalizada: {'Sí' if estado['partida_finalizada'] else 'No'}"
+            f"Defensor: {estado['nombre_defensor']} (dinero: {estado['dinero_defensor']})\n"
+            f"Atacante: {estado['nombre_atacante']} (dinero: {estado['dinero_atacante']})\n"
+            f"Marcador: {estado['rondas_ganadas_defensor']} - {estado['rondas_ganadas_atacante']}\n"
+            f"Base: {estado['vida_base']}/{estado['vida_maxima_base']}\n"
+            f"Torres: {len(estado['torres'])} | Muros: {len(estado.get('muros', []))}\n"
+            f"Unidades: {len(estado['unidades'])}\n"
+            f"Finalizada: {'Si' if estado['partida_finalizada'] else 'No'}"
         ))
+        dibujar_tablero(estado)
 
-        if estado["partida_finalizada"]:
+        if estado.get("partida_finalizada") and not estado_actual["mensaje_final_mostrado"]:
+            estado_actual["mensaje_final_mostrado"] = True
             messagebox.showinfo(
                 "Partida finalizada",
-                f"{estado['ganador_partida']} ganó la partida "
-                f"como {estado['rol_ganador_partida']}."
+                f"{estado['ganador_partida']} gano la partida como {estado['rol_ganador_partida']}.",
             )
 
-    def agregar_eventos_a_la_lista(lista_eventos):
+    def procesar_mensajes_red():
         """
-        Descripción:
-            Agrega una lista de mensajes de eventos al final del
-            cuadro de eventos visible en pantalla.
+        Descripcion:
+            Procesa mensajes pendientes recibidos del servidor y
+            actualiza la interfaz desde el hilo principal de Tkinter.
 
         Entradas:
-            lista_eventos: lista de cadenas de texto con los eventos
-                ocurridos durante el último turno de combate.
-        """
-        for evento in lista_eventos:
-            caja_eventos.insert(tk.END, evento)
-        caja_eventos.yview(tk.END)
+            Ninguna.
 
-    def crear_partida_click():
-        """
-        Descripción:
-            Crea una nueva partida usando al usuario con sesión
-            iniciada como defensor y al usuario escrito en el campo
-            de texto como atacante.
-        """
-        nombre_defensor = obtener_usuario_actual()
-        nombre_atacante = campo_rival.get().strip()
+        Salidas:
+            None: Consume la cola de mensajes de red.
 
-        if not nombre_defensor:
-            messagebox.showwarning("Sesión requerida",
-                                    "Debes iniciar sesión para jugar.")
+        Restricciones:
+            - Debe programarse periodicamente con after().
+        """
+        while not cola_mensajes.empty():
+            mensaje = cola_mensajes.get()
+            texto_mensaje = mensaje.get("mensaje", "")
+            if texto_mensaje:
+                agregar_evento(texto_mensaje)
+
+            datos = mensaje.get("datos", {})
+            if isinstance(datos, dict):
+                resultado = datos.get("resultado_combate")
+                if isinstance(resultado, dict):
+                    for evento in resultado.get("eventos", []):
+                        agregar_evento(evento)
+
+            if mensaje.get("estado") is not None:
+                refrescar_estado(mensaje["estado"])
+
+        if window2.winfo_exists():
+            window2.after(300, procesar_mensajes_red)
+
+    def conectar_click():
+        """
+        Descripcion:
+            Lee IP, usuario, rol y puerto desde la interfaz y conecta
+            el cliente con el servidor.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            None: Actualiza mensajes visibles y estado de conexion.
+
+        Restricciones:
+            - El puerto debe ser un entero.
+        """
+        host = campo_ip.get().strip()
+        usuario = campo_usuario.get().strip()
+        rol = variable_rol.get().strip()
+        try:
+            puerto = int(campo_puerto.get())
+        except ValueError:
+            messagebox.showwarning("Puerto invalido", "El puerto debe ser un numero entero.")
             return
 
-        if not nombre_atacante:
-            messagebox.showwarning("Falta el rival",
-                                    "Escribe el nombre de usuario del atacante.")
-            return
+        exito, mensaje = adaptador.conectar(host, usuario, rol, puerto)
+        etiqueta_conexion.config(text=mensaje, fg="green" if exito else "red")
+        agregar_evento(mensaje)
+        if exito:
+            adaptador.cliente.obtener_estado()
 
-        if nombre_defensor == nombre_atacante:
-            messagebox.showwarning("Usuarios iguales",
-                                    "El defensor y el atacante deben ser distintos.")
-            return
-
-        app.crear_partida(nombre_defensor, nombre_atacante)
-        caja_eventos.delete(0, tk.END)
-        caja_eventos.insert(tk.END, f"Partida creada: {nombre_defensor} (defensor) "
-                                     f"vs {nombre_atacante} (atacante).")
-        refrescar_estado()
-
-    boton_crear_partida = tk.Button(
-        panel_creacion,
-        text="Crear partida",
-        font=("Arial", 12, "bold"),
-        bg="lightgreen",
-        command=crear_partida_click
-    )
-    boton_crear_partida.grid(row=0, column=2, padx=8)
-
-    # --- Panel de compras --------------------------------------------------
+    boton_conectar = tk.Button(panel_conexion, text="Conectar", font=("Arial", 11, "bold"), bg="lightgreen", command=conectar_click)
+    boton_conectar.grid(row=0, column=8, padx=8)
 
     panel_compras = tk.Frame(window2)
-    panel_compras.place(relx=0.27, rely=0.62, anchor="n")
-
-    etiqueta_torre = tk.Label(panel_compras, text="Comprar torre:", font=("Arial", 12, "bold"))
-    etiqueta_torre.grid(row=0, column=0, columnspan=3, pady=(0, 6))
+    panel_compras.place(relx=0.50, rely=0.82, anchor="n")
 
     variable_tipo_torre = tk.StringVar(value=TIPOS_TORRE[0])
-    menu_torre = tk.OptionMenu(panel_compras, variable_tipo_torre, *TIPOS_TORRE)
-    menu_torre.grid(row=1, column=0, padx=4)
+    variable_tipo_unidad = tk.StringVar(value=TIPOS_UNIDAD[0])
 
-    campo_fila_torre = tk.Entry(panel_compras, width=5)
-    campo_fila_torre.insert(0, "3")
-    campo_fila_torre.grid(row=1, column=1, padx=4)
+    tk.Label(panel_compras, text="Defensa", font=("Arial", 11, "bold")).grid(row=0, column=0, columnspan=5)
+    tk.OptionMenu(panel_compras, variable_tipo_torre, *TIPOS_TORRE).grid(row=1, column=0, padx=3)
+    campo_fila_defensa = tk.Entry(panel_compras, width=5)
+    campo_fila_defensa.insert(0, "3")
+    campo_fila_defensa.grid(row=1, column=1, padx=3)
+    campo_columna_defensa = tk.Entry(panel_compras, width=5)
+    campo_columna_defensa.insert(0, "2")
+    campo_columna_defensa.grid(row=1, column=2, padx=3)
 
-    campo_columna_torre = tk.Entry(panel_compras, width=5)
-    campo_columna_torre.insert(0, "2")
-    campo_columna_torre.grid(row=1, column=2, padx=4)
-
-    def comprar_torre_click():
+    def obtener_posicion_defensa():
         """
-        Descripción:
-            Lee el tipo de torre y la posición elegida, e intenta
-            comprarla dentro de la partida activa.
+        Descripcion:
+            Lee la fila y columna de defensa desde los campos de texto.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            tuple[int, int]: Fila y columna ingresadas.
+            None: Si algun valor no es entero.
+
+        Restricciones:
+            - Los campos deben contener numeros enteros.
         """
         try:
-            fila = int(campo_fila_torre.get())
-            columna = int(campo_columna_torre.get())
+            return int(campo_fila_defensa.get()), int(campo_columna_defensa.get())
         except ValueError:
-            messagebox.showwarning("Posición inválida",
-                                    "Fila y columna deben ser números enteros.")
-            return
+            messagebox.showwarning("Posicion invalida", "Fila y columna deben ser numeros enteros.")
+            return None
 
-        exito, mensaje = app.comprar_torre(variable_tipo_torre.get(), fila, columna)
-        caja_eventos.insert(tk.END, mensaje)
-        caja_eventos.yview(tk.END)
-        refrescar_estado()
+    def comprar_torre_click():
+        posicion = obtener_posicion_defensa()
+        if posicion is not None:
+            exito, mensaje = adaptador.cliente.comprar_torre(variable_tipo_torre.get(), posicion[0], posicion[1])
+            agregar_evento(mensaje)
+            if not exito:
+                messagebox.showwarning("No se pudo enviar", mensaje)
 
-    boton_comprar_torre = tk.Button(
-        panel_compras,
-        text="Comprar torre",
-        bg="lightblue",
-        command=comprar_torre_click
-    )
-    boton_comprar_torre.grid(row=1, column=3, padx=8)
+    def comprar_muro_click():
+        posicion = obtener_posicion_defensa()
+        if posicion is not None:
+            exito, mensaje = adaptador.cliente.comprar_muro(posicion[0], posicion[1])
+            agregar_evento(mensaje)
+            if not exito:
+                messagebox.showwarning("No se pudo enviar", mensaje)
 
-    etiqueta_unidad = tk.Label(panel_compras, text="Comprar unidad:", font=("Arial", 12, "bold"))
-    etiqueta_unidad.grid(row=2, column=0, columnspan=3, pady=(14, 6))
+    tk.Button(panel_compras, text="Comprar torre", bg="lightblue", command=comprar_torre_click).grid(row=1, column=3, padx=3)
+    tk.Button(panel_compras, text="Comprar muro", bg="lightgray", command=comprar_muro_click).grid(row=1, column=4, padx=3)
 
-    variable_tipo_unidad = tk.StringVar(value=TIPOS_UNIDAD[0])
-    menu_unidad = tk.OptionMenu(panel_compras, variable_tipo_unidad, *TIPOS_UNIDAD)
-    menu_unidad.grid(row=3, column=0, padx=4)
-
+    tk.Label(panel_compras, text="Ataque", font=("Arial", 11, "bold")).grid(row=2, column=0, columnspan=5, pady=(10, 0))
+    tk.OptionMenu(panel_compras, variable_tipo_unidad, *TIPOS_UNIDAD).grid(row=3, column=0, padx=3)
     campo_fila_unidad = tk.Entry(panel_compras, width=5)
     campo_fila_unidad.insert(0, "10")
-    campo_fila_unidad.grid(row=3, column=1, padx=4)
-
+    campo_fila_unidad.grid(row=3, column=1, padx=3)
     campo_columna_unidad = tk.Entry(panel_compras, width=5)
     campo_columna_unidad.insert(0, "2")
-    campo_columna_unidad.grid(row=3, column=2, padx=4)
+    campo_columna_unidad.grid(row=3, column=2, padx=3)
 
     def comprar_unidad_click():
         """
-        Descripción:
-            Lee el tipo de unidad y la posición elegida, e intenta
-            comprarla dentro de la partida activa.
+        Descripcion:
+            Envia al servidor una solicitud para comprar unidad con la
+            posicion escrita en la interfaz.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            None: Envia la accion por red o muestra un error.
+
+        Restricciones:
+            - La fila y columna deben ser enteros.
         """
         try:
             fila = int(campo_fila_unidad.get())
             columna = int(campo_columna_unidad.get())
         except ValueError:
-            messagebox.showwarning("Posición inválida",
-                                    "Fila y columna deben ser números enteros.")
+            messagebox.showwarning("Posicion invalida", "Fila y columna deben ser numeros enteros.")
             return
+        exito, mensaje = adaptador.cliente.comprar_unidad(variable_tipo_unidad.get(), fila, columna)
+        agregar_evento(mensaje)
+        if not exito:
+            messagebox.showwarning("No se pudo enviar", mensaje)
 
-        exito, mensaje = app.comprar_unidad(variable_tipo_unidad.get(), fila, columna)
-        caja_eventos.insert(tk.END, mensaje)
-        caja_eventos.yview(tk.END)
-        refrescar_estado()
+    tk.Button(panel_compras, text="Comprar unidad", bg="salmon", command=comprar_unidad_click).grid(row=3, column=3, padx=3)
 
-    boton_comprar_unidad = tk.Button(
-        panel_compras,
-        text="Comprar unidad",
-        bg="lightblue",
-        command=comprar_unidad_click
-    )
-    boton_comprar_unidad.grid(row=3, column=3, padx=8)
+    panel_combate = tk.Frame(window2)
+    panel_combate.place(relx=0.20, rely=0.82, anchor="n")
 
-    # --- Botón de combate --------------------------------------------------
-
-    def ejecutar_combate_click():
+    def enviar_accion_simple(funcion_cliente):
         """
-        Descripción:
-            Ejecuta un turno de combate dentro de la partida activa
-            y muestra los eventos ocurridos en el cuadro de eventos.
+        Descripcion:
+            Ejecuta una accion simple del cliente y muestra el
+            resultado del envio en la lista de eventos.
+
+        Entradas:
+            funcion_cliente (function): Metodo sin parametros del
+                cliente de red.
+
+        Salidas:
+            None: Envia accion al servidor.
+
+        Restricciones:
+            - Debe haber conexion activa para que el envio sea exitoso.
         """
-        resultado = app.ejecutar_combate()
+        exito, mensaje = funcion_cliente()
+        agregar_evento(mensaje)
+        if not exito:
+            messagebox.showwarning("No se pudo enviar", mensaje)
 
-        if not resultado:
-            messagebox.showwarning("Sin partida", "Primero crea una partida.")
-            return
+    tk.Button(panel_combate, text="Iniciar combate", font=("Arial", 11, "bold"), bg="orange", command=lambda: enviar_accion_simple(adaptador.cliente.iniciar_combate)).grid(row=0, column=0, padx=4, pady=3)
+    tk.Button(panel_combate, text="Pausar", font=("Arial", 11), command=lambda: enviar_accion_simple(adaptador.cliente.pausar_combate)).grid(row=0, column=1, padx=4, pady=3)
+    tk.Button(panel_combate, text="Actualizar", font=("Arial", 11), command=lambda: enviar_accion_simple(adaptador.cliente.obtener_estado)).grid(row=1, column=0, padx=4, pady=3)
+    tk.Button(panel_combate, text="Turno manual", font=("Arial", 11), command=lambda: enviar_accion_simple(adaptador.cliente.ejecutar_combate)).grid(row=1, column=1, padx=4, pady=3)
 
-        if resultado["eventos"]:
-            agregar_eventos_a_la_lista(resultado["eventos"])
-        else:
-            caja_eventos.insert(tk.END, "(Turno sin eventos de combate)")
-            caja_eventos.yview(tk.END)
+    def cerrar_ventana():
+        adaptador.cerrar()
+        cerrar_todo()
 
-        refrescar_estado()
-
-    boton_combate = tk.Button(
-        window2,
-        text="Ejecutar turno de combate",
-        font=("Arial", 13, "bold"),
-        bg="orange",
-        command=ejecutar_combate_click
-    )
-    boton_combate.place(relx=0.27, rely=0.92, anchor="center")
-
-    window2.protocol("WM_DELETE_WINDOW", cerrar_todo)
+    window2.after(300, procesar_mensajes_red)
+    window2.protocol("WM_DELETE_WINDOW", cerrar_ventana)
