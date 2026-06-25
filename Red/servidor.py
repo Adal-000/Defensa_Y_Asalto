@@ -62,6 +62,11 @@ FASE_PREPARACION = "preparacion"
 FASE_COMBATE = "combate"
 FASE_FINALIZADA = "finalizada"
 
+CODIGO_ACCION_NO_PERMITIDA = "accion_no_permitida_en_fase"
+CODIGO_PARTIDA_NO_CREADA = "partida_no_creada"
+CODIGO_ROL_INCORRECTO = "rol_incorrecto"
+CODIGO_SIN_UNIDADES_ATACANTES = "sin_unidades_atacantes"
+
 
 class ClienteConectado:
     """
@@ -338,6 +343,131 @@ class ServidorPartida:
                 total_conectados += 1
         return total_conectados
 
+    def _acciones_permitidas_para_cliente(self, cliente=None):
+        """
+        Descripcion:
+            Calcula que acciones puede enviar un cliente segun su rol y
+            la fase actual de la sala. Esto evita que la interfaz tenga
+            que decidir reglas de negocio como compras durante combate.
+
+        Entradas:
+            cliente (ClienteConectado): Cliente que consulta acciones.
+                Puede ser None para devolver acciones generales.
+
+        Salidas:
+            list[str]: Acciones permitidas para el cliente o la sala.
+
+        Restricciones:
+            - cliente.rol debe ser defensor o atacante cuando se pasa
+              un cliente especifico.
+        """
+        acciones_basicas = [ACCION_OBTENER_ESTADO, ACCION_SALIR]
+        fase_actual = self._obtener_fase_actual()
+
+        if fase_actual == FASE_ESPERANDO_JUGADORES:
+            return acciones_basicas
+
+        if fase_actual == FASE_FINALIZADA:
+            return acciones_basicas
+
+        if fase_actual == FASE_COMBATE:
+            return [ACCION_PAUSAR_COMBATE] + acciones_basicas
+
+        acciones_preparacion = [
+            ACCION_INICIAR_COMBATE,
+            ACCION_EJECUTAR_COMBATE,
+        ] + acciones_basicas
+
+        if cliente is None:
+            return [
+                ACCION_COMPRAR_TORRE,
+                ACCION_COMPRAR_MURO,
+                ACCION_COMPRAR_UNIDAD,
+            ] + acciones_preparacion
+
+        if cliente.rol == ROL_DEFENSOR:
+            return [ACCION_COMPRAR_TORRE, ACCION_COMPRAR_MURO] + acciones_preparacion
+
+        if cliente.rol == ROL_ATACANTE:
+            return [ACCION_COMPRAR_UNIDAD] + acciones_preparacion
+
+        return acciones_basicas
+
+    def _accion_esta_permitida(self, cliente, accion):
+        """
+        Descripcion:
+            Verifica si una accion se puede ejecutar para un cliente en
+            la fase actual.
+
+        Entradas:
+            cliente (ClienteConectado): Cliente que envio la accion.
+            accion (str): Accion solicitada.
+
+        Salidas:
+            bool: True si la accion esta permitida, False en caso
+            contrario.
+
+        Restricciones:
+            Ninguna.
+        """
+        return accion in self._acciones_permitidas_para_cliente(cliente)
+
+    def _puede_iniciar_combate(self):
+        """
+        Descripcion:
+            Verifica condiciones minimas para iniciar o avanzar combate:
+            debe existir una partida y al menos una unidad atacante.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            tuple[bool, str]: Indica si se puede iniciar el combate y
+            un mensaje descriptivo.
+
+        Restricciones:
+            - self.partida debe tener atributo unidades cuando existe.
+        """
+        if self.partida is None:
+            return False, "Aun falta que se conecte el segundo jugador."
+
+        if len(self.partida.unidades) == 0:
+            return False, "No se puede iniciar combate sin unidades atacantes."
+
+        return True, "Combate disponible."
+
+    def _enviar_error_a_cliente(self, cliente, mensaje, codigo_error,
+                                accion=None, tipo_respuesta=TIPO_RESULTADO):
+        """
+        Descripcion:
+            Envia una respuesta de error con codigo estandar y datos de
+            estado, para que la interfaz pueda mostrar mensajes claros.
+
+        Entradas:
+            cliente (ClienteConectado): Cliente que recibira el error.
+            mensaje (str): Texto explicativo.
+            codigo_error (str): Codigo estable del error.
+            accion (str): Accion que provoco el error.
+            tipo_respuesta (str): Tipo de respuesta del protocolo.
+
+        Salidas:
+            None: Envia el mensaje por red al cliente.
+
+        Restricciones:
+            Ninguna.
+        """
+        datos = self._crear_datos_estado(cliente, accion=accion)
+        datos["codigo_error"] = codigo_error
+        self._enviar_a_cliente(
+            cliente,
+            crear_respuesta(
+                tipo_respuesta,
+                False,
+                mensaje,
+                datos=datos,
+            ),
+        )
+
     def _crear_datos_estado(self, cliente=None, accion=None, resultado_combate=None):
         """
         Descripcion:
@@ -380,6 +510,8 @@ class ServidorPartida:
 
         if resultado_combate is not None:
             datos["resultado_combate"] = resultado_combate
+
+        datos["acciones_permitidas"] = self._acciones_permitidas_para_cliente(cliente)
 
         return datos
 
@@ -554,9 +686,11 @@ class ServidorPartida:
                 self._procesar_mensaje(cliente, mensaje)
 
             except ErrorProtocolo as error:
-                self._enviar_a_cliente(
+                self._enviar_error_a_cliente(
                     cliente,
-                    crear_respuesta(TIPO_ERROR, False, str(error)),
+                    str(error),
+                    CODIGO_ROL_INCORRECTO,
+                    tipo_respuesta=TIPO_ERROR,
                 )
             except OSError:
                 break
@@ -591,16 +725,33 @@ class ServidorPartida:
             return
 
         if self.partida is None:
-            self._enviar_a_cliente(
+            self._enviar_error_a_cliente(
                 cliente,
-                crear_respuesta(
-                    TIPO_RESULTADO,
-                    False,
-                    "Aun falta que se conecte el segundo jugador.",
-                    datos=self._crear_datos_estado(cliente, accion=accion),
-                ),
+                "Aun falta que se conecte el segundo jugador.",
+                CODIGO_PARTIDA_NO_CREADA,
+                accion=accion,
             )
             return
+
+        if not self._accion_esta_permitida(cliente, accion):
+            self._enviar_error_a_cliente(
+                cliente,
+                "La accion no esta permitida para este rol o fase de la partida.",
+                CODIGO_ACCION_NO_PERMITIDA,
+                accion=accion,
+            )
+            return
+
+        if accion in (ACCION_INICIAR_COMBATE, ACCION_EJECUTAR_COMBATE):
+            puede_iniciar, mensaje_validacion = self._puede_iniciar_combate()
+            if not puede_iniciar:
+                self._enviar_error_a_cliente(
+                    cliente,
+                    mensaje_validacion,
+                    CODIGO_SIN_UNIDADES_ATACANTES,
+                    accion=accion,
+                )
+                return
 
         with self.bloqueo:
             if accion == ACCION_COMPRAR_TORRE:

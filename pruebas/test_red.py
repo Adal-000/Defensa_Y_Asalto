@@ -21,6 +21,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", "Logica"))
 
 from protocolo import (
     ACCION_COMPRAR_TORRE,
+    ACCION_COMPRAR_UNIDAD,
+    ACCION_INICIAR_COMBATE,
     ACCION_UNIRSE,
     ErrorProtocolo,
     convertir_a_json_linea,
@@ -34,6 +36,8 @@ from servidor import (
     FASE_COMBATE,
     FASE_ESPERANDO_JUGADORES,
     FASE_PREPARACION,
+    CODIGO_ACCION_NO_PERMITIDA,
+    CODIGO_SIN_UNIDADES_ATACANTES,
     ServidorPartida,
 )
 import archivos
@@ -186,6 +190,76 @@ class PruebasClienteServidorRed(unittest.TestCase):
         self.assertIsNone(servidor.clientes_por_rol["defensor"])
         self.assertIsNone(servidor.partida)
         self.assertFalse(servidor.combate_activo)
+
+    def test_servidor_informa_acciones_permitidas_por_rol(self):
+        """Verifica que las acciones permitidas dependan del rol del cliente."""
+        servidor = ServidorPartida(validar_usuarios=False)
+        servidor.partida = type("PartidaFalsa", (), {
+            "partida_finalizada": False,
+            "unidades": [object()],
+        })()
+        defensor = type("ClienteFalso", (), {
+            "usuario": "ana",
+            "rol": "defensor",
+            "conectado": True,
+        })()
+        atacante = type("ClienteFalso", (), {
+            "usuario": "luis",
+            "rol": "atacante",
+            "conectado": True,
+        })()
+
+        acciones_defensor = servidor._crear_datos_estado(defensor)["acciones_permitidas"]
+        acciones_atacante = servidor._crear_datos_estado(atacante)["acciones_permitidas"]
+
+        self.assertIn(ACCION_COMPRAR_TORRE, acciones_defensor)
+        self.assertNotIn(ACCION_COMPRAR_UNIDAD, acciones_defensor)
+        self.assertIn(ACCION_COMPRAR_UNIDAD, acciones_atacante)
+        self.assertNotIn(ACCION_COMPRAR_TORRE, acciones_atacante)
+
+    def test_servidor_bloquea_accion_fuera_de_fase(self):
+        """Verifica que no se pueda comprar unidades durante combate activo."""
+        servidor = ServidorPartida(validar_usuarios=False)
+        servidor.partida = type("PartidaFalsa", (), {
+            "partida_finalizada": False,
+            "unidades": [object()],
+        })()
+        servidor.combate_activo = True
+        respuestas = []
+        servidor._enviar_a_cliente = lambda cliente, mensaje: respuestas.append(mensaje)
+        cliente = type("ClienteFalso", (), {
+            "usuario": "luis",
+            "rol": "atacante",
+            "conectado": True,
+        })()
+
+        servidor._procesar_mensaje(
+            cliente,
+            {"accion": ACCION_COMPRAR_UNIDAD, "tipo_unidad": "soldado", "fila": 10, "columna": 1},
+        )
+
+        self.assertFalse(respuestas[0]["exito"])
+        self.assertEqual(respuestas[0]["datos"]["codigo_error"], CODIGO_ACCION_NO_PERMITIDA)
+
+    def test_servidor_no_inicia_combate_sin_unidades(self):
+        """Verifica que el servidor rechace iniciar combate sin unidades."""
+        servidor = ServidorPartida(validar_usuarios=False)
+        servidor.partida = type("PartidaFalsa", (), {
+            "partida_finalizada": False,
+            "unidades": [],
+        })()
+        respuestas = []
+        servidor._enviar_a_cliente = lambda cliente, mensaje: respuestas.append(mensaje)
+        cliente = type("ClienteFalso", (), {
+            "usuario": "ana",
+            "rol": "defensor",
+            "conectado": True,
+        })()
+
+        servidor._procesar_mensaje(cliente, {"accion": ACCION_INICIAR_COMBATE})
+
+        self.assertFalse(respuestas[0]["exito"])
+        self.assertEqual(respuestas[0]["datos"]["codigo_error"], CODIGO_SIN_UNIDADES_ATACANTES)
 
 
 if __name__ == "__main__":

@@ -208,6 +208,8 @@ El servidor envia en `datos` campos estandar para facilitar la interfaz:
 - `jugadores_conectados`: cantidad de clientes activos.
 - `roles_ocupados`: roles actualmente conectados.
 - `rol_cliente` y `usuario_cliente`: aparecen en respuestas dirigidas a un cliente.
+- `acciones_permitidas`: lista de acciones que el cliente puede enviar segun su rol y fase.
+- `codigo_error`: aparece cuando una accion falla por fase, rol o condicion de partida.
 
 El servidor valida que los usuarios existan en `datos/jugadores.json`
 antes de aceptar una conexion de partida. Por eso, los jugadores deben
@@ -242,6 +244,8 @@ Actualmente las pruebas cubren:
 - Validacion de usuarios registrados antes de entrar al servidor.
 - Estado estandar de red con fase actual y combate activo.
 - Limpieza de sala cuando todos los clientes se desconectan.
+- Acciones permitidas por rol y fase de partida.
+- Codigos de error para acciones fuera de fase o combate sin unidades.
 
 ## Cómo ejecutar la demo de consola
 
