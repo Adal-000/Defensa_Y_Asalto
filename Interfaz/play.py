@@ -17,6 +17,7 @@ if RUTA_RED not in sys.path:
     sys.path.append(RUTA_RED)
 
 from cliente import ClientePartida, PUERTO_PREDETERMINADO
+from protocolo import ACCION_CAMBIAR_FACCION, ACCION_ELEGIR_FACCION, ACCION_LISTO_LOBBY
 from servidor import ServidorPartida
 
 
@@ -97,6 +98,8 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     }
 
     faccion_temporal = tk.StringVar(value="")
+    facciones_ocupadas = {}
+    listos_remotos = set()
     faccion_confirmada = tk.StringVar(value="")
     seleccion_bloqueada = tk.BooleanVar(value=False)
     listo_para_mapa = tk.BooleanVar(value=False)
@@ -123,6 +126,19 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         else:
             sala["listos"].discard(estado_red["rol"])
 
+    def enviar_accion_lobby(accion, **datos):
+        if adaptador.cliente.conectado:
+            adaptador.cliente.enviar_accion(accion, **datos)
+
+    def sincronizar_lobby_remoto(datos):
+        facciones_ocupadas.clear()
+        facciones_ocupadas.update(datos.get("facciones_lobby", {}))
+        listos_remotos.clear()
+        listos_remotos.update(datos.get("listos_lobby", []))
+        sala = obtener_datos_sala()
+        sala["facciones"] = facciones_ocupadas.copy()
+        sala["listos"] = set(listos_remotos)
+
     def hay_dos_jugadores():
         return estado_red["jugadores_conectados"] >= 2
 
@@ -136,6 +152,13 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         if not {"defensor", "atacante"}.issubset(facciones):
             return False
         return facciones["defensor"] != facciones["atacante"]
+
+    def faccion_esta_ocupada_por_otro(nombre_faccion):
+        sala = obtener_datos_sala()
+        for rol, faccion in sala["facciones"].items():
+            if rol != estado_red["rol"] and faccion == nombre_faccion:
+                return True
+        return False
 
     def GoMainR():
         adaptador.cerrar()
@@ -171,7 +194,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     titulo.place(relx=0.5, y=30, anchor="center")
 
     panel_superior = tk.Frame(window2, bg=COLOR_PANEL, relief="groove", bd=2, padx=12, pady=10)
-    panel_superior.place(relx=0.5, y=92, anchor="center")
+    panel_superior.place(relx=0.5, y=82, anchor="center")
 
     variable_modo_conexion = tk.StringVar(value="crear_servidor")
     tk.Label(panel_superior, text="Modo:", font=("Arial", 11, "bold"), bg=COLOR_PANEL).grid(row=0, column=0, padx=4)
@@ -184,8 +207,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     campo_ip.grid(row=1, column=1, padx=4)
 
     tk.Label(panel_superior, text="Usuario:", font=("Arial", 11), bg=COLOR_PANEL).grid(row=1, column=2, padx=4)
-    campo_usuario = tk.Entry(panel_superior, font=("Arial", 11), width=14)
-    campo_usuario.insert(0, obtener_usuario_actual() or "Invitado")
+    campo_usuario = tk.Label(panel_superior, text=obtener_usuario_actual() or "Invitado", font=("Arial", 11, "bold"), width=14, bg=COLOR_PANEL, relief="sunken", anchor="w")
     campo_usuario.grid(row=1, column=3, padx=4)
 
     tk.Label(panel_superior, text="Rol:", font=("Arial", 11), bg=COLOR_PANEL).grid(row=1, column=4, padx=4)
@@ -198,34 +220,58 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     campo_puerto.grid(row=1, column=7, padx=4)
 
     etiqueta_conexion = tk.Label(window2, text="Sin conexión.", font=("Arial", 12, "bold"), fg="red", bg=COLOR_FONDO)
-    etiqueta_conexion.place(relx=0.5, y=140, anchor="center")
+    etiqueta_conexion.place(relx=0.5, y=132, anchor="center")
 
     panel_facciones = tk.Frame(window2, bg=COLOR_FONDO)
-    panel_facciones.place(relx=0.5, y=215, anchor="n")
+    panel_facciones.place(relx=0.5, y=188, anchor="n")
     botones_faccion = {}
 
     texto_faccion = tk.Label(window2, text="Elige una facción", font=("Arial", 12, "bold"), width=34, height=2, relief="solid", bd=2, bg=COLOR_FONDO)
-    texto_faccion.place(relx=0.5, y=420, anchor="center")
+    texto_faccion.place(relx=0.5, y=158, anchor="center")
 
     texto_espera = tk.Label(window2, text="", font=("Arial", 11, "bold"), fg=COLOR_ALERTA, bg=COLOR_FONDO, width=24)
-    texto_espera.place(x=910, y=485)
+    texto_espera.place(x=900, y=575)
 
-    caja_eventos = tk.Listbox(window2, font=("Consolas", 9), width=60, height=4)
-    caja_eventos.place(relx=0.5, y=505, anchor="center")
+    caja_info_facciones = tk.Listbox(window2, font=("Consolas", 9), width=42, height=5)
+    caja_info_facciones.place(x=250, y=535)
+
+    caja_eventos = tk.Listbox(window2, font=("Consolas", 9), width=48, height=5)
+    caja_eventos.place(x=595, y=535)
 
     def agregar_evento(texto):
         if texto:
             caja_eventos.insert(tk.END, texto)
             caja_eventos.yview(tk.END)
 
+    def actualizar_info_facciones(texto=None):
+        caja_info_facciones.delete(0, tk.END)
+        if texto:
+            caja_info_facciones.insert(tk.END, texto)
+        if faccion_confirmada.get():
+            caja_info_facciones.insert(tk.END, f"Tu facción: {faccion_confirmada.get()}")
+        elif faccion_temporal.get():
+            caja_info_facciones.insert(tk.END, f"Seleccionada: {faccion_temporal.get()}")
+        else:
+            caja_info_facciones.insert(tk.END, "Debe elegir una facción.")
+        for rol, faccion in obtener_datos_sala()["facciones"].items():
+            caja_info_facciones.insert(tk.END, f"{rol}: {faccion}")
+
     def refrescar_botones():
         for nombre_faccion, boton in botones_faccion.items():
-            color = COLOR_SELECCION if nombre_faccion == faccion_temporal.get() else COLOR_FONDO
+            ocupada = faccion_esta_ocupada_por_otro(nombre_faccion)
+            color = "#ffc7c7" if ocupada else COLOR_FONDO
+            if nombre_faccion == faccion_temporal.get():
+                color = COLOR_SELECCION
             boton.config(relief="sunken" if nombre_faccion == faccion_temporal.get() else "raised", bg=color)
+        actualizar_info_facciones()
 
     def seleccionar_faccion(nombre_faccion):
         if not hay_dos_jugadores():
             texto_faccion.config(text="Esperando al contrincante", fg=COLOR_ALERTA)
+            return
+        if faccion_esta_ocupada_por_otro(nombre_faccion):
+            texto_faccion.config(text="Facción ya elegida", fg=COLOR_ALERTA)
+            actualizar_info_facciones("Facción ya elegida por el otro jugador.")
             return
         if seleccion_bloqueada.get():
             cambiar_faccion_click()
@@ -256,13 +302,14 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         sala = obtener_datos_sala()
         for rol, faccion in sala["facciones"].items():
             if rol != estado_red["rol"] and faccion == faccion_temporal.get():
-                texto_faccion.config(text="Facción elegida para el segundo jugador", fg=COLOR_ALERTA)
+                texto_faccion.config(text="Facción ya elegida", fg=COLOR_ALERTA)
                 agregar_evento("Facción ya elegida por el contrincante.")
                 return
         faccion_confirmada.set(faccion_temporal.get())
         seleccion_bloqueada.set(True)
         listo_para_mapa.set(False)
         registrar_estado_local(False)
+        enviar_accion_lobby(ACCION_ELEGIR_FACCION, faccion=faccion_confirmada.get())
         texto_faccion.config(text="Facción elegida", fg=COLOR_LISTO)
         refrescar_botones()
 
@@ -271,6 +318,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         listo_para_mapa.set(False)
         faccion_confirmada.set("")
         registrar_estado_local(False)
+        enviar_accion_lobby(ACCION_CAMBIAR_FACCION)
         texto_espera.config(text="")
         texto_faccion.config(text="Elige una facción" if not faccion_temporal.get() else f"Facción {faccion_temporal.get()}", fg="black")
 
@@ -282,7 +330,9 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             texto_faccion.config(text="Elige una facción", fg=COLOR_ALERTA)
             return
         listo_para_mapa.set(True)
+        estado_red["en_espera"] = True
         registrar_estado_local(True)
+        enviar_accion_lobby(ACCION_LISTO_LOBBY)
         if facciones_validas_en_sala() and roles_necesarios_listos():
             GoMapaR()
             return
@@ -332,7 +382,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
 
     def conectar_click():
         host = campo_ip.get().strip()
-        usuario = campo_usuario.get().strip()
+        usuario = estado_red["usuario"]
         rol = variable_rol.get().strip()
         try:
             puerto = int(campo_puerto.get())
@@ -353,14 +403,14 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     boton_conectar = tk.Button(panel_superior, text="Continuar", font=("Arial", 11, "bold"), bg="lightgreen", command=conectar_click)
     boton_conectar.grid(row=1, column=8, padx=8)
 
-    boton_elegir_faccion = tk.Button(window2, text="Elegir facción", font=("Arial", 12, "bold"), width=16, bg="lightgreen", command=elegir_faccion_click)
-    boton_elegir_faccion.place(x=55, y=480)
-
     boton_cambiar_faccion = tk.Button(window2, text="Cambiar facción", font=("Arial", 12, "bold"), width=16, bg="#ffd36b", command=cambiar_faccion_click)
-    boton_cambiar_faccion.place(x=230, y=480)
+    boton_cambiar_faccion.place(x=55, y=535)
+
+    boton_elegir_faccion = tk.Button(window2, text="Elegir facción", font=("Arial", 12, "bold"), width=16, bg="lightgreen", command=elegir_faccion_click)
+    boton_elegir_faccion.place(x=55, y=585)
 
     boton_iniciar_combate = tk.Button(window2, text="Jugar", font=("Arial", 13, "bold"), width=18, height=2, bg="orange", command=iniciar_combate_click)
-    boton_iniciar_combate.place(x=905, y=470)
+    boton_iniciar_combate.place(x=1030, y=545)
 
     def procesar_mensajes_red():
         while not cola_mensajes.empty():
@@ -372,6 +422,8 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             if isinstance(datos, dict):
                 estado_red["jugadores_conectados"] = int(datos.get("jugadores_conectados", estado_red["jugadores_conectados"]))
                 estado_red["rol"] = datos.get("rol_cliente", datos.get("rol", estado_red["rol"]))
+                sincronizar_lobby_remoto(datos)
+                refrescar_botones()
                 if hay_dos_jugadores():
                     etiqueta_conexion.config(text="Sala completa: 2 jugadores conectados.", fg="green")
                 elif estado_red["conectado"]:

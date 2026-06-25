@@ -34,6 +34,9 @@ from protocolo import (
     ACCION_EJECUTAR_COMBATE,
     ACCION_INICIAR_COMBATE,
     ACCION_OBTENER_ESTADO,
+    ACCION_ELEGIR_FACCION,
+    ACCION_CAMBIAR_FACCION,
+    ACCION_LISTO_LOBBY,
     ACCION_PAUSAR_COMBATE,
     ACCION_SALIR,
     ACCION_UNIRSE,
@@ -165,6 +168,8 @@ class ServidorPartida:
         }
         self.validar_usuarios = validar_usuarios
         self.ruta_jugadores = ruta_jugadores
+        self.facciones_lobby = {}
+        self.listos_lobby = set()
         self.bloqueo = threading.Lock()
 
     def iniciar(self):
@@ -497,6 +502,8 @@ class ServidorPartida:
                 rol for rol, cliente_conectado in self.clientes_por_rol.items()
                 if cliente_conectado is not None and cliente_conectado.conectado
             ],
+            "facciones_lobby": self.facciones_lobby.copy(),
+            "listos_lobby": list(self.listos_lobby),
         }
 
         if cliente is not None:
@@ -722,6 +729,44 @@ class ServidorPartida:
 
         if accion == ACCION_OBTENER_ESTADO:
             self._enviar_estado_a_cliente(cliente, "Estado actual enviado.")
+            return
+
+        if accion == ACCION_ELEGIR_FACCION:
+            faccion = obtener_texto(mensaje, "faccion")
+            with self.bloqueo:
+                for rol, faccion_ocupada in self.facciones_lobby.items():
+                    if rol != cliente.rol and faccion_ocupada == faccion:
+                        self._enviar_error_a_cliente(
+                            cliente,
+                            "Facción ya elegida por el contrincante.",
+                            "faccion_ya_elegida",
+                            accion=accion,
+                        )
+                        return
+                self.facciones_lobby[cliente.rol] = faccion
+                self.listos_lobby.discard(cliente.rol)
+            self._enviar_estado_a_todos("Facción elegida.")
+            return
+
+        if accion == ACCION_CAMBIAR_FACCION:
+            with self.bloqueo:
+                self.facciones_lobby.pop(cliente.rol, None)
+                self.listos_lobby.discard(cliente.rol)
+            self._enviar_estado_a_todos("Jugador cambió facción.")
+            return
+
+        if accion == ACCION_LISTO_LOBBY:
+            if cliente.rol not in self.facciones_lobby:
+                self._enviar_error_a_cliente(
+                    cliente,
+                    "Debe elegir una facción antes de jugar.",
+                    "faccion_no_elegida",
+                    accion=accion,
+                )
+                return
+            with self.bloqueo:
+                self.listos_lobby.add(cliente.rol)
+            self._enviar_estado_a_todos("Jugador listo. Esperando jugador.")
             return
 
         if self.partida is None:
@@ -1017,6 +1062,8 @@ class ServidorPartida:
         with self.bloqueo:
             if self.clientes_por_rol.get(cliente.rol) is cliente:
                 self.clientes_por_rol[cliente.rol] = None
+            self.facciones_lobby.pop(cliente.rol, None)
+            self.listos_lobby.discard(cliente.rol)
             self.combate_activo = False
             if self._contar_jugadores_conectados() == 0:
                 self.partida = None
