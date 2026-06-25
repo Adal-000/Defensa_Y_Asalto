@@ -57,7 +57,7 @@ root = tk.Tk()
 root.withdraw()
 
 # Guarda el nombre de usuario que inició sesión, para que las demás
-# ventanas (Perfil, Play, Puntajes) sepan quién está jugando.
+# ventanas (Perfil, Play, Puntajes) sepan quién está jugando. NO funka
 estado_sesion = {"usuario_actual": None}
 
 
