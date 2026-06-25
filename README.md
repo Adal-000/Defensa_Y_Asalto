@@ -184,10 +184,13 @@ actualizado a ambos clientes.
 
 ### Conexion con Tkinter
 
-La pantalla `Interfaz/play.py` ya trabaja como cliente de red. La
-interfaz no llama directamente a `Partida` cuando se juega en dos
-computadoras; usa `ClientePartida` para enviar acciones y recibir el
-estado oficial calculado por el servidor. Los metodos principales son:
+La pantalla `Interfaz/play.py` ya trabaja como cliente de red. Al entrar
+a Play, el jugador puede elegir entre `Crear servidor` para hospedar la
+partida desde su computadora o `Unirse a partida` para conectarse a la
+IP de otro servidor. La interfaz no llama directamente a `Partida` cuando
+se juega en dos computadoras; usa `ClientePartida` para enviar acciones
+y recibir el estado oficial calculado por el servidor. Los metodos
+principales son:
 
 ```python
 cliente.conectar(ip_servidor, usuario, rol="defensor")
@@ -257,8 +260,9 @@ python demo_consola.py
 
 ## Nota para la interfaz gráfica
 
-`play.py` ya permite conectarse a un servidor, comprar torres, comprar
-muros, comprar unidades, iniciar/pausar combate y actualizar el tablero
+`play.py` ya permite crear un servidor local, unirse a un servidor remoto,
+comprar torres, comprar muros, comprar unidades, iniciar/pausar combate
+y actualizar el tablero
 usando el estado oficial recibido por red. La interfaz debe seguir
 limitandose a mostrar datos y enviar acciones; el calculo de combate,
 dinero, rondas y victoria permanece en `Logica/` y en el servidor.

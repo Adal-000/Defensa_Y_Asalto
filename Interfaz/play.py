@@ -4,7 +4,9 @@
 
 import os
 import queue
+import socket
 import sys
+import threading
 import tkinter as tk
 from tkinter import messagebox
 
@@ -18,6 +20,7 @@ for ruta in (RUTA_LOGICA, RUTA_RED):
 
 import app
 from cliente import ClientePartida, PUERTO_PREDETERMINADO
+from servidor import ServidorPartida
 
 
 TIPOS_TORRE = [torre["clave"] for torre in app.obtener_catalogo_torres()]
@@ -133,9 +136,30 @@ def play(root, GoMain, cerrar_todo, configurar_ventana, obtener_usuario_actual):
     cola_mensajes = queue.Queue()
     adaptador = AdaptadorClienteTkinter(cola_mensajes)
     estado_actual = {"datos": None, "mensaje_final_mostrado": False}
+    servidor_local = {"instancia": None, "hilo": None}
+
+    def detener_servidor_local():
+        """
+        Descripcion:
+            Detiene el servidor creado desde esta ventana, si existe.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            None: Cierra el socket servidor local.
+
+        Restricciones:
+            Ninguna.
+        """
+        if servidor_local["instancia"] is not None:
+            servidor_local["instancia"].detener()
+            servidor_local["instancia"] = None
+            servidor_local["hilo"] = None
 
     def GoMainR():
         adaptador.cerrar()
+        detener_servidor_local()
         window2.destroy()
         GoMain()
 
@@ -151,24 +175,39 @@ def play(root, GoMain, cerrar_todo, configurar_ventana, obtener_usuario_actual):
     panel_conexion = tk.Frame(window2)
     panel_conexion.place(relx=0.5, rely=0.15, anchor="center")
 
-    tk.Label(panel_conexion, text="IP servidor:", font=("Arial", 11)).grid(row=0, column=0, padx=4)
+    variable_modo_conexion = tk.StringVar(value="crear_servidor")
+    tk.Label(panel_conexion, text="Modo:", font=("Arial", 11, "bold")).grid(row=0, column=0, padx=4, sticky="e")
+    tk.Radiobutton(
+        panel_conexion,
+        text="Crear servidor",
+        variable=variable_modo_conexion,
+        value="crear_servidor",
+    ).grid(row=0, column=1, padx=4, sticky="w")
+    tk.Radiobutton(
+        panel_conexion,
+        text="Unirse a partida",
+        variable=variable_modo_conexion,
+        value="unirse_partida",
+    ).grid(row=0, column=2, padx=4, sticky="w")
+
+    tk.Label(panel_conexion, text="IP servidor:", font=("Arial", 11)).grid(row=1, column=0, padx=4)
     campo_ip = tk.Entry(panel_conexion, font=("Arial", 11), width=15)
     campo_ip.insert(0, "127.0.0.1")
-    campo_ip.grid(row=0, column=1, padx=4)
+    campo_ip.grid(row=1, column=1, padx=4)
 
-    tk.Label(panel_conexion, text="Usuario:", font=("Arial", 11)).grid(row=0, column=2, padx=4)
+    tk.Label(panel_conexion, text="Usuario:", font=("Arial", 11)).grid(row=1, column=2, padx=4)
     campo_usuario = tk.Entry(panel_conexion, font=("Arial", 11), width=14)
     campo_usuario.insert(0, obtener_usuario_actual() or "")
-    campo_usuario.grid(row=0, column=3, padx=4)
+    campo_usuario.grid(row=1, column=3, padx=4)
 
-    tk.Label(panel_conexion, text="Rol:", font=("Arial", 11)).grid(row=0, column=4, padx=4)
+    tk.Label(panel_conexion, text="Rol:", font=("Arial", 11)).grid(row=1, column=4, padx=4)
     variable_rol = tk.StringVar(value="defensor")
-    tk.OptionMenu(panel_conexion, variable_rol, "defensor", "atacante").grid(row=0, column=5, padx=4)
+    tk.OptionMenu(panel_conexion, variable_rol, "defensor", "atacante").grid(row=1, column=5, padx=4)
 
-    tk.Label(panel_conexion, text="Puerto:", font=("Arial", 11)).grid(row=0, column=6, padx=4)
+    tk.Label(panel_conexion, text="Puerto:", font=("Arial", 11)).grid(row=1, column=6, padx=4)
     campo_puerto = tk.Entry(panel_conexion, font=("Arial", 11), width=7)
     campo_puerto.insert(0, str(PUERTO_PREDETERMINADO))
-    campo_puerto.grid(row=0, column=7, padx=4)
+    campo_puerto.grid(row=1, column=7, padx=4)
 
     etiqueta_conexion = tk.Label(window2, text="Sin conexion.", font=("Arial", 12, "bold"), fg="red")
     etiqueta_conexion.place(relx=0.5, rely=0.21, anchor="center")
@@ -312,11 +351,68 @@ def play(root, GoMain, cerrar_todo, configurar_ventana, obtener_usuario_actual):
         if window2.winfo_exists():
             window2.after(300, procesar_mensajes_red)
 
+    def iniciar_servidor_local(puerto):
+        """
+        Descripcion:
+            Crea un servidor de partida desde la misma interfaz y lo
+            ejecuta en un hilo para que Tkinter no se congele.
+
+        Entradas:
+            puerto (int): Puerto donde escuchara el servidor local.
+
+        Salidas:
+            tuple[bool, str]: Resultado de iniciar el servidor.
+
+        Restricciones:
+            - El puerto debe estar libre.
+            - Solo debe existir un servidor local por ventana Play.
+        """
+        if servidor_local["instancia"] is not None:
+            return True, "Servidor local ya estaba iniciado."
+
+        try:
+            socket_prueba = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            socket_prueba.bind(("0.0.0.0", puerto))
+            socket_prueba.close()
+        except OSError as error:
+            return False, f"No se pudo crear el servidor en el puerto {puerto}: {error}"
+
+        servidor = ServidorPartida(puerto=puerto)
+        hilo_servidor = threading.Thread(target=servidor.iniciar, daemon=True)
+        servidor_local["instancia"] = servidor
+        servidor_local["hilo"] = hilo_servidor
+        hilo_servidor.start()
+        return True, f"Servidor creado. Otro jugador puede unirse al puerto {puerto}."
+
+    def conectar_cliente(host, usuario, rol, puerto):
+        """
+        Descripcion:
+            Conecta el ClientePartida al servidor indicado y pide el
+            estado inicial si la conexion fue exitosa.
+
+        Entradas:
+            host (str): IP del servidor.
+            usuario (str): Nombre de usuario.
+            rol (str): Rol solicitado.
+            puerto (int): Puerto del servidor.
+
+        Salidas:
+            None: Actualiza mensajes visibles.
+
+        Restricciones:
+            - El servidor debe estar escuchando.
+        """
+        exito, mensaje = adaptador.conectar(host, usuario, rol, puerto)
+        etiqueta_conexion.config(text=mensaje, fg="green" if exito else "red")
+        agregar_evento(mensaje)
+        if exito:
+            adaptador.cliente.obtener_estado()
+
     def conectar_click():
         """
         Descripcion:
-            Lee IP, usuario, rol y puerto desde la interfaz y conecta
-            el cliente con el servidor.
+            Permite elegir entre crear un servidor local o unirse a una
+            partida existente, y luego conecta el cliente de esta ventana.
 
         Entradas:
             Ninguna.
@@ -326,24 +422,31 @@ def play(root, GoMain, cerrar_todo, configurar_ventana, obtener_usuario_actual):
 
         Restricciones:
             - El puerto debe ser un entero.
+            - Para unirse a una partida, la IP debe apuntar a un servidor activo.
         """
         host = campo_ip.get().strip()
         usuario = campo_usuario.get().strip()
         rol = variable_rol.get().strip()
+        modo_conexion = variable_modo_conexion.get()
         try:
             puerto = int(campo_puerto.get())
         except ValueError:
             messagebox.showwarning("Puerto invalido", "El puerto debe ser un numero entero.")
             return
 
-        exito, mensaje = adaptador.conectar(host, usuario, rol, puerto)
-        etiqueta_conexion.config(text=mensaje, fg="green" if exito else "red")
-        agregar_evento(mensaje)
-        if exito:
-            adaptador.cliente.obtener_estado()
+        if modo_conexion == "crear_servidor":
+            exito_servidor, mensaje_servidor = iniciar_servidor_local(puerto)
+            etiqueta_conexion.config(text=mensaje_servidor, fg="green" if exito_servidor else "red")
+            agregar_evento(mensaje_servidor)
+            if not exito_servidor:
+                return
+            window2.after(250, lambda: conectar_cliente("127.0.0.1", usuario, rol, puerto))
+            return
 
-    boton_conectar = tk.Button(panel_conexion, text="Conectar", font=("Arial", 11, "bold"), bg="lightgreen", command=conectar_click)
-    boton_conectar.grid(row=0, column=8, padx=8)
+        conectar_cliente(host, usuario, rol, puerto)
+
+    boton_conectar = tk.Button(panel_conexion, text="Continuar", font=("Arial", 11, "bold"), bg="lightgreen", command=conectar_click)
+    boton_conectar.grid(row=1, column=8, padx=8)
 
     panel_compras = tk.Frame(window2)
     panel_compras.place(relx=0.50, rely=0.82, anchor="n")
@@ -468,6 +571,7 @@ def play(root, GoMain, cerrar_todo, configurar_ventana, obtener_usuario_actual):
 
     def cerrar_ventana():
         adaptador.cerrar()
+        detener_servidor_local()
         cerrar_todo()
 
     window2.after(300, procesar_mensajes_red)
