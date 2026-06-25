@@ -122,6 +122,24 @@ def buscar_jugador(nombre_usuario, ruta_archivo=RUTA_ARCHIVO_JUGADORES):
     return None
 
 
+def _preparar_texto_credencial(valor):
+    """
+    Descripcion:
+        Convierte una credencial a texto y elimina espacios sobrantes
+        al inicio y al final. Esto evita registros como " ana " y
+        mantiene el manejo de datos uniforme entre registro y login.
+
+    Entradas:
+        valor: dato recibido desde la interfaz o desde una prueba.
+
+    Salidas:
+        str: texto limpio.
+    """
+    if valor is None:
+        return ""
+    return str(valor).strip()
+
+
 def registrar_jugador(nombre_usuario, contrasena,
                        ruta_archivo=RUTA_ARCHIVO_JUGADORES):
     """
@@ -142,11 +160,26 @@ def registrar_jugador(nombre_usuario, contrasena,
 
     Restricciones:
         - nombre_usuario y contrasena no deben estar vacios.
+        - El nombre de usuario debe tener al menos 3 caracteres.
+        - La contrasena debe tener al menos 4 caracteres.
+        - El nombre de usuario no puede contener espacios internos.
         - No puede existir previamente un jugador con el mismo
           nombre_usuario.
     """
+    nombre_usuario = _preparar_texto_credencial(nombre_usuario)
+    contrasena = _preparar_texto_credencial(contrasena)
+
     if not nombre_usuario or not contrasena:
         return False, "El usuario y la contrasena no pueden estar vacios."
+
+    if len(nombre_usuario) < 3:
+        return False, "El nombre de usuario debe tener al menos 3 caracteres."
+
+    if " " in nombre_usuario:
+        return False, "El nombre de usuario no puede contener espacios."
+
+    if len(contrasena) < 4:
+        return False, "La contrasena debe tener al menos 4 caracteres."
 
     lista_jugadores = cargar_jugadores(ruta_archivo)
 
@@ -179,16 +212,29 @@ def validar_login(nombre_usuario, contrasena,
         descriptivo del resultado.
 
     Restricciones:
+        - El usuario y la contrasena no deben estar vacios.
         - Las credenciales deben coincidir exactamente con las
           almacenadas (la validacion distingue mayusculas/minusculas).
     """
+    nombre_usuario = _preparar_texto_credencial(nombre_usuario)
+    contrasena = _preparar_texto_credencial(contrasena)
+
+    if not nombre_usuario and not contrasena:
+        return False, "Ingrese usuario y contrasena."
+
+    if not nombre_usuario:
+        return False, "Ingrese el nombre de usuario."
+
+    if not contrasena:
+        return False, "Ingrese la contrasena."
+
     jugador_encontrado = buscar_jugador(nombre_usuario, ruta_archivo)
 
     if jugador_encontrado is None:
-        return False, "El usuario no existe."
+        return False, "El usuario no existe. Verifique el nombre o registre una cuenta."
 
     if jugador_encontrado.contrasena != contrasena:
-        return False, "La contrasena es incorrecta."
+        return False, "La contrasena es incorrecta. Intente nuevamente."
 
     return True, "Inicio de sesion exitoso."
 

@@ -5,28 +5,30 @@ dos jugadores en Python con interfaz gráfica en Tkinter.
 
 ## Estructura del repositorio
 
-```
+```text
 Defensa_Y_Asalto/
 ├── Interfaz/             # Desarrollador 1 — ventanas Tkinter
 │   ├── root.py           # Punto de entrada del programa completo
 │   ├── login.py          # Inicio de sesión y registro
 │   ├── main.py           # Menú principal
-│   ├── perfil.py         # Perfil del jugador (victorias)
+│   ├── perfil.py         # Perfil del jugador
 │   ├── puntajes.py       # Ranking propio y mundial
-│   ├── play.py           # Pantalla de juego (compras y combate)
-│   └── config.py         # Configuración
+│   ├── play.py           # Pantalla de juego
+│   └── config.py         # Configuración visual
 ├── Logica/               # Desarrollador 2 — lógica interna del juego
-│   ├── jugador.py
-│   ├── archivos.py
-│   ├── torre.py
-│   ├── unidad.py
-│   ├── base.py
-│   ├── combate.py
-│   ├── partida.py
-│   ├── ranking.py
-│   └── app.py            # Funciones públicas para la interfaz
+│   ├── jugador.py        # Clase Jugador
+│   ├── archivos.py       # Registro, login, JSON y victorias
+│   ├── torre.py          # Torres defensivas y habilidades
+│   ├── unidad.py         # Unidades atacantes y habilidades
+│   ├── muro.py           # Muros defensivos
+│   ├── base.py           # Base central
+│   ├── combate.py        # Movimiento, ataques y habilidades
+│   ├── partida.py        # Rondas, dinero y victoria
+│   ├── ranking.py        # Top 5 defensores y atacantes
+│   └── app.py            # Funciones públicas para Tkinter
 ├── datos/
-│   └── jugadores.json    # Se crea automáticamente (no se versiona)
+│   ├── .gitkeep
+│   └── jugadores.json    # Se crea/actualiza en ejecución
 ├── pruebas/
 │   └── test_logica.py    # Pruebas unitarias de la lógica
 └── demo_consola.py       # Simulación por consola, sin Tkinter
@@ -41,46 +43,108 @@ python Interfaz/root.py
 ```
 
 `root.py` agrega automáticamente la carpeta `Logica/` a `sys.path`,
-así que no es necesario instalar nada adicional ni cambiar de
-directorio.
+así que no es necesario instalar nada adicional.
 
-## Flujo de pantallas
+## Funciones principales para la interfaz
 
-1. **Login** (`login.py`): el jugador se registra o inicia sesión.
-   Usa `app.registrar_jugador` y `app.validar_login`.
-2. **Menú principal** (`main.py`): muestra el usuario con sesión activa.
-3. **Perfil** (`perfil.py`): muestra las victorias del jugador como
-   defensor y como atacante, usando `app.obtener_jugador`.
-4. **Puntajes** (`puntajes.py`): muestra las victorias propias y el
-   top 5 de defensores/atacantes a nivel mundial, usando
-   `app.obtener_top_defensores` y `app.obtener_top_atacantes`.
-5. **Play** (`play.py`): el usuario logueado juega como **defensor**
-   contra un rival que se escribe como **atacante**. Permite:
-   - Crear la partida (`app.crear_partida`).
-   - Comprar torres (`app.comprar_torre`) eligiendo tipo, fila y columna.
-   - Comprar unidades (`app.comprar_unidad`) eligiendo tipo, fila y columna.
-   - Ejecutar turnos de combate (`app.ejecutar_combate`), viendo los
-     eventos en una lista y el estado (dinero, vida de la base,
-     marcador) en una etiqueta que se actualiza en cada acción.
+El Desarrollador 1 debe conectarse principalmente con `Logica/app.py`.
+Ese archivo no usa Tkinter; solo recibe y devuelve datos simples.
 
-Tipos de torre: `arquera`, `cañon`, `hielo`, `soporte`.
-Tipos de unidad: `soldado`, `escudero`, `explorador`, `demoledor`.
+Funciones disponibles:
 
-> Nota: `play.py` no dibuja el tablero en un `Canvas` todavía; usa
-> campos de texto para fila/columna y una lista de eventos. Es un
-> punto de partida funcional que se puede mejorar visualmente sin
-> tocar la lógica de `Logica/`.
+```python
+registrar_jugador(usuario, contrasena)
+validar_login(usuario, contrasena)
+obtener_jugador(usuario)
+crear_partida(defensor, atacante)
+comprar_torre(tipo_torre, fila, columna)
+comprar_muro(fila, columna)
+comprar_unidad(tipo_unidad, fila, columna)
+ejecutar_combate()
+obtener_estado_partida()
+obtener_catalogo_torres()
+obtener_catalogo_unidades()
+obtener_top_defensores()
+obtener_top_atacantes()
+```
+
+## Lógica implementada
+
+La parte del Desarrollador 2 incluye:
+
+- Registro e inicio de sesión con archivo JSON.
+- Evita usuarios repetidos.
+- Limpieza y validación básica de credenciales.
+- Actualización de victorias por rol al finalizar la partida.
+- Ranking top 5 de defensores y atacantes.
+- Clase `Jugador`.
+- Clase `Torre` con tipos: `arquera`, `cañon`, `hielo`, `soporte`.
+- Clase `Unidad` con tipos: `soldado`, `escudero`, `explorador`, `demoledor`.
+- Clase `Muro` para bloquear unidades.
+- Clase `Base` con vida y destrucción.
+- Clase `Partida` para rondas, dinero, compras, marcador y victoria.
+- Módulo `combate.py` para movimiento, ataques, daño, eliminación y habilidades.
+
+## Sistema de dinero
+
+- El defensor inicia con dinero para comprar torres y muros.
+- El atacante inicia con dinero para comprar unidades.
+- En cada ronda aumenta el dinero inicial con un bono adicional.
+- El defensor gana dinero al eliminar unidades.
+- El atacante gana dinero al dañar o destruir torres.
+- El atacante gana dinero al dañar la base central.
+
+## Habilidades implementadas
+
+Torres:
+
+- `arquera`: disparo doble.
+- `cañon`: daño en área.
+- `hielo`: congela unidades.
+- `soporte`: repara torres dañadas.
+
+Unidades:
+
+- `soldado`: ataque doble.
+- `escudero`: escudo temporal.
+- `explorador`: aumento de velocidad.
+- `demoledor`: daño extra contra torres.
 
 ## Cómo ejecutar las pruebas
+
+Desde la raíz del repositorio:
 
 ```bash
 python -m unittest pruebas.test_logica -v
 ```
 
-## Cómo ejecutar la demo de consola (sin Tkinter)
+Actualmente las pruebas cubren:
 
-Útil para depurar la lógica sin abrir ninguna ventana:
+- Registro.
+- Login.
+- Carga y guardado de jugadores.
+- Actualización de victorias.
+- Compra de torres.
+- Compra de muros.
+- Compra de unidades.
+- Validación de posiciones ocupadas y fuera del tablero.
+- Daño a unidades, torres, muros y base.
+- Habilidades de torres y unidades.
+- Condiciones de victoria.
+- Recompensas de dinero por combate.
+- Ranking.
+
+## Cómo ejecutar la demo de consola
+
+Útil para probar la lógica sin abrir ventanas:
 
 ```bash
 python demo_consola.py
 ```
+
+## Nota para la interfaz gráfica
+
+`play.py` ya permite crear partidas, comprar torres, comprar unidades y
+ejecutar combate. La función `comprar_muro(fila, columna)` ya existe en
+la lógica y queda lista para conectarse desde Tkinter si se desea agregar
+un botón de compra de muros.

@@ -21,6 +21,7 @@ from jugador import Jugador
 from base import Base
 from torre import crear_torre_por_tipo
 from unidad import crear_unidad_por_tipo
+from muro import crear_muro
 from combate import ejecutar_turno_de_combate
 from partida import Partida
 import archivos
@@ -203,6 +204,49 @@ class PruebasCombate(unittest.TestCase):
         if unidad_resultante is not None:
             self.assertLess(unidad_resultante.vida, unidad.vida_maxima)
 
+    def test_torre_hielo_congela_unidad(self):
+        """Verifica que la habilidad de hielo congele una unidad en rango."""
+        torre = crear_torre_por_tipo("hielo", fila=2, columna=2)
+        unidad = crear_unidad_por_tipo("soldado", fila=2, columna=2)
+
+        ejecutar_turno_de_combate([torre], [unidad], Base(), 0)
+
+        self.assertTrue(unidad.congelada)
+
+    def test_torre_canon_dana_varias_unidades(self):
+        """Verifica que el canón use daño en área contra varias unidades."""
+        torre = crear_torre_por_tipo("cañon", fila=3, columna=2)
+        unidad_uno = crear_unidad_por_tipo("escudero", fila=3, columna=2)
+        unidad_dos = crear_unidad_por_tipo("soldado", fila=3, columna=3)
+
+        ejecutar_turno_de_combate([torre], [unidad_uno, unidad_dos], Base(), 0)
+
+        self.assertLess(unidad_uno.vida, unidad_uno.vida_maxima)
+        self.assertLess(unidad_dos.vida, unidad_dos.vida_maxima)
+
+    def test_soldado_aplica_ataque_doble_a_base(self):
+        """Verifica que la habilidad ataque doble haga daño adicional."""
+        base = Base(vida_inicial=100)
+        unidad = crear_unidad_por_tipo("soldado", fila=0, columna=1)
+
+        ejecutar_turno_de_combate([], [unidad], base, 0)
+
+        self.assertEqual(base.vida, 76)
+
+    def test_muro_detiene_unidad_y_recibe_dano(self):
+        """Verifica que un muro bloquee a la unidad y reciba daño."""
+        base = Base(vida_inicial=100)
+        muro = crear_muro(fila=9, columna=1)
+        unidad = crear_unidad_por_tipo("soldado", fila=10, columna=1)
+
+        _, unidades_restantes, muros_restantes = ejecutar_turno_de_combate(
+            [], [unidad], base, 0, lista_muros=[muro]
+        )
+
+        self.assertEqual(unidades_restantes[0].fila, 9)
+        self.assertLess(muros_restantes[0].vida, muros_restantes[0].vida_maxima)
+
+
 
 class PruebasPartida(unittest.TestCase):
     """
@@ -257,6 +301,40 @@ class PruebasPartida(unittest.TestCase):
 
         self.assertTrue(resultado["ronda_finalizada"])
         self.assertEqual(partida.rondas_ganadas_atacante, 1)
+
+    def test_comprar_muro_con_dinero_suficiente(self):
+        """Verifica que el defensor pueda comprar un muro."""
+        partida = Partida("defensor_prueba", "atacante_prueba")
+        exito, _ = partida.comprar_muro(fila=4, columna=1)
+
+        self.assertTrue(exito)
+        self.assertEqual(len(partida.muros), 1)
+
+    def test_no_permite_dos_defensas_en_misma_posicion(self):
+        """Verifica que no se coloquen dos defensas en la misma casilla."""
+        partida = Partida("defensor_prueba", "atacante_prueba")
+        partida.comprar_torre("arquera", fila=2, columna=2)
+        exito, _ = partida.comprar_muro(fila=2, columna=2)
+
+        self.assertFalse(exito)
+
+    def test_no_permite_unidad_fuera_del_tablero(self):
+        """Verifica que una unidad fuera del tablero no pueda comprarse."""
+        partida = Partida("defensor_prueba", "atacante_prueba")
+        exito, _ = partida.comprar_unidad("soldado", fila=99, columna=1)
+
+        self.assertFalse(exito)
+
+    def test_atacante_gana_dinero_por_danar_base(self):
+        """Verifica que el atacante reciba dinero al dañar la base."""
+        partida = Partida("defensor_prueba", "atacante_prueba")
+        partida.dinero_atacante = 0
+        partida.unidades.append(crear_unidad_por_tipo("soldado", fila=0, columna=1))
+
+        partida.ejecutar_combate()
+
+        self.assertGreater(partida.dinero_atacante, 0)
+
 
 
 class PruebasRanking(unittest.TestCase):
