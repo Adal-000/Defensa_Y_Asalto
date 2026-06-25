@@ -95,6 +95,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
 
     catalogo_facciones = app.obtener_catalogo_facciones()
     imagenes_facciones = {}
+    datos_facciones_por_nombre = {faccion["nombre"]: faccion for faccion in catalogo_facciones}
     faccion_temporal = tk.StringVar(value="")
     facciones_ocupadas = {}
     listos_remotos = set()
@@ -293,13 +294,73 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         for rol, faccion in obtener_datos_sala()["facciones"].items():
             caja_info_facciones.insert(tk.END, f"{rol}: {faccion}")
 
+    def texto_boton_faccion(nombre_faccion, ocupada=False, seleccionada=False):
+        datos_faccion = datos_facciones_por_nombre.get(nombre_faccion, {})
+        codigo = datos_faccion.get("codigo", "")
+        prefijo = "✓ " if seleccionada else "🔒 " if ocupada else ""
+        return f"{prefijo}{codigo}\n{nombre_faccion}"
+
+    def pintar_rectangulo(imagen, color, x1, y1, x2, y2):
+        imagen.put(color, to=(x1, y1, x2, y2))
+
+    def crear_imagen_bandera(codigo):
+        ancho = 120
+        alto = 72
+        imagen = tk.PhotoImage(master=window2, width=ancho, height=alto)
+        pintar_rectangulo(imagen, "white", 0, 0, ancho, alto)
+
+        if codigo == "ESP":
+            pintar_rectangulo(imagen, "#aa151b", 0, 0, ancho, 18)
+            pintar_rectangulo(imagen, "#f1bf00", 0, 18, ancho, 54)
+            pintar_rectangulo(imagen, "#aa151b", 0, 54, ancho, alto)
+        elif codigo == "ENG":
+            pintar_rectangulo(imagen, "#012169", 0, 0, ancho, alto)
+            pintar_rectangulo(imagen, "white", 0, 28, ancho, 44)
+            pintar_rectangulo(imagen, "white", 52, 0, 68, alto)
+            pintar_rectangulo(imagen, "#c8102e", 0, 32, ancho, 40)
+            pintar_rectangulo(imagen, "#c8102e", 56, 0, 64, alto)
+        elif codigo == "ALE":
+            pintar_rectangulo(imagen, "#000000", 0, 0, ancho, 24)
+            pintar_rectangulo(imagen, "#dd0000", 0, 24, ancho, 48)
+            pintar_rectangulo(imagen, "#ffce00", 0, 48, ancho, alto)
+        elif codigo == "RUS":
+            pintar_rectangulo(imagen, "#ffffff", 0, 0, ancho, 24)
+            pintar_rectangulo(imagen, "#0039a6", 0, 24, ancho, 48)
+            pintar_rectangulo(imagen, "#d52b1e", 0, 48, ancho, alto)
+        elif codigo == "ITA":
+            pintar_rectangulo(imagen, "#009246", 0, 0, 40, alto)
+            pintar_rectangulo(imagen, "#ffffff", 40, 0, 80, alto)
+            pintar_rectangulo(imagen, "#ce2b37", 80, 0, ancho, alto)
+        elif codigo == "USA":
+            alto_fr = alto // 13
+            for indice in range(13):
+                color = "#b22234" if indice % 2 == 0 else "#ffffff"
+                pintar_rectangulo(imagen, color, 0, indice * alto_fr, ancho, (indice + 1) * alto_fr)
+            pintar_rectangulo(imagen, "#3c3b6e", 0, 0, 52, 39)
+            for y in (7, 19, 31):
+                for x in (8, 20, 32, 44):
+                    pintar_rectangulo(imagen, "#ffffff", x, y, x + 3, y + 3)
+        pintar_rectangulo(imagen, "#555555", 0, 0, ancho, 1)
+        pintar_rectangulo(imagen, "#555555", 0, alto - 1, ancho, alto)
+        pintar_rectangulo(imagen, "#555555", 0, 0, 1, alto)
+        pintar_rectangulo(imagen, "#555555", ancho - 1, 0, ancho, alto)
+        return imagen
+
     def refrescar_botones():
         for nombre_faccion, boton in botones_faccion.items():
             ocupada = faccion_esta_ocupada_por_otro(nombre_faccion)
+            seleccionada = nombre_faccion == faccion_temporal.get()
             color = "#ffc7c7" if ocupada else COLOR_FONDO
-            if nombre_faccion == faccion_temporal.get():
+            if seleccionada:
                 color = COLOR_SELECCION
-            boton.config(relief="sunken" if nombre_faccion == faccion_temporal.get() else "raised", bg=color)
+            boton.config(
+                text=texto_boton_faccion(nombre_faccion, ocupada, seleccionada),
+                image=imagenes_facciones.get(nombre_faccion),
+                compound="top",
+                relief="sunken" if seleccionada else "raised",
+                bg=color,
+                activebackground=color,
+            )
         actualizar_info_facciones()
 
     def seleccionar_faccion(nombre_faccion):
@@ -320,19 +381,16 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         nombre_faccion = datos_faccion["nombre"]
         fila = indice // 3
         columna = indice % 3
-        imagen = None
-        try:
-            imagen = tk.PhotoImage(file=datos_faccion["imagen"]).subsample(4, 4)
-            imagenes_facciones[nombre_faccion] = imagen
-        except tk.TclError:
-            imagen = None
+        imagen = crear_imagen_bandera(datos_faccion["codigo"])
+        imagenes_facciones[nombre_faccion] = imagen
         boton_faccion = tk.Button(
             panel_facciones,
-            text=f"{datos_faccion['codigo']}\n{nombre_faccion}",
+            text=texto_boton_faccion(nombre_faccion),
             image=imagen, compound="top",
             font=("Arial", 12, "bold"), width=170, height=120,
             command=lambda faccion=nombre_faccion: seleccionar_faccion(faccion)
         )
+        boton_faccion.imagen_faccion = imagen
         boton_faccion.grid(row=fila, column=columna, padx=24, pady=8)
         botones_faccion[nombre_faccion] = boton_faccion
 
