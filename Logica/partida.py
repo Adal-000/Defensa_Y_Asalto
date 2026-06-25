@@ -1,14 +1,15 @@
 """
 Descripcion:
     Modulo que define la clase Partida, encargada de coordinar todo
-    el flujo del juego "Defensa y Asalto de Base": el sistema de
-    dinero, las rondas, las compras de torres y unidades, la fase de
-    combate y las condiciones de victoria.
+    el flujo del juego "Defensa y Asalto de Base": sistema de
+    dinero, rondas, compras de torres, muros y unidades, fase de
+    combate y condiciones de victoria.
 """
 
 from base import Base
 from torre import crear_torre_por_tipo
 from unidad import crear_unidad_por_tipo
+from muro import crear_muro
 from combate import ejecutar_turno_de_combate
 from archivos import actualizar_victoria
 
@@ -18,6 +19,12 @@ DINERO_EXTRA_POR_RONDA = 100
 RONDAS_PARA_GANAR_PARTIDA = 3
 FILA_BASE = 0
 MAXIMO_TURNOS_POR_RONDA = 30
+CANTIDAD_FILAS_TABLERO = 11
+CANTIDAD_COLUMNAS_TABLERO = 6
+RECOMPENSA_DEFENSOR_POR_UNIDAD = 20
+RECOMPENSA_ATACANTE_POR_TORRE_DANADA = 10
+RECOMPENSA_ATACANTE_POR_TORRE_DESTRUIDA = 30
+RECOMPENSA_ATACANTE_POR_BASE_DANADA = 15
 
 
 class Partida:
@@ -25,9 +32,8 @@ class Partida:
     Descripcion:
         Representa una partida completa entre un jugador defensor y
         un jugador atacante. Administra el dinero de cada jugador,
-        las torres y unidades en juego, la base central, el numero
-        de rondas ganadas por cada jugador y el historial de eventos
-        de la partida.
+        las estructuras y unidades en juego, la base central, el
+        numero de rondas ganadas y el historial de eventos.
 
     Entradas:
         nombre_defensor (str): Nombre de usuario del jugador que
@@ -53,6 +59,7 @@ class Partida:
         self.dinero_atacante = 0
 
         self.torres = []
+        self.muros = []
         self.unidades = []
         self.base = Base()
 
@@ -72,9 +79,9 @@ class Partida:
     def iniciar_nueva_ronda(self):
         """
         Descripcion:
-            Prepara una nueva ronda: reinicia la base, limpia las
-            torres y unidades de la ronda anterior, y entrega el
-            dinero inicial correspondiente a ambos jugadores.
+            Prepara una nueva ronda: reinicia la base, limpia torres,
+            muros y unidades de la ronda anterior, y entrega el
+            dinero correspondiente a ambos jugadores.
 
         Entradas:
             Ninguna.
@@ -91,6 +98,7 @@ class Partida:
         self.numero_ronda += 1
         self.turnos_en_ronda_actual = 0
         self.torres = []
+        self.muros = []
         self.unidades = []
         self.base.reiniciar()
 
@@ -101,33 +109,168 @@ class Partida:
             DINERO_EXTRA_POR_RONDA * (self.numero_ronda - 1)
         )
 
-        self.historial_eventos.append(
-            f"Inicia la ronda {self.numero_ronda}."
+        self.historial_eventos.append(f"Inicia la ronda {self.numero_ronda}.")
+
+    def _posicion_esta_dentro_del_tablero(self, fila, columna):
+        """
+        Descripcion:
+            Valida si una posicion pertenece al tablero definido por
+            la logica de la partida.
+
+        Entradas:
+            fila (int): Fila que se desea revisar.
+            columna (int): Columna que se desea revisar.
+
+        Salidas:
+            bool: True si la posicion esta dentro del tablero, False
+            en caso contrario.
+
+        Restricciones:
+            - fila y columna deben ser numeros enteros.
+        """
+        return (
+            isinstance(fila, int)
+            and isinstance(columna, int)
+            and 0 <= fila < CANTIDAD_FILAS_TABLERO
+            and 0 <= columna < CANTIDAD_COLUMNAS_TABLERO
         )
+
+    def _posicion_defensiva_ocupada(self, fila, columna):
+        """
+        Descripcion:
+            Determina si una posicion ya esta ocupada por una torre o
+            un muro del defensor.
+
+        Entradas:
+            fila (int): Fila a revisar.
+            columna (int): Columna a revisar.
+
+        Salidas:
+            bool: True si la posicion esta ocupada, False en caso
+            contrario.
+
+        Restricciones:
+            Ninguna.
+        """
+        for torre in self.torres:
+            if torre.fila == fila and torre.columna == columna:
+                return True
+
+        for muro in self.muros:
+            if muro.fila == fila and muro.columna == columna:
+                return True
+
+        return False
+
+    def _posicion_unidad_ocupada(self, fila, columna):
+        """
+        Descripcion:
+            Determina si una posicion ya esta ocupada por una unidad
+            atacante.
+
+        Entradas:
+            fila (int): Fila a revisar.
+            columna (int): Columna a revisar.
+
+        Salidas:
+            bool: True si existe una unidad en esa posicion, False
+            en caso contrario.
+
+        Restricciones:
+            Ninguna.
+        """
+        for unidad in self.unidades:
+            if unidad.fila == fila and unidad.columna == columna:
+                return True
+        return False
+
+    def _validar_compra_defensiva(self, fila, columna):
+        """
+        Descripcion:
+            Valida que una torre o muro pueda colocarse en la
+            posicion indicada.
+
+        Entradas:
+            fila (int): Fila donde se quiere colocar la defensa.
+            columna (int): Columna donde se quiere colocar la defensa.
+
+        Salidas:
+            tuple[bool, str]: Indica si la posicion es valida y un
+            mensaje descriptivo.
+
+        Restricciones:
+            - No se permite colocar defensas en la fila de la base.
+            - No se permite usar posiciones ocupadas.
+        """
+        if not self._posicion_esta_dentro_del_tablero(fila, columna):
+            return False, "La posicion esta fuera del tablero."
+
+        if fila == FILA_BASE:
+            return False, "No se puede colocar una defensa sobre la base."
+
+        if self._posicion_defensiva_ocupada(fila, columna):
+            return False, "La posicion ya esta ocupada por una defensa."
+
+        return True, "Posicion valida."
+
+    def _validar_compra_unidad(self, fila, columna):
+        """
+        Descripcion:
+            Valida que una unidad atacante pueda colocarse en la
+            posicion indicada.
+
+        Entradas:
+            fila (int): Fila donde se quiere colocar la unidad.
+            columna (int): Columna donde se quiere colocar la unidad.
+
+        Salidas:
+            tuple[bool, str]: Indica si la posicion es valida y un
+            mensaje descriptivo.
+
+        Restricciones:
+            - No se permite colocar unidades directamente sobre la
+              base central.
+            - No se permite colocar unidades sobre otra unidad.
+        """
+        if not self._posicion_esta_dentro_del_tablero(fila, columna):
+            return False, "La posicion esta fuera del tablero."
+
+        if fila == FILA_BASE:
+            return False, "No se puede colocar una unidad sobre la base."
+
+        if self._posicion_unidad_ocupada(fila, columna):
+            return False, "La posicion ya esta ocupada por una unidad."
+
+        return True, "Posicion valida."
 
     def comprar_torre(self, tipo_torre, fila, columna):
         """
         Descripcion:
             Permite al defensor comprar y colocar una torre en el
-            tablero, siempre que tenga suficiente dinero disponible.
+            tablero, siempre que tenga dinero suficiente y la
+            posicion sea valida.
 
         Entradas:
-            tipo_torre (str): Tipo de torre a comprar (por ejemplo,
-                "arquera", "cañon", "hielo" o "soporte").
+            tipo_torre (str): Tipo de torre a comprar.
             fila (int): Fila del tablero donde se colocara la torre.
             columna (int): Columna del tablero donde se colocara la
                 torre.
 
         Salidas:
-            tuple[bool, str]: El primer valor indica si la compra
-            fue exitosa. El segundo valor es un mensaje descriptivo
-            del resultado.
+            tuple[bool, str]: El primer valor indica si la compra fue
+            exitosa. El segundo valor es un mensaje descriptivo.
 
         Restricciones:
             - tipo_torre debe ser un tipo de torre valido.
-            - El defensor debe tener dinero suficiente para comprar
-              la torre.
+            - El defensor debe tener dinero suficiente.
+            - La posicion debe estar libre y dentro del tablero.
         """
+        posicion_valida, mensaje_posicion = self._validar_compra_defensiva(
+            fila, columna
+        )
+        if not posicion_valida:
+            return False, mensaje_posicion
+
         nueva_torre = crear_torre_por_tipo(tipo_torre, fila, columna)
 
         if nueva_torre is None:
@@ -144,31 +287,73 @@ class Partida:
 
         return True, f"{nueva_torre.nombre} comprada correctamente."
 
+    def comprar_muro(self, fila, columna):
+        """
+        Descripcion:
+            Permite al defensor comprar y colocar un muro en el
+            tablero. El muro sirve para bloquear o retrasar unidades
+            atacantes.
+
+        Entradas:
+            fila (int): Fila del tablero donde se colocara el muro.
+            columna (int): Columna del tablero donde se colocara el
+                muro.
+
+        Salidas:
+            tuple[bool, str]: El primer valor indica si la compra fue
+            exitosa. El segundo valor es un mensaje descriptivo.
+
+        Restricciones:
+            - El defensor debe tener dinero suficiente.
+            - La posicion debe estar libre y dentro del tablero.
+        """
+        posicion_valida, mensaje_posicion = self._validar_compra_defensiva(
+            fila, columna
+        )
+        if not posicion_valida:
+            return False, mensaje_posicion
+
+        nuevo_muro = crear_muro(fila, columna)
+
+        if self.dinero_defensor < nuevo_muro.costo:
+            return False, "El defensor no tiene suficiente dinero."
+
+        self.dinero_defensor -= nuevo_muro.costo
+        self.muros.append(nuevo_muro)
+        self.historial_eventos.append(
+            f"El defensor compra un muro en ({fila}, {columna})."
+        )
+
+        return True, "Muro comprado correctamente."
+
     def comprar_unidad(self, tipo_unidad, fila, columna):
         """
         Descripcion:
             Permite al atacante comprar y colocar una unidad en el
-            tablero, siempre que tenga suficiente dinero disponible.
+            tablero, siempre que tenga dinero suficiente y la
+            posicion sea valida.
 
         Entradas:
-            tipo_unidad (str): Tipo de unidad a comprar (por
-                ejemplo, "soldado", "escudero", "explorador" o
-                "demoledor").
-            fila (int): Fila del tablero donde se colocara la
-                unidad.
+            tipo_unidad (str): Tipo de unidad a comprar.
+            fila (int): Fila del tablero donde se colocara la unidad.
             columna (int): Columna del tablero donde se colocara la
                 unidad.
 
         Salidas:
-            tuple[bool, str]: El primer valor indica si la compra
-            fue exitosa. El segundo valor es un mensaje descriptivo
-            del resultado.
+            tuple[bool, str]: El primer valor indica si la compra fue
+            exitosa. El segundo valor es un mensaje descriptivo.
 
         Restricciones:
             - tipo_unidad debe ser un tipo de unidad valido.
-            - El atacante debe tener dinero suficiente para comprar
-              la unidad.
+            - El atacante debe tener dinero suficiente.
+            - La posicion debe estar libre y dentro del tablero.
         """
+        posicion_valida, mensaje_posicion = self._validar_compra_unidad(
+            fila, columna
+        )
+        if not posicion_valida:
+            return False, mensaje_posicion
+
         nueva_unidad = crear_unidad_por_tipo(tipo_unidad, fila, columna)
 
         if nueva_unidad is None:
@@ -185,36 +370,35 @@ class Partida:
 
         return True, f"{nueva_unidad.nombre} comprada correctamente."
 
-    def _otorgar_dinero_por_combate(self, vida_torres_antes, vida_unidades_antes):
+    def _otorgar_dinero_por_combate(self, vida_torres_antes,
+                                     vida_unidades_antes, vida_base_antes):
         """
         Descripcion:
             Otorga dinero a los jugadores segun lo ocurrido durante
             el ultimo turno de combate: el defensor gana dinero por
-            cada unidad eliminada y el atacante gana dinero por cada
-            torre danada, destruida o por dano causado a la base.
+            unidades eliminadas y el atacante gana dinero por torres
+            danadas, torres destruidas o dano causado a la base.
 
         Entradas:
-            vida_torres_antes (dict): Diccionario que asocia el id
-                de cada torre con su vida antes del turno de
-                combate.
-            vida_unidades_antes (dict): Diccionario que asocia el id
-                de cada unidad con su vida antes del turno de
-                combate.
+            vida_torres_antes (dict): Relacion entre id de torre y
+                vida antes del combate.
+            vida_unidades_antes (dict): Relacion entre id de unidad y
+                vida antes del combate.
+            vida_base_antes (int): Vida de la base antes del combate.
 
         Salidas:
-            None: Modifica los atributos dinero_defensor y
-            dinero_atacante.
+            None: Modifica dinero_defensor y dinero_atacante.
 
         Restricciones:
             Ninguna.
         """
-        for identificador_unidad, vida_anterior in vida_unidades_antes.items():
+        for identificador_unidad in vida_unidades_antes:
             unidad_actual = next(
                 (unidad for unidad in self.unidades if id(unidad) == identificador_unidad),
                 None,
             )
             if unidad_actual is None or unidad_actual.esta_eliminada():
-                self.dinero_defensor += 20
+                self.dinero_defensor += RECOMPENSA_DEFENSOR_POR_UNIDAD
 
         for identificador_torre, vida_anterior in vida_torres_antes.items():
             torre_actual = next(
@@ -222,24 +406,27 @@ class Partida:
                 None,
             )
             if torre_actual is None:
-                self.dinero_atacante += 30
+                self.dinero_atacante += RECOMPENSA_ATACANTE_POR_TORRE_DESTRUIDA
             elif torre_actual.vida < vida_anterior:
-                self.dinero_atacante += 10
+                self.dinero_atacante += RECOMPENSA_ATACANTE_POR_TORRE_DANADA
+
+        if self.base.vida < vida_base_antes:
+            self.dinero_atacante += RECOMPENSA_ATACANTE_POR_BASE_DANADA
 
     def ejecutar_combate(self):
         """
         Descripcion:
             Ejecuta un turno de combate completo dentro de la ronda
-            actual: mueve unidades, resuelve ataques, otorga dinero
-            por las acciones realizadas y verifica si la ronda ha
-            terminado.
+            actual: activa habilidades, mueve unidades, resuelve
+            ataques, otorga dinero por acciones y verifica si la
+            ronda termino.
 
         Entradas:
             Ninguna.
 
         Salidas:
             dict: Estado resumido del turno de combate, incluyendo
-            los eventos ocurridos y si la ronda ha finalizado.
+            eventos ocurridos y si la ronda finalizo.
 
         Restricciones:
             - No debe llamarse si la partida ya finalizo.
@@ -249,13 +436,22 @@ class Partida:
 
         vida_torres_antes = {id(torre): torre.vida for torre in self.torres}
         vida_unidades_antes = {id(unidad): unidad.vida for unidad in self.unidades}
+        vida_base_antes = self.base.vida
 
         eventos_turno = []
-        self.torres, self.unidades = ejecutar_turno_de_combate(
-            self.torres, self.unidades, self.base, FILA_BASE, eventos_turno
+        resultado_combate = ejecutar_turno_de_combate(
+            self.torres,
+            self.unidades,
+            self.base,
+            FILA_BASE,
+            eventos_turno,
+            self.muros,
         )
+        self.torres, self.unidades, self.muros = resultado_combate
 
-        self._otorgar_dinero_por_combate(vida_torres_antes, vida_unidades_antes)
+        self._otorgar_dinero_por_combate(
+            vida_torres_antes, vida_unidades_antes, vida_base_antes
+        )
 
         self.turnos_en_ronda_actual += 1
         self.historial_eventos.extend(eventos_turno)
@@ -274,15 +470,14 @@ class Partida:
         """
         Descripcion:
             Verifica si la ronda actual debe terminar segun las
-            condiciones de victoria del defensor o del atacante, y
-            en caso afirmativo actualiza el marcador de la partida.
+            condiciones de victoria del defensor o atacante, y en
+            caso afirmativo actualiza el marcador de la partida.
 
         Entradas:
             Ninguna.
 
         Salidas:
-            bool: True si la ronda finalizo, False si debe
-            continuar.
+            bool: True si la ronda finalizo, False si continua.
 
         Restricciones:
             Ninguna.
@@ -294,7 +489,9 @@ class Partida:
         atacante_sin_dinero_ni_unidades = (
             self.dinero_atacante <= 0 and len(self.unidades) == 0
         )
-        todas_unidades_eliminadas = len(self.unidades) == 0 and self.turnos_en_ronda_actual > 0
+        todas_unidades_eliminadas = (
+            len(self.unidades) == 0 and self.turnos_en_ronda_actual > 0
+        )
 
         if atacante_sin_dinero_ni_unidades or todas_unidades_eliminadas:
             self._finalizar_ronda("defensor")
@@ -318,8 +515,8 @@ class Partida:
                 "defensor" o "atacante".
 
         Salidas:
-            None: Modifica el marcador de la partida y, si
-            corresponde, finaliza la partida completa.
+            None: Modifica el marcador y, si corresponde, finaliza la
+            partida completa.
 
         Restricciones:
             - rol_ganador_ronda debe ser "defensor" o "atacante".
@@ -345,9 +542,9 @@ class Partida:
     def _finalizar_partida(self, rol_ganador):
         """
         Descripcion:
-            Marca la partida como finalizada, determina el nombre
-            del jugador ganador y actualiza su registro de victorias
-            en el archivo de jugadores.
+            Marca la partida como finalizada, determina el nombre del
+            jugador ganador y actualiza su registro de victorias en
+            el archivo de jugadores.
 
         Entradas:
             rol_ganador (str): Rol con el que se gano la partida.
@@ -385,10 +582,9 @@ class Partida:
             Ninguna.
 
         Salidas:
-            dict: Diccionario con la informacion relevante de la
-            partida: nombres de jugadores, dinero, numero de ronda,
-            marcador, vida de la base, torres, unidades y si la
-            partida ha finalizado.
+            dict: Diccionario con nombres de jugadores, dinero,
+            numero de ronda, marcador, vida de la base, torres,
+            muros, unidades y estado final de la partida.
 
         Restricciones:
             Ninguna.
@@ -408,15 +604,33 @@ class Partida:
                 {
                     "nombre": torre.nombre,
                     "vida": torre.vida,
+                    "vida_maxima": torre.vida_maxima,
+                    "dano": torre.dano,
+                    "alcance": torre.alcance,
+                    "habilidad": torre.habilidad,
                     "fila": torre.fila,
                     "columna": torre.columna,
                 }
                 for torre in self.torres
             ],
+            "muros": [
+                {
+                    "nombre": muro.nombre,
+                    "vida": muro.vida,
+                    "vida_maxima": muro.vida_maxima,
+                    "fila": muro.fila,
+                    "columna": muro.columna,
+                }
+                for muro in self.muros
+            ],
             "unidades": [
                 {
                     "nombre": unidad.nombre,
                     "vida": unidad.vida,
+                    "vida_maxima": unidad.vida_maxima,
+                    "dano": unidad.dano,
+                    "velocidad": unidad.velocidad,
+                    "habilidad": unidad.habilidad,
                     "fila": unidad.fila,
                     "columna": unidad.columna,
                 }
@@ -433,8 +647,8 @@ def crear_partida(nombre_defensor, nombre_atacante):
     """
     Descripcion:
         Funcion de conveniencia para crear una nueva partida entre
-        dos jugadores. Pensada para ser llamada directamente desde
-        la interfaz grafica del Desarrollador 1.
+        dos jugadores. Pensada para ser llamada desde la interfaz
+        grafica del Desarrollador 1.
 
     Entradas:
         nombre_defensor (str): Nombre de usuario del jugador

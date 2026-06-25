@@ -138,6 +138,29 @@ def comprar_torre(tipo_torre, fila, columna):
     return _partida_actual.comprar_torre(tipo_torre, fila, columna)
 
 
+def comprar_muro(fila, columna):
+    """
+    Descripcion:
+        Permite al defensor comprar un muro dentro de la partida
+        activa. Esta funcion queda disponible para que la interfaz
+        grafica pueda agregar compra de muros sin cambiar la logica.
+
+    Entradas:
+        fila (int): Fila del tablero donde se coloca el muro.
+        columna (int): Columna del tablero donde se coloca el muro.
+
+    Salidas:
+        tuple[bool, str]: Exito de la operacion y mensaje
+        descriptivo.
+
+    Restricciones:
+        - Debe existir una partida activa creada con crear_partida.
+    """
+    if _partida_actual is None:
+        return False, "No hay una partida activa."
+    return _partida_actual.comprar_muro(fila, columna)
+
+
 def comprar_unidad(tipo_unidad, fila, columna):
     """
     Descripcion:
@@ -202,6 +225,76 @@ def obtener_estado_partida():
     if _partida_actual is None:
         return {}
     return _partida_actual.obtener_estado_partida()
+
+
+def obtener_catalogo_torres():
+    """
+    Descripcion:
+        Devuelve informacion basica de los tipos de torres que puede
+        comprar el defensor. Es util para llenar menus o etiquetas de
+        ayuda en la interfaz grafica.
+
+    Entradas:
+        Ninguna.
+
+    Salidas:
+        list[dict]: Lista con clave, nombre, costo, vida, dano,
+        alcance y habilidad de cada torre disponible.
+
+    Restricciones:
+        Ninguna.
+    """
+    from torre import FABRICANTES_TORRES
+
+    catalogo = []
+    for clave, fabricante in FABRICANTES_TORRES.items():
+        torre = fabricante()
+        catalogo.append({
+            "clave": clave,
+            "nombre": torre.nombre,
+            "costo": torre.costo,
+            "vida": torre.vida,
+            "dano": torre.dano,
+            "alcance": torre.alcance,
+            "habilidad": torre.habilidad,
+            "turnos_habilidad": torre.turnos_habilidad,
+        })
+    return catalogo
+
+
+def obtener_catalogo_unidades():
+    """
+    Descripcion:
+        Devuelve informacion basica de los tipos de unidades que
+        puede comprar el atacante. Es util para llenar menus o
+        etiquetas de ayuda en la interfaz grafica.
+
+    Entradas:
+        Ninguna.
+
+    Salidas:
+        list[dict]: Lista con clave, nombre, costo, vida, dano,
+        velocidad y habilidad de cada unidad disponible.
+
+    Restricciones:
+        Ninguna.
+    """
+    from unidad import FABRICANTES_UNIDADES
+
+    catalogo = []
+    for clave, fabricante in FABRICANTES_UNIDADES.items():
+        unidad = fabricante()
+        catalogo.append({
+            "clave": clave,
+            "nombre": unidad.nombre,
+            "costo": unidad.costo,
+            "vida": unidad.vida,
+            "dano": unidad.dano,
+            "velocidad": unidad.velocidad,
+            "habilidad": unidad.habilidad,
+            "turnos_habilidad": unidad.turnos_habilidad,
+        })
+    return catalogo
 
 
 def obtener_top_defensores():
