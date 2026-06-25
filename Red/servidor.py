@@ -25,6 +25,7 @@ if RUTA_LOGICA not in sys.path:
 if RUTA_RED not in sys.path:
     sys.path.append(RUTA_RED)
 
+from archivos import buscar_jugador
 from partida import crear_partida
 from protocolo import (
     ACCION_COMPRAR_MURO,
@@ -56,6 +57,10 @@ HOST_PREDETERMINADO = "0.0.0.0"
 PUERTO_PREDETERMINADO = 5000
 INTERVALO_COMBATE_SEGUNDOS = 1.0
 MAXIMO_JUGADORES = 2
+FASE_ESPERANDO_JUGADORES = "esperando_jugadores"
+FASE_PREPARACION = "preparacion"
+FASE_COMBATE = "combate"
+FASE_FINALIZADA = "finalizada"
 
 
 class ClienteConectado:
@@ -140,7 +145,8 @@ class ServidorPartida:
     """
 
     def __init__(self, host=HOST_PREDETERMINADO, puerto=PUERTO_PREDETERMINADO,
-                 intervalo_combate=INTERVALO_COMBATE_SEGUNDOS):
+                 intervalo_combate=INTERVALO_COMBATE_SEGUNDOS,
+                 validar_usuarios=True, ruta_jugadores=None):
         self.host = host
         self.puerto = puerto
         self.intervalo_combate = intervalo_combate
@@ -152,6 +158,8 @@ class ServidorPartida:
             ROL_DEFENSOR: None,
             ROL_ATACANTE: None,
         }
+        self.validar_usuarios = validar_usuarios
+        self.ruta_jugadores = ruta_jugadores
         self.bloqueo = threading.Lock()
 
     def iniciar(self):
@@ -248,6 +256,133 @@ class ServidorPartida:
         except OSError:
             return "127.0.0.1"
 
+    def _usuario_puede_conectarse(self, usuario):
+        """
+        Descripcion:
+            Valida si un usuario puede entrar a la sala del servidor.
+            Cuando la validacion esta activa, el nombre debe existir
+            en el archivo JSON de jugadores del proyecto.
+
+        Entradas:
+            usuario (str): Nombre de usuario recibido desde el cliente.
+
+        Salidas:
+            tuple[bool, str]: Indica si puede conectarse y un mensaje
+            descriptivo para enviar al cliente.
+
+        Restricciones:
+            - usuario debe ser texto no vacio.
+            - Si validar_usuarios es True, el jugador debe existir en
+              el archivo JSON de jugadores.
+        """
+        usuario = str(usuario).strip()
+        if usuario == "":
+            return False, "El usuario no puede estar vacio."
+
+        if not self.validar_usuarios:
+            return True, "Usuario aceptado."
+
+        if self.ruta_jugadores is None:
+            jugador = buscar_jugador(usuario)
+        else:
+            jugador = buscar_jugador(usuario, self.ruta_jugadores)
+
+        if jugador is None:
+            return False, "El usuario no existe. Debe registrarse antes de conectarse."
+
+        return True, "Usuario registrado correctamente."
+
+    def _obtener_fase_actual(self):
+        """
+        Descripcion:
+            Calcula la fase actual de la sala para que la interfaz no
+            tenga que deducirla revisando varios campos sueltos.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            str: Fase actual de la sala o partida.
+
+        Restricciones:
+            Ninguna.
+        """
+        if self.partida is None:
+            return FASE_ESPERANDO_JUGADORES
+
+        if self.partida.partida_finalizada:
+            return FASE_FINALIZADA
+
+        if self.combate_activo:
+            return FASE_COMBATE
+
+        return FASE_PREPARACION
+
+    def _contar_jugadores_conectados(self):
+        """
+        Descripcion:
+            Cuenta cuantos clientes siguen conectados al servidor.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            int: Cantidad de clientes activos.
+
+        Restricciones:
+            Ninguna.
+        """
+        total_conectados = 0
+        for cliente in self.clientes_por_rol.values():
+            if cliente is not None and cliente.conectado:
+                total_conectados += 1
+        return total_conectados
+
+    def _crear_datos_estado(self, cliente=None, accion=None, resultado_combate=None):
+        """
+        Descripcion:
+            Construye un bloque de datos estandar para todas las
+            respuestas del servidor, de forma que la interfaz reciba
+            siempre campos consistentes sobre rol, fase y conexion.
+
+        Entradas:
+            cliente (ClienteConectado): Cliente destinatario de la
+                respuesta. Puede ser None al enviar a todos.
+            accion (str): Accion que provoco la respuesta.
+            resultado_combate (dict): Resultado del turno de combate,
+                si aplica.
+
+        Salidas:
+            dict: Datos listos para agregarse a una respuesta JSON.
+
+        Restricciones:
+            Ninguna.
+        """
+        datos = {
+            "combate_activo": self.combate_activo,
+            "fase_actual": self._obtener_fase_actual(),
+            "partida_creada": self.partida is not None,
+            "jugadores_conectados": self._contar_jugadores_conectados(),
+            "roles_ocupados": [
+                rol for rol, cliente_conectado in self.clientes_por_rol.items()
+                if cliente_conectado is not None and cliente_conectado.conectado
+            ],
+        }
+
+        if cliente is not None:
+            datos["rol_cliente"] = cliente.rol
+            datos["usuario_cliente"] = cliente.usuario
+            datos["rol"] = cliente.rol
+            datos["usuario"] = cliente.usuario
+
+        if accion is not None:
+            datos["accion"] = accion
+
+        if resultado_combate is not None:
+            datos["resultado_combate"] = resultado_combate
+
+        return datos
+
     def _preparar_cliente(self, conexion, direccion):
         """
         Descripcion:
@@ -283,6 +418,14 @@ class ServidorPartida:
 
             usuario = obtener_texto(mensaje_inicial, "usuario")
             rol_solicitado = obtener_texto(mensaje_inicial, "rol", obligatorio=False)
+            usuario_valido, mensaje_usuario = self._usuario_puede_conectarse(usuario)
+            if not usuario_valido:
+                enviar_mensaje(
+                    conexion,
+                    crear_respuesta(TIPO_ERROR, False, mensaje_usuario),
+                )
+                conexion.close()
+                return
 
             with self.bloqueo:
                 rol_asignado = self._asignar_rol(usuario, rol_solicitado)
@@ -290,7 +433,7 @@ class ServidorPartida:
                 if rol_asignado is None:
                     enviar_mensaje(
                         conexion,
-                        crear_respuesta(TIPO_ERROR, False, "La sala ya tiene dos jugadores."),
+                        crear_respuesta(TIPO_ERROR, False, "No se pudo asignar rol: sala llena, rol ocupado o usuario repetido."),
                     )
                     conexion.close()
                     return
@@ -306,7 +449,7 @@ class ServidorPartida:
                     TIPO_CONEXION,
                     True,
                     f"Conectado como {rol_asignado}.",
-                    datos={"rol": rol_asignado, "usuario": usuario},
+                    datos=self._crear_datos_estado(cliente),
                 ),
             )
 
@@ -454,6 +597,7 @@ class ServidorPartida:
                     TIPO_RESULTADO,
                     False,
                     "Aun falta que se conecte el segundo jugador.",
+                    datos=self._crear_datos_estado(cliente, accion=accion),
                 ),
             )
             return
@@ -507,7 +651,7 @@ class ServidorPartida:
             exito,
             texto,
             estado=estado,
-            datos={"accion": accion, "rol": cliente.rol},
+            datos=self._crear_datos_estado(cliente, accion=accion),
         )
         self._enviar_a_cliente(cliente, respuesta)
         self._enviar_estado_a_todos(texto)
@@ -572,7 +716,7 @@ class ServidorPartida:
                     True,
                     "Combate actualizado.",
                     estado=estado,
-                    datos={"resultado_combate": resultado, "combate_activo": self.combate_activo},
+                    datos=self._crear_datos_estado(resultado_combate=resultado),
                 )
             )
 
@@ -600,7 +744,7 @@ class ServidorPartida:
                 exito,
                 mensaje,
                 estado=estado,
-                datos={"resultado_combate": resultado},
+                datos=self._crear_datos_estado(resultado_combate=resultado),
             )
         )
 
@@ -625,7 +769,13 @@ class ServidorPartida:
 
         self._enviar_a_cliente(
             cliente,
-            crear_respuesta(TIPO_ESTADO, True, mensaje, estado=estado),
+            crear_respuesta(
+                TIPO_ESTADO,
+                True,
+                mensaje,
+                estado=estado,
+                datos=self._crear_datos_estado(cliente),
+            ),
         )
 
     def _enviar_estado_a_todos(self, mensaje):
@@ -653,7 +803,7 @@ class ServidorPartida:
                 True,
                 mensaje,
                 estado=estado,
-                datos={"combate_activo": self.combate_activo},
+                datos=self._crear_datos_estado(),
             )
         )
 
@@ -717,6 +867,8 @@ class ServidorPartida:
             if self.clientes_por_rol.get(cliente.rol) is cliente:
                 self.clientes_por_rol[cliente.rol] = None
             self.combate_activo = False
+            if self._contar_jugadores_conectados() == 0:
+                self.partida = None
 
         print(f"{cliente.usuario} se desconecto.")
         self._enviar_a_todos(
@@ -724,7 +876,7 @@ class ServidorPartida:
                 TIPO_EVENTO,
                 True,
                 f"{cliente.usuario} se desconecto. Combate pausado.",
-                datos={"combate_activo": False},
+                datos=self._crear_datos_estado(),
             )
         )
 

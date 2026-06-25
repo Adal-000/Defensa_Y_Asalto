@@ -8,8 +8,12 @@ Descripcion:
         python -m unittest pruebas.test_red -v
 """
 
+import contextlib
+import io
 import os
+import shutil
 import sys
+import tempfile
 import unittest
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "Red"))
@@ -26,7 +30,13 @@ from protocolo import (
     obtener_entero,
 )
 from cliente import ClientePartida
-from servidor import ServidorPartida
+from servidor import (
+    FASE_COMBATE,
+    FASE_ESPERANDO_JUGADORES,
+    FASE_PREPARACION,
+    ServidorPartida,
+)
+import archivos
 
 
 class PruebasProtocoloRed(unittest.TestCase):
@@ -95,6 +105,87 @@ class PruebasClienteServidorRed(unittest.TestCase):
 
         self.assertEqual(rol_uno, "defensor")
         self.assertEqual(rol_dos, "atacante")
+
+    def test_cliente_guarda_resumen_de_red_recibido(self):
+        """Verifica que el cliente guarde rol, fase y combate activo."""
+        cliente = ClientePartida()
+        mensaje = {
+            "exito": True,
+            "mensaje": "Estado actualizado.",
+            "datos": {
+                "rol_cliente": "defensor",
+                "fase_actual": FASE_COMBATE,
+                "combate_activo": True,
+            },
+        }
+
+        cliente._procesar_mensaje_entrante(mensaje)
+        resumen = cliente.obtener_resumen_red()
+
+        self.assertEqual(resumen["rol"], "defensor")
+        self.assertEqual(resumen["fase_actual"], FASE_COMBATE)
+        self.assertTrue(resumen["combate_activo"])
+
+    def test_servidor_valida_usuario_registrado(self):
+        """Verifica que el servidor rechace usuarios no registrados."""
+        carpeta_temporal = tempfile.mkdtemp()
+        ruta_jugadores = os.path.join(carpeta_temporal, "jugadores.json")
+        try:
+            archivos.registrar_jugador("ana", "1234", ruta_jugadores)
+            servidor = ServidorPartida(ruta_jugadores=ruta_jugadores)
+
+            exito_ana, _ = servidor._usuario_puede_conectarse("ana")
+            exito_luis, mensaje_luis = servidor._usuario_puede_conectarse("luis")
+
+            self.assertTrue(exito_ana)
+            self.assertFalse(exito_luis)
+            self.assertIn("no existe", mensaje_luis)
+        finally:
+            shutil.rmtree(carpeta_temporal)
+
+    def test_servidor_entrega_datos_estado_estandar(self):
+        """Verifica que el servidor entregue fase, roles y estado de combate."""
+        servidor = ServidorPartida(validar_usuarios=False)
+        datos_iniciales = servidor._crear_datos_estado()
+
+        self.assertEqual(datos_iniciales["fase_actual"], FASE_ESPERANDO_JUGADORES)
+        self.assertFalse(datos_iniciales["partida_creada"])
+        self.assertFalse(datos_iniciales["combate_activo"])
+
+        servidor.partida = type("PartidaFalsa", (), {"partida_finalizada": False})()
+        datos_preparacion = servidor._crear_datos_estado()
+        self.assertEqual(datos_preparacion["fase_actual"], FASE_PREPARACION)
+
+        servidor.combate_activo = True
+        datos_combate = servidor._crear_datos_estado(resultado_combate={"eventos": []})
+        self.assertEqual(datos_combate["fase_actual"], FASE_COMBATE)
+        self.assertIn("resultado_combate", datos_combate)
+
+    def test_servidor_reinicia_partida_si_no_quedan_clientes(self):
+        """Verifica que la sala se limpie cuando todos se desconectan."""
+        servidor = ServidorPartida(validar_usuarios=False)
+
+        class ClienteFalso:
+            def __init__(self):
+                self.usuario = "ana"
+                self.rol = "defensor"
+                self.conectado = True
+
+            def cerrar(self):
+                self.conectado = False
+
+        cliente = ClienteFalso()
+        servidor.clientes_por_rol["defensor"] = cliente
+        servidor.partida = object()
+        servidor.combate_activo = True
+
+        salida_temporal = io.StringIO()
+        with contextlib.redirect_stdout(salida_temporal):
+            servidor._desconectar_cliente(cliente)
+
+        self.assertIsNone(servidor.clientes_por_rol["defensor"])
+        self.assertIsNone(servidor.partida)
+        self.assertFalse(servidor.combate_activo)
 
 
 if __name__ == "__main__":

@@ -62,6 +62,9 @@ class ClientePartida:
         self.usuario = None
         self.rol = None
         self.ultimo_estado = None
+        self.fase_actual = None
+        self.combate_activo = False
+        self.ultimo_error = None
         self.ultimos_mensajes = []
         self.bloqueo = threading.Lock()
 
@@ -158,9 +161,19 @@ class ClientePartida:
             if "estado" in mensaje and mensaje["estado"] is not None:
                 self.ultimo_estado = mensaje["estado"]
 
+            if mensaje.get("exito") is False:
+                self.ultimo_error = mensaje.get("mensaje")
+
             datos = mensaje.get("datos", {})
-            if isinstance(datos, dict) and "rol" in datos:
-                self.rol = datos["rol"]
+            if isinstance(datos, dict):
+                if "rol" in datos:
+                    self.rol = datos["rol"]
+                if "rol_cliente" in datos:
+                    self.rol = datos["rol_cliente"]
+                if "fase_actual" in datos:
+                    self.fase_actual = datos["fase_actual"]
+                if "combate_activo" in datos:
+                    self.combate_activo = bool(datos["combate_activo"])
 
         if self.callback_mensaje is not None:
             self.callback_mensaje(mensaje)
@@ -375,6 +388,35 @@ class ClientePartida:
         """
         with self.bloqueo:
             return self.ultimo_estado
+
+    def obtener_resumen_red(self):
+        """
+        Descripcion:
+            Devuelve los datos de red mas recientes recibidos desde el
+            servidor, sin enviar una nueva solicitud. Es util para que
+            una interfaz consulte rol, fase, combate activo y ultimo
+            error de forma simple.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            dict: Resumen local de la conexion del cliente.
+
+        Restricciones:
+            - Los datos dependen del ultimo mensaje recibido desde el
+              servidor.
+        """
+        with self.bloqueo:
+            return {
+                "conectado": self.conectado,
+                "usuario": self.usuario,
+                "rol": self.rol,
+                "fase_actual": self.fase_actual,
+                "combate_activo": self.combate_activo,
+                "ultimo_error": self.ultimo_error,
+                "tiene_estado": self.ultimo_estado is not None,
+            }
 
 
 if __name__ == "__main__":

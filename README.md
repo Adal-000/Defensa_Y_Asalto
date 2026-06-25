@@ -182,10 +182,12 @@ Para tiempo real, se usa `iniciar`. Desde ese momento el servidor ejecuta
 un turno de combate automaticamente cada segundo y envia el estado
 actualizado a ambos clientes.
 
-### Conexion futura con Tkinter
+### Conexion con Tkinter
 
-La interfaz no debe llamar directamente a `Partida` cuando se juegue en
-dos computadoras. Debe crear un `ClientePartida` y usar metodos como:
+La pantalla `Interfaz/play.py` ya trabaja como cliente de red. La
+interfaz no llama directamente a `Partida` cuando se juega en dos
+computadoras; usa `ClientePartida` para enviar acciones y recibir el
+estado oficial calculado por el servidor. Los metodos principales son:
 
 ```python
 cliente.conectar(ip_servidor, usuario, rol="defensor")
@@ -195,11 +197,21 @@ cliente.comprar_unidad("soldado", fila, columna)
 cliente.iniciar_combate()
 cliente.pausar_combate()
 estado = cliente.obtener_ultimo_estado_local()
+resumen_red = cliente.obtener_resumen_red()
 ```
 
-El siguiente paso del proyecto es tomar ese `estado` y dibujarlo en
-`play.py` con botones, tablero, torres, muros, unidades y barra de vida
-de la base.
+El servidor envia en `datos` campos estandar para facilitar la interfaz:
+
+- `fase_actual`: `esperando_jugadores`, `preparacion`, `combate` o `finalizada`.
+- `combate_activo`: indica si el servidor esta avanzando turnos automaticamente.
+- `partida_creada`: indica si ya se conectaron defensor y atacante.
+- `jugadores_conectados`: cantidad de clientes activos.
+- `roles_ocupados`: roles actualmente conectados.
+- `rol_cliente` y `usuario_cliente`: aparecen en respuestas dirigidas a un cliente.
+
+El servidor valida que los usuarios existan en `datos/jugadores.json`
+antes de aceptar una conexion de partida. Por eso, los jugadores deben
+registrarse desde la interfaz antes de entrar al modo en red.
 
 ## Cómo ejecutar las pruebas
 
@@ -227,6 +239,9 @@ Actualmente las pruebas cubren:
 - Protocolo JSON de red.
 - Cliente sin conexion.
 - Asignacion basica de roles del servidor.
+- Validacion de usuarios registrados antes de entrar al servidor.
+- Estado estandar de red con fase actual y combate activo.
+- Limpieza de sala cuando todos los clientes se desconectan.
 
 ## Cómo ejecutar la demo de consola
 
@@ -238,7 +253,8 @@ python demo_consola.py
 
 ## Nota para la interfaz gráfica
 
-`play.py` ya permite crear partidas, comprar torres, comprar unidades y
-ejecutar combate. La función `comprar_muro(fila, columna)` ya existe en
-la lógica y queda lista para conectarse desde Tkinter si se desea agregar
-un botón de compra de muros.
+`play.py` ya permite conectarse a un servidor, comprar torres, comprar
+muros, comprar unidades, iniciar/pausar combate y actualizar el tablero
+usando el estado oficial recibido por red. La interfaz debe seguir
+limitandose a mostrar datos y enviar acciones; el calculo de combate,
+dinero, rondas y victoria permanece en `Logica/` y en el servidor.
