@@ -30,6 +30,22 @@ COLOR_ALERTA = "#c40000"
 
 LOBBY_LOCAL = {}
 
+DATOS_PARTIDA = {
+    "rol": "",
+    "usuario": "",
+    "faccion": "",
+    "puerto": "",
+    "modo": "red"
+}
+
+
+def obtener_datos_partida():
+    """
+    Devuelve los datos básicos de la partida seleccionada.
+    Se usa desde root.py o desde el mapa.
+    """
+    return DATOS_PARTIDA.copy()
+
 
 class AdaptadorClienteTkinter:
     """
@@ -128,6 +144,12 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         GoMain()
 
     def GoMapaR():
+        DATOS_PARTIDA["rol"] = estado_red["rol"]
+        DATOS_PARTIDA["usuario"] = estado_red["usuario"]
+        DATOS_PARTIDA["faccion"] = faccion_confirmada.get()
+        DATOS_PARTIDA["puerto"] = estado_red["puerto"]
+        DATOS_PARTIDA["modo"] = "red"
+
         adaptador.cerrar()
         detener_servidor_local()
         window2.destroy()
