@@ -18,6 +18,7 @@ from config import config
 from perfil import perfil
 from puntajes import puntajes
 from login import login
+from mapa import mapa
 
 
 
@@ -129,7 +130,16 @@ def GoPlay():
         Abre la ventana de juego.
     """
 
-    play(root, GoMain, cerrar_todo, configurar_ventana, obtener_usuario_actual)
+    play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_actual)
+
+
+def GoMapa():
+    """
+    Descripción:
+        Abre la ventana del mapa desde Play.
+    """
+
+    mapa(root, GoPlay, cerrar_todo, configurar_ventana)
 
 
 def GoConfig():
