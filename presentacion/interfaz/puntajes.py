@@ -5,7 +5,7 @@
 
 import tkinter as tk
 
-import app
+from aplicacion import app
 
 
 def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,

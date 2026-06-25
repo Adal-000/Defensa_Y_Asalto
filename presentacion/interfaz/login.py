@@ -5,7 +5,7 @@
 import tkinter as tk
 from tkinter import messagebox
 
-import app
+from aplicacion import app
 
 
 def login(root, GoMain, cerrar_todo, configurar_ventana, establecer_usuario_actual):

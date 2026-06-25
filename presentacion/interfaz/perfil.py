@@ -5,7 +5,7 @@
 
 import tkinter as tk
 
-import app
+from aplicacion import app
 
 
 def perfil(root, GoMain, GoPuntajes, cerrar_todo, configurar_ventana,

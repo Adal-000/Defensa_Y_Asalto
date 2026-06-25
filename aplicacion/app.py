@@ -12,13 +12,13 @@ Descripcion:
     conectarlos facilmente con los widgets de su interfaz.
 """
 
-import archivos
-from archivos import registrar_jugador as _registrar_jugador
-from archivos import validar_login as _validar_login
-from archivos import buscar_jugador as _buscar_jugador
-from partida import crear_partida as _crear_partida
-from ranking import obtener_top_defensores as _obtener_top_defensores
-from ranking import obtener_top_atacantes as _obtener_top_atacantes
+from infraestructura.persistencia import archivos
+from infraestructura.persistencia.archivos import registrar_jugador as _registrar_jugador
+from infraestructura.persistencia.archivos import validar_login as _validar_login
+from infraestructura.persistencia.archivos import buscar_jugador as _buscar_jugador
+from aplicacion.partida import crear_partida as _crear_partida
+from aplicacion.ranking import obtener_top_defensores as _obtener_top_defensores
+from aplicacion.ranking import obtener_top_atacantes as _obtener_top_atacantes
 
 _partida_actual = None
 
@@ -244,7 +244,7 @@ def obtener_catalogo_torres():
     Restricciones:
         Ninguna.
     """
-    from torre import FABRICANTES_TORRES
+    from defensa_y_asalto.dominio.entidades.torre import FABRICANTES_TORRES
 
     catalogo = []
     for clave, fabricante in FABRICANTES_TORRES.items():
@@ -279,7 +279,7 @@ def obtener_catalogo_unidades():
     Restricciones:
         Ninguna.
     """
-    from unidad import FABRICANTES_UNIDADES
+    from defensa_y_asalto.dominio.entidades.unidad import FABRICANTES_UNIDADES
 
     catalogo = []
     for clave, fabricante in FABRICANTES_UNIDADES.items():

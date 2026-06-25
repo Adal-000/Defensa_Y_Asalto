@@ -6,7 +6,7 @@ Descripcion:
     Desarrollador 1 la muestre en la interfaz grafica con Tkinter.
 """
 
-from archivos import cargar_jugadores, RUTA_ARCHIVO_JUGADORES
+from infraestructura.persistencia.archivos import cargar_jugadores, RUTA_ARCHIVO_JUGADORES
 
 CANTIDAD_MAXIMA_RANKING = 5
 

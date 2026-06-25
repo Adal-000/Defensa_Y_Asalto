@@ -6,18 +6,11 @@ Descripcion:
     acciones y recibir estados actualizados desde el servidor.
 """
 
-import os
 import socket
 import sys
 import threading
 
-RUTA_PROYECTO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-RUTA_RED = os.path.join(RUTA_PROYECTO, "Red")
-
-if RUTA_RED not in sys.path:
-    sys.path.append(RUTA_RED)
-
-from protocolo import (
+from infraestructura.red.protocolo import (
     ACCION_COMPRAR_MURO,
     ACCION_COMPRAR_TORRE,
     ACCION_COMPRAR_UNIDAD,

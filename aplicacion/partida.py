@@ -6,12 +6,12 @@ Descripcion:
     combate y condiciones de victoria.
 """
 
-from base import Base
-from torre import crear_torre_por_tipo
-from unidad import crear_unidad_por_tipo
-from muro import crear_muro
-from combate import ejecutar_turno_de_combate
-from archivos import actualizar_victoria
+from dominio.entidades.base import Base
+from dominio.entidades.torre import crear_torre_por_tipo
+from dominio.entidades.unidad import crear_unidad_por_tipo
+from dominio.entidades.muro import crear_muro
+from dominio.servicios.combate import ejecutar_turno_de_combate
+from infraestructura.persistencia.archivos import actualizar_victoria
 
 DINERO_INICIAL_DEFENSOR = 300
 DINERO_INICIAL_ATACANTE = 250

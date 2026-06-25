@@ -9,25 +9,14 @@ Descripcion:
     mediante la clase Partida y envia estados por sockets usando JSON.
 """
 
-import os
 import socket
 import sys
 import threading
 import time
 
-RUTA_PROYECTO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-RUTA_LOGICA = os.path.join(RUTA_PROYECTO, "Logica")
-RUTA_RED = os.path.join(RUTA_PROYECTO, "Red")
-
-if RUTA_LOGICA not in sys.path:
-    sys.path.append(RUTA_LOGICA)
-
-if RUTA_RED not in sys.path:
-    sys.path.append(RUTA_RED)
-
-from archivos import buscar_jugador
-from partida import crear_partida
-from protocolo import (
+from infraestructura.persistencia.archivos import buscar_jugador
+from aplicacion.partida import crear_partida
+from infraestructura.red.protocolo import (
     ACCION_COMPRAR_MURO,
     ACCION_COMPRAR_TORRE,
     ACCION_COMPRAR_UNIDAD,

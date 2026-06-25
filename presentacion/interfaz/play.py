@@ -2,23 +2,15 @@
 # Archivo para jugar
 #=======================================#
 
-import os
 import queue
 import socket
-import sys
 import threading
 import tkinter as tk
 from tkinter import messagebox
 
-RUTA_PROYECTO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-RUTA_RED = os.path.join(RUTA_PROYECTO, "Red")
-
-if RUTA_RED not in sys.path:
-    sys.path.append(RUTA_RED)
-
-from cliente import ClientePartida, PUERTO_PREDETERMINADO
-from protocolo import ACCION_CAMBIAR_FACCION, ACCION_ELEGIR_FACCION, ACCION_LISTO_LOBBY
-from servidor import ServidorPartida
+from infraestructura.red.cliente import ClientePartida, PUERTO_PREDETERMINADO
+from infraestructura.red.protocolo import ACCION_CAMBIAR_FACCION, ACCION_ELEGIR_FACCION, ACCION_LISTO_LOBBY
+from infraestructura.red.servidor import ServidorPartida
 
 
 FACCIONES = ["Rusia", "España", "Italia", "EE.UU", "Alemania", "Francia"]

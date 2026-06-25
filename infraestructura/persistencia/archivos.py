@@ -9,13 +9,14 @@ Descripcion:
 import json
 import os
 
-from jugador import Jugador
+from dominio.entidades.jugador import Jugador
 
-# Carpeta raiz del proyecto (un nivel arriba de la carpeta Logica/).
-# Se calcula a partir de la ubicacion de este archivo para que la ruta
-# al archivo de jugadores funcione sin importar desde donde se ejecute
-# el programa (por ejemplo, desde Interfaz/root.py).
-_CARPETA_RAIZ_PROYECTO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Carpeta raiz del proyecto. Este archivo vive en:
+# src/defensa_y_asalto/infraestructura/persistencia/archivos.py
+# Por eso subimos cuatro niveles para llegar a la carpeta principal.
+_CARPETA_RAIZ_PROYECTO = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "..")
+)
 
 RUTA_ARCHIVO_JUGADORES = os.path.join(_CARPETA_RAIZ_PROYECTO, "datos", "jugadores.json")
 
