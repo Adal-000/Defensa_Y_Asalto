@@ -19,6 +19,7 @@ from infraestructura.persistencia.archivos import buscar_jugador as _buscar_juga
 from aplicacion.partida import crear_partida as _crear_partida
 from aplicacion.ranking import obtener_top_defensores as _obtener_top_defensores
 from aplicacion.ranking import obtener_top_atacantes as _obtener_top_atacantes
+from aplicacion.facciones import obtener_catalogo_facciones as _obtener_catalogo_facciones
 
 _partida_actual = None
 
@@ -333,3 +334,22 @@ def obtener_top_atacantes():
         Ninguna.
     """
     return _obtener_top_atacantes()
+
+
+def obtener_catalogo_facciones():
+    """
+    Descripcion:
+        Devuelve el catalogo de facciones visuales disponibles para
+        la interfaz. Estas facciones no alteran reglas de juego; solo
+        aportan nombre, codigo e imagen sugerida.
+
+    Entradas:
+        Ninguna.
+
+    Salidas:
+        list[dict]: Lista de facciones visuales.
+
+    Restricciones:
+        Ninguna.
+    """
+    return _obtener_catalogo_facciones()

@@ -8,18 +8,21 @@ import threading
 import tkinter as tk
 from tkinter import messagebox
 
+from aplicacion import app
 from infraestructura.red.cliente import ClientePartida, PUERTO_PREDETERMINADO
-from infraestructura.red.protocolo import ACCION_CAMBIAR_FACCION, ACCION_ELEGIR_FACCION, ACCION_LISTO_LOBBY
 from infraestructura.red.servidor import ServidorPartida
 
 
-FACCIONES = ["Rusia", "España", "Italia", "EE.UU", "Alemania", "Francia"]
+ACCION_CAMBIAR_FACCION = "cambiar_faccion"
+ACCION_ELEGIR_FACCION = "elegir_faccion"
+ACCION_LISTO_LOBBY = "listo_lobby"
 COLOR_FONDO = "#f0f0f0"
 COLOR_PANEL = "#ffffff"
 COLOR_BORDE = "#9a9a9a"
 COLOR_SELECCION = "#b7d7ff"
 COLOR_LISTO = "#1f8f3a"
 COLOR_ALERTA = "#c40000"
+COLOR_AYUDA = "#fff3bf"
 
 LOBBY_LOCAL = {}
 
@@ -80,6 +83,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     cola_mensajes = queue.Queue()
     adaptador = AdaptadorClienteTkinter(cola_mensajes)
     servidor_local = {"instancia": None, "hilo": None}
+    control_ventana = {"cerrando": False, "after_id": None}
     estado_red = {
         "conectado": False,
         "jugadores_conectados": 0,
@@ -89,12 +93,24 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         "en_espera": False,
     }
 
+    catalogo_facciones = app.obtener_catalogo_facciones()
+    imagenes_facciones = {}
     faccion_temporal = tk.StringVar(value="")
     facciones_ocupadas = {}
     listos_remotos = set()
     faccion_confirmada = tk.StringVar(value="")
     seleccion_bloqueada = tk.BooleanVar(value=False)
     listo_para_mapa = tk.BooleanVar(value=False)
+
+    def obtener_ip_local_visible():
+        try:
+            socket_prueba = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            socket_prueba.connect(("8.8.8.8", 80))
+            ip_local = socket_prueba.getsockname()[0]
+            socket_prueba.close()
+            return ip_local
+        except OSError:
+            return "127.0.0.1"
 
     def obtener_clave_sala():
         return str(estado_red["puerto"])
@@ -152,10 +168,28 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                 return True
         return False
 
-    def GoMainR():
+    def cerrar_sala(destruir_aplicacion=False):
+        if control_ventana["cerrando"]:
+            return
+        control_ventana["cerrando"] = True
+        if control_ventana["after_id"] is not None:
+            try:
+                window2.after_cancel(control_ventana["after_id"])
+            except tk.TclError:
+                pass
+            control_ventana["after_id"] = None
         adaptador.cerrar()
         detener_servidor_local()
-        window2.destroy()
+        try:
+            if window2.winfo_exists():
+                window2.destroy()
+        except tk.TclError:
+            pass
+        if destruir_aplicacion:
+            cerrar_todo()
+
+    def GoMainR():
+        cerrar_sala()
         GoMain()
 
     def GoMapaR():
@@ -165,9 +199,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         DATOS_PARTIDA["puerto"] = estado_red["puerto"]
         DATOS_PARTIDA["modo"] = "red"
 
-        adaptador.cerrar()
-        detener_servidor_local()
-        window2.destroy()
+        cerrar_sala()
         GoMapa()
 
     def detener_servidor_local():
@@ -183,10 +215,10 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     boton_volver.place(x=10, y=8)
 
     titulo = tk.Label(window2, text="Play en red", font=("Arial", 28, "bold"), bg=COLOR_FONDO)
-    titulo.place(relx=0.5, y=30, anchor="center")
+    titulo.place(relx=0.5, y=42, anchor="center")
 
     panel_superior = tk.Frame(window2, bg=COLOR_PANEL, relief="groove", bd=2, padx=12, pady=10)
-    panel_superior.place(relx=0.5, y=82, anchor="center")
+    panel_superior.place(relx=0.5, y=118, anchor="center")
 
     variable_modo_conexion = tk.StringVar(value="crear_servidor")
     tk.Label(panel_superior, text="Modo:", font=("Arial", 11, "bold"), bg=COLOR_PANEL).grid(row=0, column=0, padx=4)
@@ -212,23 +244,36 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     campo_puerto.grid(row=1, column=7, padx=4)
 
     etiqueta_conexion = tk.Label(window2, text="Sin conexión.", font=("Arial", 12, "bold"), fg="red", bg=COLOR_FONDO)
-    etiqueta_conexion.place(relx=0.5, y=132, anchor="center")
+    etiqueta_conexion.place(relx=0.5, y=176, anchor="center")
+
+    etiqueta_ayuda_red = tk.Label(
+        window2,
+        text="Si creas servidor, el segundo jugador debe conectarse a la IP local y puerto mostrados aquí.",
+        font=("Arial", 10, "bold"), bg=COLOR_AYUDA, fg="#3d2b00", relief="solid", bd=1, padx=8, pady=3
+    )
+    etiqueta_ayuda_red.place(relx=0.5, y=200, anchor="center")
+
+    etiqueta_datos_host = tk.Label(
+        window2, text="IP para compartir: -- | Puerto: --",
+        font=("Arial", 12, "bold"), bg="#d7f5ff", fg="#00384d", relief="solid", bd=2, padx=10, pady=4
+    )
+    etiqueta_datos_host.place(relx=0.5, y=229, anchor="center")
 
     panel_facciones = tk.Frame(window2, bg=COLOR_FONDO)
-    panel_facciones.place(relx=0.5, y=188, anchor="n")
+    panel_facciones.place(relx=0.5, y=285, anchor="n")
     botones_faccion = {}
 
     texto_faccion = tk.Label(window2, text="Elige una facción", font=("Arial", 12, "bold"), width=34, height=2, relief="solid", bd=2, bg=COLOR_FONDO)
-    texto_faccion.place(relx=0.5, y=158, anchor="center")
+    texto_faccion.place(relx=0.5, y=260, anchor="center")
 
     texto_espera = tk.Label(window2, text="", font=("Arial", 11, "bold"), fg=COLOR_ALERTA, bg=COLOR_FONDO, width=24)
-    texto_espera.place(x=900, y=575)
+    texto_espera.place(x=905, y=615)
 
-    caja_info_facciones = tk.Listbox(window2, font=("Consolas", 9), width=42, height=5)
-    caja_info_facciones.place(x=250, y=535)
+    caja_info_facciones = tk.Listbox(window2, font=("Consolas", 9), width=42, height=4)
+    caja_info_facciones.place(x=265, y=600)
 
-    caja_eventos = tk.Listbox(window2, font=("Consolas", 9), width=48, height=5)
-    caja_eventos.place(x=595, y=535)
+    caja_eventos = tk.Listbox(window2, font=("Consolas", 9), width=48, height=4)
+    caja_eventos.place(x=610, y=600)
 
     def agregar_evento(texto):
         if texto:
@@ -271,16 +316,24 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         texto_faccion.config(text=f"Facción {nombre_faccion}", fg="black")
         refrescar_botones()
 
-    for indice, nombre_faccion in enumerate(FACCIONES):
+    for indice, datos_faccion in enumerate(catalogo_facciones):
+        nombre_faccion = datos_faccion["nombre"]
         fila = indice // 3
         columna = indice % 3
+        imagen = None
+        try:
+            imagen = tk.PhotoImage(file=datos_faccion["imagen"]).subsample(4, 4)
+            imagenes_facciones[nombre_faccion] = imagen
+        except tk.TclError:
+            imagen = None
         boton_faccion = tk.Button(
             panel_facciones,
-            text=f"┌───────────────┐\n│   Bandera   │\n└───────────────┘\n{nombre_faccion}",
-            font=("Arial", 12, "bold"), width=20, height=5,
+            text=f"{datos_faccion['codigo']}\n{nombre_faccion}",
+            image=imagen, compound="top",
+            font=("Arial", 12, "bold"), width=170, height=120,
             command=lambda faccion=nombre_faccion: seleccionar_faccion(faccion)
         )
-        boton_faccion.grid(row=fila, column=columna, padx=24, pady=18)
+        boton_faccion.grid(row=fila, column=columna, padx=24, pady=8)
         botones_faccion[nombre_faccion] = boton_faccion
 
     def elegir_faccion_click():
@@ -360,11 +413,14 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         hilo.start()
         campo_puerto.delete(0, tk.END)
         campo_puerto.insert(0, str(puerto_final))
-        return True, f"Servidor creado. Otro jugador puede unirse al puerto {puerto_final}."
+        ip_local = obtener_ip_local_visible()
+        etiqueta_datos_host.config(text=f"IP para compartir: {ip_local} | Puerto: {puerto_final}")
+        return True, f"Servidor creado. El segundo jugador debe conectarse a {ip_local}:{puerto_final}."
 
     def conectar_cliente(host, usuario, rol, puerto):
         estado_red["puerto"] = puerto
         estado_red["usuario"] = usuario
+        etiqueta_datos_host.config(text=f"IP para compartir: {obtener_ip_local_visible()} | Puerto: {puerto}")
         exito, mensaje = adaptador.conectar(host, usuario, rol, puerto)
         etiqueta_conexion.config(text=mensaje, fg="green" if exito else "red")
         agregar_evento(mensaje)
@@ -388,7 +444,17 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             if not exito:
                 return
             puerto = int(campo_puerto.get())
-            window2.after(250, lambda: conectar_cliente("127.0.0.1", usuario, rol, puerto))
+
+            def conectar_local_demorado():
+                if control_ventana["cerrando"]:
+                    return
+                try:
+                    if window2.winfo_exists():
+                        conectar_cliente("127.0.0.1", usuario, rol, puerto)
+                except tk.TclError:
+                    control_ventana["cerrando"] = True
+
+            window2.after(250, conectar_local_demorado)
             return
         conectar_cliente(host, usuario, rol, puerto)
 
@@ -396,13 +462,13 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     boton_conectar.grid(row=1, column=8, padx=8)
 
     boton_cambiar_faccion = tk.Button(window2, text="Cambiar facción", font=("Arial", 12, "bold"), width=16, bg="#ffd36b", command=cambiar_faccion_click)
-    boton_cambiar_faccion.place(x=55, y=535)
+    boton_cambiar_faccion.place(x=55, y=585)
 
     boton_elegir_faccion = tk.Button(window2, text="Elegir facción", font=("Arial", 12, "bold"), width=16, bg="lightgreen", command=elegir_faccion_click)
-    boton_elegir_faccion.place(x=55, y=585)
+    boton_elegir_faccion.place(x=55, y=635)
 
     boton_iniciar_combate = tk.Button(window2, text="Jugar", font=("Arial", 13, "bold"), width=18, height=2, bg="orange", command=iniciar_combate_click)
-    boton_iniciar_combate.place(x=1030, y=545)
+    boton_iniciar_combate.place(x=1010, y=610)
 
     def procesar_mensajes_red():
         while not cola_mensajes.empty():
@@ -415,6 +481,10 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                 estado_red["jugadores_conectados"] = int(datos.get("jugadores_conectados", estado_red["jugadores_conectados"]))
                 estado_red["rol"] = datos.get("rol_cliente", datos.get("rol", estado_red["rol"]))
                 sincronizar_lobby_remoto(datos)
+                roles_ocupados = set(datos.get("roles_ocupados", []))
+                roles_faltantes = [rol for rol in ("defensor", "atacante") if rol not in roles_ocupados]
+                if roles_faltantes:
+                    texto_espera.config(text="Falta: " + ", ".join(roles_faltantes))
                 refrescar_botones()
                 if hay_dos_jugadores():
                     etiqueta_conexion.config(text="Sala completa: 2 jugadores conectados.", fg="green")
@@ -422,13 +492,15 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                     etiqueta_conexion.config(text="Conectado. Esperando al segundo jugador.", fg="orange")
             if estado_red["en_espera"] and facciones_validas_en_sala() and roles_necesarios_listos():
                 GoMapaR()
-        if window2.winfo_exists():
-            window2.after(300, procesar_mensajes_red)
+        if not control_ventana["cerrando"]:
+            try:
+                if window2.winfo_exists():
+                    control_ventana["after_id"] = window2.after(300, procesar_mensajes_red)
+            except tk.TclError:
+                control_ventana["cerrando"] = True
 
     def cerrar_ventana():
-        adaptador.cerrar()
-        detener_servidor_local()
-        cerrar_todo()
+        cerrar_sala(destruir_aplicacion=True)
 
-    window2.after(300, procesar_mensajes_red)
+    control_ventana["after_id"] = window2.after(300, procesar_mensajes_red)
     window2.protocol("WM_DELETE_WINDOW", cerrar_ventana)

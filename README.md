@@ -69,6 +69,7 @@ ejecutar_combate()
 obtener_estado_partida()
 obtener_catalogo_torres()
 obtener_catalogo_unidades()
+obtener_catalogo_facciones()
 obtener_top_defensores()
 obtener_top_atacantes()
 ```
@@ -89,6 +90,7 @@ La parte del Desarrollador 2 incluye:
 - Clase `Base` con vida y destrucción.
 - Clase `Partida` para rondas, dinero, compras, marcador y victoria.
 - Módulo `combate.py` para movimiento, ataques, daño, eliminación y habilidades.
+- Catálogo visual de facciones: España, Inglaterra, Alemania, Rusia, Italia y EE.UU.
 
 ## Sistema de dinero
 
@@ -203,7 +205,9 @@ estado = cliente.obtener_ultimo_estado_local()
 resumen_red = cliente.obtener_resumen_red()
 ```
 
-Si el puerto escrito no esta disponible al crear servidor desde `Play`, la interfaz prueba puertos alternativos cercanos y actualiza el campo `Puerto` con el que debe usar el segundo jugador.
+Si el puerto escrito no esta disponible al crear servidor desde `Play`, la interfaz prueba puertos alternativos cercanos y actualiza el campo `Puerto` con el que debe usar el segundo jugador. La pantalla tambien muestra de forma destacada la IP local y el puerto que el anfitrion debe compartir.
+
+Las facciones de `Play` son visuales: se cargan desde `aplicacion.obtener_catalogo_facciones()`, usan imagenes existentes de `Imagenes/Soldados/` y no cambian dinero, daño, vida, velocidad, habilidades, rondas ni victoria.
 
 El servidor envia en `datos` campos estandar para facilitar la interfaz:
 
