@@ -114,27 +114,16 @@ def play(root, GoMain, *argumentos):
         Crea la ventana de juego conectada al modo cliente-servidor.
         La interfaz solo muestra el estado recibido, dibuja un tablero
         simple, permite elegir una faccion visual del jugador y envia
-<<<<<<< ours
-        acciones al servidor mediante ClientePartida.
-=======
         acciones al servidor mediante ClientePartida. Acepta tanto la
         llamada nueva con GoMapa como la llamada anterior sin GoMapa
         para mantener compatibilidad entre versiones de root.py.
->>>>>>> theirs
 
     Entradas:
         root: ventana raiz oculta.
         GoMain: funcion para volver al menu principal.
-<<<<<<< ours
-        cerrar_todo: funcion para cerrar completamente el programa.
-        configurar_ventana: funcion que centra y configura la ventana.
-        obtener_usuario_actual: funcion que devuelve el nombre del
-            jugador que inicio sesion.
-=======
         argumentos (tuple): Puede contener cerrar_todo, configurar_ventana
             y obtener_usuario_actual; o GoMapa, cerrar_todo,
             configurar_ventana y obtener_usuario_actual.
->>>>>>> theirs
 
     Salidas:
         No retorna ningun valor.
@@ -143,10 +132,7 @@ def play(root, GoMain, *argumentos):
         - Debe existir un servidor ejecutandose para jugar en red.
         - La logica de dinero, combate y victoria vive en el servidor.
         - La faccion es una seleccion visual local para la interfaz.
-<<<<<<< ours
-=======
         - La firma recibida debe tener 3 o 4 argumentos adicionales.
->>>>>>> theirs
     """
 
     if len(argumentos) == 3:
@@ -299,7 +285,6 @@ def play(root, GoMain, *argumentos):
 
         Entradas:
             Ninguna.
-<<<<<<< ours
 
         Salidas:
             None: Desbloquea el selector de facciones.
@@ -407,115 +392,6 @@ def play(root, GoMain, *argumentos):
             - Debe llamarse desde Tkinter usando after() o eventos de
               la ventana.
         """
-=======
-
-        Salidas:
-            None: Desbloquea el selector de facciones.
-
-        Restricciones:
-            - Solo modifica datos visuales de la interfaz.
-        """
-        seleccion_faccion_bloqueada.set(False)
-        faccion_confirmada.set("")
-        etiqueta_faccion.config(text="Faccion sin confirmar", fg="red")
-        menu_facciones.config(state="normal")
-
-    tk.Button(
-        panel_faccion,
-        text="Elegir",
-        font=("Arial", 10, "bold"),
-        bg="lightgreen",
-        command=elegir_faccion_click,
-    ).grid(row=0, column=3, padx=4)
-    tk.Button(
-        panel_faccion,
-        text="Cambiar",
-        font=("Arial", 10, "bold"),
-        bg="#ffd36b",
-        command=cambiar_faccion_click,
-    ).grid(row=0, column=4, padx=4)
-
-    texto_estado = tk.Label(window2, text="Conectate a un servidor para comenzar.", font=("Arial", 12), justify="left")
-    texto_estado.place(relx=0.20, rely=0.33, anchor="n")
-
-    marco_tablero = tk.Frame(window2, bd=2, relief="solid")
-    marco_tablero.place(relx=0.50, rely=0.33, anchor="n")
-    celdas_tablero = []
-    for fila in range(CANTIDAD_FILAS_TABLERO):
-        fila_celdas = []
-        for columna in range(CANTIDAD_COLUMNAS_TABLERO):
-            celda = tk.Label(marco_tablero, text="", width=4, height=2, relief="ridge", bg="white")
-            celda.grid(row=fila, column=columna)
-            fila_celdas.append(celda)
-        celdas_tablero.append(fila_celdas)
-
-    caja_eventos = tk.Listbox(window2, font=("Consolas", 9), width=48, height=17)
-    caja_eventos.place(relx=0.79, rely=0.33, anchor="n")
-
-    def agregar_evento(texto):
-        """
-        Descripcion:
-            Agrega un mensaje al cuadro de eventos de la interfaz.
-
-        Entradas:
-            texto (str): Mensaje que se desea mostrar.
-
-        Salidas:
-            None: Modifica el Listbox de eventos.
-
-        Restricciones:
-            - Debe llamarse desde el hilo principal de Tkinter.
-        """
-        if texto:
-            caja_eventos.insert(tk.END, texto)
-            caja_eventos.yview(tk.END)
-
-    def dibujar_tablero(estado):
-        """
-        Descripcion:
-            Dibuja una vista simple del tablero usando el estado
-            oficial recibido desde el servidor.
-
-        Entradas:
-            estado (dict): Estado de partida devuelto por el servidor.
-
-        Salidas:
-            None: Actualiza colores y textos de las celdas.
-
-        Restricciones:
-            - El estado debe contener listas de torres, muros y
-              unidades con fila y columna.
-        """
-        for fila in range(CANTIDAD_FILAS_TABLERO):
-            for columna in range(CANTIDAD_COLUMNAS_TABLERO):
-                texto = "B" if fila == 0 else ""
-                color = "lightgreen" if fila == 0 else "white"
-                celdas_tablero[fila][columna].config(text=texto, bg=color)
-
-        for torre in estado.get("torres", []):
-            celdas_tablero[torre["fila"]][torre["columna"]].config(text="T", bg="lightblue")
-        for muro in estado.get("muros", []):
-            celdas_tablero[muro["fila"]][muro["columna"]].config(text="M", bg="gray80")
-        for unidad in estado.get("unidades", []):
-            celdas_tablero[unidad["fila"]][unidad["columna"]].config(text="U", bg="salmon")
-
-    def refrescar_estado(estado):
-        """
-        Descripcion:
-            Actualiza etiquetas y tablero con el estado oficial de la
-            partida recibido por red.
-
-        Entradas:
-            estado (dict): Estado actual de la partida.
-
-        Salidas:
-            None: Modifica widgets de la ventana.
-
-        Restricciones:
-            - Debe llamarse desde Tkinter usando after() o eventos de
-              la ventana.
-        """
->>>>>>> theirs
         estado_actual["datos"] = estado
 
         if not estado:
@@ -550,17 +426,10 @@ def play(root, GoMain, *argumentos):
 
         Entradas:
             Ninguna.
-<<<<<<< ours
 
         Salidas:
             None: Consume la cola de mensajes de red.
 
-=======
-
-        Salidas:
-            None: Consume la cola de mensajes de red.
-
->>>>>>> theirs
         Restricciones:
             - Debe programarse periodicamente con after().
         """
@@ -728,17 +597,10 @@ def play(root, GoMain, *argumentos):
             return
 
         conectar_cliente(host, usuario, rol, puerto)
-<<<<<<< ours
 
     boton_conectar = tk.Button(panel_conexion, text="Continuar", font=("Arial", 11, "bold"), bg="lightgreen", command=conectar_click)
     boton_conectar.grid(row=1, column=8, padx=8)
 
-=======
-
-    boton_conectar = tk.Button(panel_conexion, text="Continuar", font=("Arial", 11, "bold"), bg="lightgreen", command=conectar_click)
-    boton_conectar.grid(row=1, column=8, padx=8)
-
->>>>>>> theirs
     panel_compras = tk.Frame(window2)
     panel_compras.place(relx=0.50, rely=0.82, anchor="n")
 
@@ -818,15 +680,13 @@ def play(root, GoMain, *argumentos):
         Restricciones:
             - La fila y columna deben ser enteros.
         """
-        host = campo_ip.get().strip()
-        usuario = campo_usuario.get().strip()
-        rol = variable_rol.get().strip()
-        modo_conexion = variable_modo_conexion.get()
         try:
-            puerto = int(campo_puerto.get())
+            fila = int(campo_fila_unidad.get())
+            columna = int(campo_columna_unidad.get())
         except ValueError:
             messagebox.showwarning("Posicion invalida", "Fila y columna deben ser numeros enteros.")
             return
+
         exito, mensaje = adaptador.cliente.comprar_unidad(variable_tipo_unidad.get(), fila, columna)
         agregar_evento(mensaje)
         if not exito:
