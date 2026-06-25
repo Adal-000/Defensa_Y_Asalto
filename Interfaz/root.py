@@ -19,6 +19,7 @@ from perfil import perfil
 from puntajes import puntajes
 from login import login
 from mapa import mapa
+from play import obtener_datos_partida
 
 
 
@@ -58,7 +59,7 @@ root = tk.Tk()
 root.withdraw()
 
 # Guarda el nombre de usuario que inició sesión, para que las demás
-# ventanas (Perfil, Play, Puntajes) sepan quién está jugando. NO funka
+# ventanas (Perfil, Play, Puntajes) sepan quién está jugando.
 estado_sesion = {"usuario_actual": None}
 
 
@@ -133,13 +134,13 @@ def GoPlay():
     play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_actual)
 
 
-def GoMapa(datos_partida=None):
+def GoMapa():
     """
     Descripción:
         Abre la ventana del mapa desde Play.
     """
 
-    mapa(root, GoPlay, cerrar_todo, configurar_ventana, datos_partida)
+    mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida)
 
 
 def GoConfig():
