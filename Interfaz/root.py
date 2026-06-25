@@ -3,13 +3,21 @@
 # Archivo base para manejo de ventanas
 #=======================================#
 
+import os
+import sys
 import tkinter as tk
+
+# Permite importar los modulos de la carpeta Logica/ (ubicada al
+# mismo nivel que Interfaz/) sin necesidad de instalar el proyecto
+# como paquete.
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Logica"))
 
 from main import main
 from play import play
 from config import config
 from perfil import perfil
 from puntajes import puntajes
+from login import login
 
 
 
@@ -48,6 +56,43 @@ def configurar_ventana(window1, nombre):
 root = tk.Tk()
 root.withdraw()
 
+# Guarda el nombre de usuario que inició sesión, para que las demás
+# ventanas (Perfil, Play, Puntajes) sepan quién está jugando.
+estado_sesion = {"usuario_actual": None}
+
+
+def establecer_usuario_actual(nombre_usuario):
+    """
+    Descripción:
+        Guarda el nombre de usuario que acaba de iniciar sesión.
+
+    Entradas:
+        nombre_usuario: nombre del usuario que inició sesión.
+    """
+
+    estado_sesion["usuario_actual"] = nombre_usuario
+
+
+def obtener_usuario_actual():
+    """
+    Descripción:
+        Devuelve el nombre de usuario que tiene la sesión activa.
+
+    Salidas:
+        El nombre de usuario actual, o None si nadie ha iniciado sesión.
+    """
+
+    return estado_sesion["usuario_actual"]
+
+
+def GoLogin():
+    """
+    Descripción:
+        Abre la ventana de inicio de sesión / registro.
+    """
+
+    login(root, GoMain, cerrar_todo, configurar_ventana, establecer_usuario_actual)
+
 
 def GoMain():
     """
@@ -55,7 +100,8 @@ def GoMain():
         Abre la ventana principal.
     """
 
-    main(root, GoPerfil, GoPlay, GoConfig, cerrar_todo, configurar_ventana)
+    main(root, GoPerfil, GoPlay, GoConfig, cerrar_todo, configurar_ventana,
+         obtener_usuario_actual)
 
 
 def GoPerfil():
@@ -64,7 +110,8 @@ def GoPerfil():
         Abre la ventana de perfil.
     """
 
-    perfil(root, GoMain, GoPuntajes, cerrar_todo, configurar_ventana)
+    perfil(root, GoMain, GoPuntajes, cerrar_todo, configurar_ventana,
+           obtener_usuario_actual)
 
 
 def GoPuntajes():
@@ -73,7 +120,7 @@ def GoPuntajes():
         Abre la ventana de puntajes desde perfil.
     """
 
-    puntajes(root, GoPerfil, cerrar_todo, configurar_ventana)
+    puntajes(root, GoPerfil, cerrar_todo, configurar_ventana, obtener_usuario_actual)
 
 
 def GoPlay():
@@ -82,7 +129,7 @@ def GoPlay():
         Abre la ventana de juego.
     """
 
-    play(root, GoMain, cerrar_todo, configurar_ventana)
+    play(root, GoMain, cerrar_todo, configurar_ventana, obtener_usuario_actual)
 
 
 def GoConfig():
@@ -103,6 +150,6 @@ def cerrar_todo():
     root.destroy()
 
 
-GoMain()
+GoLogin()
 
 root.mainloop()

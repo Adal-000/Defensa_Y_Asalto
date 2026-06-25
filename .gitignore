@@ -1,0 +1,13 @@
+# Archivos compilados de Python
+__pycache__/
+*.pyc
+
+# Archivos de Visual Studio
+.vs/
+
+# Datos generados en tiempo de ejecucion (no se versionan)
+datos/jugadores.json
+
+# Entornos virtuales
+venv/
+env/

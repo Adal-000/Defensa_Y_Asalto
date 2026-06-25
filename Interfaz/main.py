@@ -6,7 +6,8 @@
 import tkinter as tk
 
 
-def main(root, GoPerfil, GoPlay, GoConfig, cerrar_todo, configurar_ventana):
+def main(root, GoPerfil, GoPlay, GoConfig, cerrar_todo, configurar_ventana,
+         obtener_usuario_actual):
     """
     Descripción:
         Crea la ventana principal del juego Defensa y Asalto.
@@ -18,6 +19,8 @@ def main(root, GoPerfil, GoPlay, GoConfig, cerrar_todo, configurar_ventana):
         GoConfig: función para abrir la ventana de configuración.
         cerrar_todo: función para cerrar completamente el programa.
         configurar_ventana: función que centra y configura la ventana.
+        obtener_usuario_actual: función que devuelve el nombre del
+            jugador que inició sesión.
 
     Salidas:
         No retorna ningún valor.
@@ -61,6 +64,15 @@ def main(root, GoPerfil, GoPlay, GoConfig, cerrar_todo, configurar_ventana):
         padx=20,
         pady=(0, 60)
     )
+
+    nombre_usuario_actual = obtener_usuario_actual() or "Invitado"
+
+    etiqueta_bienvenida = tk.Label(
+        window,
+        text=f"Sesión: {nombre_usuario_actual}",
+        font=("Arial", 12, "bold")
+    )
+    etiqueta_bienvenida.place(x=20, y=20)
 
     boton_perfil = tk.Button(
         contenedor,

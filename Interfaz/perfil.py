@@ -5,8 +5,11 @@
 
 import tkinter as tk
 
+import app
 
-def perfil(root, GoMain, GoPuntajes, cerrar_todo, configurar_ventana):
+
+def perfil(root, GoMain, GoPuntajes, cerrar_todo, configurar_ventana,
+           obtener_usuario_actual):
     """
     Descripción:
         Crea la ventana de perfil del juego.
@@ -17,6 +20,8 @@ def perfil(root, GoMain, GoPuntajes, cerrar_todo, configurar_ventana):
         GoPuntajes: función para abrir la ventana de puntajes.
         cerrar_todo: función para cerrar completamente el programa.
         configurar_ventana: función que centra y configura la ventana.
+        obtener_usuario_actual: función que devuelve el nombre del
+            jugador que inició sesión.
 
     Salidas:
         No retorna ningún valor.
@@ -76,5 +81,31 @@ def perfil(root, GoMain, GoPuntajes, cerrar_todo, configurar_ventana):
     )
 
     texto.place(relx=0.5, rely=0.48, anchor="center")
+
+    nombre_usuario_actual = obtener_usuario_actual()
+
+    if nombre_usuario_actual is not None:
+        datos_jugador = app.obtener_jugador(nombre_usuario_actual)
+    else:
+        datos_jugador = None
+
+    if datos_jugador is not None:
+        texto_estadisticas = (
+            f"Usuario: {datos_jugador['nombre_usuario']}\n"
+            f"Victorias como defensor: {datos_jugador['victorias_defensor']}\n"
+            f"Victorias como atacante: {datos_jugador['victorias_atacante']}\n"
+            f"Total de victorias: {datos_jugador['total_victorias']}"
+        )
+    else:
+        texto_estadisticas = "No se encontró información del jugador actual."
+
+    etiqueta_estadisticas = tk.Label(
+        window1,
+        text=texto_estadisticas,
+        font=("Arial", 16),
+        justify="left"
+    )
+
+    etiqueta_estadisticas.place(relx=0.5, rely=0.65, anchor="center")
 
     window1.protocol("WM_DELETE_WINDOW", cerrar_todo)

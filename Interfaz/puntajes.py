@@ -5,8 +5,11 @@
 
 import tkinter as tk
 
+import app
 
-def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana):
+
+def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
+             obtener_usuario_actual):
     """
     Descripción:
         Crea la ventana de puntajes del jugador y puntajes mundiales.
@@ -16,6 +19,8 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana):
         GoPerfil: función para volver a la ventana de perfil.
         cerrar_todo: función para cerrar completamente el programa.
         configurar_ventana: función que centra y configura la ventana.
+        obtener_usuario_actual: función que devuelve el nombre del
+            jugador que inició sesión.
 
     Salidas:
         No retorna ningún valor.
@@ -75,20 +80,54 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana):
 
     caja_puntajes_mundiales.place(relx=0.68, rely=0.42, anchor="center")
 
+    nombre_usuario_actual = obtener_usuario_actual()
+    datos_jugador = app.obtener_jugador(nombre_usuario_actual) if nombre_usuario_actual else None
+
+    if datos_jugador is not None:
+        texto_mis_puntajes_contenido = (
+            f"Victorias como defensor: {datos_jugador['victorias_defensor']}\n"
+            f"Victorias como atacante: {datos_jugador['victorias_atacante']}"
+        )
+    else:
+        texto_mis_puntajes_contenido = "Inicia sesión para ver tus puntajes."
+
     texto_mis_puntajes = tk.Label(
         window_puntajes,
-        text="Aquí se mostrarán los puntajes del jugador.",
-        font=("Arial", 16)
+        text=texto_mis_puntajes_contenido,
+        font=("Arial", 16),
+        justify="left"
     )
 
-    texto_mis_puntajes.place(relx=0.32, rely=0.55, anchor="center")
+    texto_mis_puntajes.place(relx=0.32, rely=0.58, anchor="center")
+
+    top_defensores = app.obtener_top_defensores()
+    top_atacantes = app.obtener_top_atacantes()
+
+    lineas_ranking = ["Top defensores:"]
+    for posicion, jugador_ranking in enumerate(top_defensores, start=1):
+        lineas_ranking.append(
+            f"{posicion}. {jugador_ranking['nombre_usuario']} "
+            f"({jugador_ranking['victorias_defensor']} victorias)"
+        )
+
+    lineas_ranking.append("")
+    lineas_ranking.append("Top atacantes:")
+    for posicion, jugador_ranking in enumerate(top_atacantes, start=1):
+        lineas_ranking.append(
+            f"{posicion}. {jugador_ranking['nombre_usuario']} "
+            f"({jugador_ranking['victorias_atacante']} victorias)"
+        )
+
+    if not top_defensores and not top_atacantes:
+        lineas_ranking = ["Aún no hay jugadores registrados."]
 
     texto_puntajes_mundiales = tk.Label(
         window_puntajes,
-        text="Aquí se mostrarán los puntajes mundiales.",
-        font=("Arial", 16)
+        text="\n".join(lineas_ranking),
+        font=("Arial", 14),
+        justify="left"
     )
 
-    texto_puntajes_mundiales.place(relx=0.68, rely=0.55, anchor="center")
+    texto_puntajes_mundiales.place(relx=0.68, rely=0.58, anchor="center")
 
     window_puntajes.protocol("WM_DELETE_WINDOW", cerrar_todo)
