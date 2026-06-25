@@ -1,5 +1,5 @@
 #=======================================#
-# Archivo para jugar
+# Archivo para iniciar sesion antes de jugar
 #=======================================#
 
 import tkinter as tk
