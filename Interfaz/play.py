@@ -35,7 +35,6 @@ class AdaptadorClienteTkinter:
         Encapsula el ClientePartida de red para que la ventana de
         Tkinter pueda enviar acciones al servidor sin mezclar la
         logica de combate con la interfaz grafica.
-<<<<<<< ours
 
     Entradas:
         cola_mensajes (queue.Queue): Cola donde se guardan los
@@ -54,26 +53,6 @@ class AdaptadorClienteTkinter:
         self.cola_mensajes = cola_mensajes
         self.cliente = ClientePartida(callback_mensaje=self._recibir_mensaje)
 
-=======
-
-    Entradas:
-        cola_mensajes (queue.Queue): Cola donde se guardan los
-            mensajes recibidos desde el hilo del cliente.
-
-    Salidas:
-        No retorna nada. Crea un adaptador listo para conectar.
-
-    Restricciones:
-        - La cola debe existir antes de crear el adaptador.
-        - Los widgets de Tkinter no deben modificarse directamente
-          desde el hilo de red.
-    """
-
-    def __init__(self, cola_mensajes):
-        self.cola_mensajes = cola_mensajes
-        self.cliente = ClientePartida(callback_mensaje=self._recibir_mensaje)
-
->>>>>>> theirs
     def _recibir_mensaje(self, mensaje):
         """
         Descripcion:
@@ -372,77 +351,6 @@ def play(root, GoMain, cerrar_todo, configurar_ventana, obtener_usuario_actual):
         if window2.winfo_exists():
             window2.after(300, procesar_mensajes_red)
 
-<<<<<<< ours
-    def iniciar_servidor_local(puerto):
-        """
-        Descripcion:
-            Crea un servidor de partida desde la misma interfaz y lo
-            ejecuta en un hilo para que Tkinter no se congele.
-
-        Entradas:
-            puerto (int): Puerto donde escuchara el servidor local.
-
-        Salidas:
-            tuple[bool, str]: Resultado de iniciar el servidor.
-
-        Restricciones:
-            - El puerto debe estar libre.
-            - Solo debe existir un servidor local por ventana Play.
-        """
-        if servidor_local["instancia"] is not None:
-            return True, "Servidor local ya estaba iniciado."
-
-        try:
-            socket_prueba = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            socket_prueba.bind(("0.0.0.0", puerto))
-            socket_prueba.close()
-        except OSError as error:
-            return False, f"No se pudo crear el servidor en el puerto {puerto}: {error}"
-
-        servidor = ServidorPartida(puerto=puerto)
-        hilo_servidor = threading.Thread(target=servidor.iniciar, daemon=True)
-        servidor_local["instancia"] = servidor
-        servidor_local["hilo"] = hilo_servidor
-        hilo_servidor.start()
-        return True, f"Servidor creado. Otro jugador puede unirse al puerto {puerto}."
-
-    def conectar_cliente(host, usuario, rol, puerto):
-        """
-        Descripcion:
-            Conecta el ClientePartida al servidor indicado y pide el
-            estado inicial si la conexion fue exitosa.
-
-        Entradas:
-            host (str): IP del servidor.
-            usuario (str): Nombre de usuario.
-            rol (str): Rol solicitado.
-            puerto (int): Puerto del servidor.
-
-        Salidas:
-            None: Actualiza mensajes visibles.
-
-        Restricciones:
-            - El servidor debe estar escuchando.
-        """
-        exito, mensaje = adaptador.conectar(host, usuario, rol, puerto)
-        etiqueta_conexion.config(text=mensaje, fg="green" if exito else "red")
-        agregar_evento(mensaje)
-        if exito:
-            adaptador.cliente.obtener_estado()
-
-    def conectar_click():
-        """
-        Descripcion:
-            Permite elegir entre crear un servidor local o unirse a una
-            partida existente, y luego conecta el cliente de esta ventana.
-
-        Entradas:
-            Ninguna.
-
-        Salidas:
-            None: Actualiza mensajes visibles y estado de conexion.
-
-=======
     def buscar_puerto_disponible(puerto_preferido):
         """
         Descripcion:
@@ -563,7 +471,6 @@ def play(root, GoMain, cerrar_todo, configurar_ventana, obtener_usuario_actual):
         Salidas:
             None: Actualiza mensajes visibles y estado de conexion.
 
->>>>>>> theirs
         Restricciones:
             - El puerto debe ser un entero.
             - Para unirse a una partida, la IP debe apuntar a un servidor activo.
@@ -576,27 +483,6 @@ def play(root, GoMain, cerrar_todo, configurar_ventana, obtener_usuario_actual):
             puerto = int(campo_puerto.get())
         except ValueError:
             messagebox.showwarning("Puerto invalido", "El puerto debe ser un numero entero.")
-<<<<<<< ours
-            return
-
-        if modo_conexion == "crear_servidor":
-            exito_servidor, mensaje_servidor = iniciar_servidor_local(puerto)
-            etiqueta_conexion.config(text=mensaje_servidor, fg="green" if exito_servidor else "red")
-            agregar_evento(mensaje_servidor)
-            if not exito_servidor:
-                return
-            window2.after(250, lambda: conectar_cliente("127.0.0.1", usuario, rol, puerto))
-            return
-
-        conectar_cliente(host, usuario, rol, puerto)
-
-    boton_conectar = tk.Button(panel_conexion, text="Continuar", font=("Arial", 11, "bold"), bg="lightgreen", command=conectar_click)
-    boton_conectar.grid(row=1, column=8, padx=8)
-
-    panel_compras = tk.Frame(window2)
-    panel_compras.place(relx=0.50, rely=0.82, anchor="n")
-
-=======
             return
 
         if modo_conexion == "crear_servidor":
@@ -617,7 +503,6 @@ def play(root, GoMain, cerrar_todo, configurar_ventana, obtener_usuario_actual):
     panel_compras = tk.Frame(window2)
     panel_compras.place(relx=0.50, rely=0.82, anchor="n")
 
->>>>>>> theirs
     variable_tipo_torre = tk.StringVar(value=TIPOS_TORRE[0])
     variable_tipo_unidad = tk.StringVar(value=TIPOS_UNIDAD[0])
 
