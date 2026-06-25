@@ -133,13 +133,13 @@ def GoPlay():
     play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_actual)
 
 
-def GoMapa():
+def GoMapa(datos_partida=None):
     """
     Descripción:
         Abre la ventana del mapa desde Play.
     """
 
-    mapa(root, GoPlay, cerrar_todo, configurar_ventana)
+    mapa(root, GoPlay, cerrar_todo, configurar_ventana, datos_partida)
 
 
 def GoConfig():
