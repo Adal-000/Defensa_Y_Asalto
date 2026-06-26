@@ -7,10 +7,19 @@ from tkinter import messagebox
 
 from aplicacion import app
 
+<<<<<<< ours
 COLOR_FONDO = "#eef3f8"
 COLOR_TARJETA = "#ffffff"
 COLOR_PRIMARIO = "#1f4e79"
 COLOR_BORDE = "#b7c7d6"
+=======
+COLOR_FONDO = "#18202b"
+COLOR_TARJETA = "#243244"
+COLOR_PRIMARIO = "#1f4e79"
+COLOR_BORDE = "#f6b73c"
+COLOR_TEXTO = "#f5f7fb"
+COLOR_SUAVE = "#b8c7d9"
+>>>>>>> theirs
 
 
 def config(root, GoMain, cerrar_todo, configurar_ventana):
@@ -59,7 +68,11 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
             ip_servidor_predeterminada=ip_var.get().strip() or "127.0.0.1",
             puerto_predeterminado=puerto,
         )
+<<<<<<< ours
         etiqueta_estado.config(text="Configuración aplicada para esta sesión.", fg="#1b5e20")
+=======
+        etiqueta_estado.config(text="Configuración aplicada para esta sesión.", fg="#8ee08e")
+>>>>>>> theirs
 
     def restablecer_configuracion():
         valores = app.restablecer_configuracion()
@@ -68,7 +81,11 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
         proyectiles_var.set(valores["mostrar_proyectiles"])
         ip_var.set(valores["ip_servidor_predeterminada"])
         puerto_var.set(str(valores["puerto_predeterminado"]))
+<<<<<<< ours
         etiqueta_estado.config(text="Configuración restablecida.", fg="#1f4e79")
+=======
+        etiqueta_estado.config(text="Configuración restablecida.", fg=COLOR_BORDE)
+>>>>>>> theirs
 
     boton_volver = tk.Button(
         window3,
@@ -83,7 +100,11 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
     )
     boton_volver.place(x=24, y=24)
 
+<<<<<<< ours
     titulo = tk.Label(window3, text="Configuración", font=("Arial", 34, "bold"), bg=COLOR_FONDO)
+=======
+    titulo = tk.Label(window3, text="Configuración", font=("Arial", 34, "bold"), bg=COLOR_FONDO, fg=COLOR_TEXTO)
+>>>>>>> theirs
     titulo.place(relx=0.5, y=70, anchor="center")
 
     subtitulo = tk.Label(
@@ -91,7 +112,11 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
         text="Ajusta opciones visuales del mapa y datos predeterminados de conexión.",
         font=("Arial", 13),
         bg=COLOR_FONDO,
+<<<<<<< ours
         fg="#4b5b6b",
+=======
+        fg=COLOR_SUAVE,
+>>>>>>> theirs
     )
     subtitulo.place(relx=0.5, y=112, anchor="center")
 
@@ -99,6 +124,7 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
     contenido_visual = tk.Frame(tarjeta_visual, bg=COLOR_TARJETA)
     contenido_visual.pack(fill="both", expand=True, padx=24, pady=20)
 
+<<<<<<< ours
     tk.Label(contenido_visual, text="Tema de interfaz", bg=COLOR_TARJETA, font=("Arial", 12, "bold"), anchor="w").pack(fill="x", pady=(0, 6))
     tk.Radiobutton(contenido_visual, text="Claro", variable=tema_var, value="claro", bg=COLOR_TARJETA, font=("Arial", 11)).pack(anchor="w")
     tk.Radiobutton(contenido_visual, text="Oscuro", variable=tema_var, value="oscuro", bg=COLOR_TARJETA, font=("Arial", 11)).pack(anchor="w")
@@ -106,16 +132,33 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
     tk.Label(contenido_visual, text="Mapa", bg=COLOR_TARJETA, font=("Arial", 12, "bold"), anchor="w").pack(fill="x", pady=(18, 6))
     tk.Checkbutton(contenido_visual, text="Mostrar cuadrícula del tablero", variable=cuadricula_var, bg=COLOR_TARJETA, font=("Arial", 11)).pack(anchor="w")
     tk.Checkbutton(contenido_visual, text="Mostrar proyectiles al ejecutar turno", variable=proyectiles_var, bg=COLOR_TARJETA, font=("Arial", 11)).pack(anchor="w")
+=======
+    tk.Label(contenido_visual, text="Tema de interfaz", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 12, "bold"), anchor="w").pack(fill="x", pady=(0, 6))
+    tk.Radiobutton(contenido_visual, text="Claro", variable=tema_var, value="claro", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 11)).pack(anchor="w")
+    tk.Radiobutton(contenido_visual, text="Oscuro", variable=tema_var, value="oscuro", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 11)).pack(anchor="w")
+
+    tk.Label(contenido_visual, text="Mapa", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 12, "bold"), anchor="w").pack(fill="x", pady=(18, 6))
+    tk.Checkbutton(contenido_visual, text="Mostrar cuadrícula del tablero", variable=cuadricula_var, bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 11)).pack(anchor="w")
+    tk.Checkbutton(contenido_visual, text="Mostrar proyectiles al ejecutar turno", variable=proyectiles_var, bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 11)).pack(anchor="w")
+>>>>>>> theirs
 
     tarjeta_red = crear_tarjeta(610, 160, 420, 300, "Conexión")
     contenido_red = tk.Frame(tarjeta_red, bg=COLOR_TARJETA)
     contenido_red.pack(fill="both", expand=True, padx=24, pady=20)
 
+<<<<<<< ours
     tk.Label(contenido_red, text="IP predeterminada del servidor", bg=COLOR_TARJETA, font=("Arial", 12, "bold"), anchor="w").pack(fill="x")
     campo_ip = tk.Entry(contenido_red, textvariable=ip_var, font=("Arial", 12), width=28)
     campo_ip.pack(anchor="w", pady=(6, 16))
 
     tk.Label(contenido_red, text="Puerto predeterminado", bg=COLOR_TARJETA, font=("Arial", 12, "bold"), anchor="w").pack(fill="x")
+=======
+    tk.Label(contenido_red, text="IP predeterminada del servidor", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 12, "bold"), anchor="w").pack(fill="x")
+    campo_ip = tk.Entry(contenido_red, textvariable=ip_var, font=("Arial", 12), width=28)
+    campo_ip.pack(anchor="w", pady=(6, 16))
+
+    tk.Label(contenido_red, text="Puerto predeterminado", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 12, "bold"), anchor="w").pack(fill="x")
+>>>>>>> theirs
     campo_puerto = tk.Entry(contenido_red, textvariable=puerto_var, font=("Arial", 12), width=12)
     campo_puerto.pack(anchor="w", pady=(6, 16))
 
@@ -123,7 +166,11 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
         contenido_red,
         text="Estos valores se usan como sugerencia al abrir Play. No cambian las reglas de red del servidor.",
         bg=COLOR_TARJETA,
+<<<<<<< ours
         fg="#4b5b6b",
+=======
+        fg=COLOR_SUAVE,
+>>>>>>> theirs
         font=("Arial", 10),
         wraplength=340,
         justify="left",
@@ -135,7 +182,11 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
     boton_restaurar = tk.Button(window3, text="Restablecer", font=("Arial", 13, "bold"), width=14, bg="#ffd54f", command=restablecer_configuracion)
     boton_restaurar.place(x=575, y=500)
 
+<<<<<<< ours
     etiqueta_estado = tk.Label(window3, text="Los cambios aplican durante la sesión actual.", font=("Arial", 11, "bold"), bg=COLOR_FONDO, fg="#4b5b6b")
+=======
+    etiqueta_estado = tk.Label(window3, text="Los cambios aplican durante la sesión actual.", font=("Arial", 11, "bold"), bg=COLOR_FONDO, fg=COLOR_SUAVE)
+>>>>>>> theirs
     etiqueta_estado.place(relx=0.5, y=565, anchor="center")
 
     window3.protocol("WM_DELETE_WINDOW", cerrar_todo)

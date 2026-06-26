@@ -6,12 +6,21 @@ import tkinter as tk
 
 from aplicacion import app
 
+<<<<<<< ours
 COLOR_FONDO = "#eef3f8"
 COLOR_TARJETA = "#ffffff"
 COLOR_PRIMARIO = "#1f4e79"
 COLOR_SECUNDARIO = "#f6b73c"
 COLOR_BORDE = "#b7c7d6"
 COLOR_TEXTO_SUAVE = "#4b5b6b"
+=======
+COLOR_FONDO = "#18202b"
+COLOR_TARJETA = "#243244"
+COLOR_PRIMARIO = "#1f4e79"
+COLOR_SECUNDARIO = "#f6b73c"
+COLOR_BORDE = "#f6b73c"
+COLOR_TEXTO_SUAVE = "#b8c7d9"
+>>>>>>> theirs
 
 
 def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
@@ -51,10 +60,17 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
         return tarjeta
 
     def crear_metrica(parent, titulo, valor, color, columna):
+<<<<<<< ours
         cuadro = tk.Frame(parent, bg="#f8fbff", highlightbackground=color, highlightthickness=2)
         cuadro.grid(row=0, column=columna, padx=10, pady=18, sticky="nsew")
         tk.Label(cuadro, text=titulo, bg="#f8fbff", fg=COLOR_TEXTO_SUAVE, font=("Arial", 11, "bold")).pack(pady=(10, 2))
         tk.Label(cuadro, text=str(valor), bg="#f8fbff", fg=color, font=("Arial", 28, "bold")).pack(pady=(0, 8))
+=======
+        cuadro = tk.Frame(parent, bg="#31445c", highlightbackground=color, highlightthickness=2)
+        cuadro.grid(row=0, column=columna, padx=10, pady=18, sticky="nsew")
+        tk.Label(cuadro, text=titulo, bg="#31445c", fg=COLOR_TEXTO_SUAVE, font=("Arial", 11, "bold")).pack(pady=(10, 2))
+        tk.Label(cuadro, text=str(valor), bg="#31445c", fg=color, font=("Arial", 28, "bold")).pack(pady=(0, 8))
+>>>>>>> theirs
         return cuadro
 
     def medalla(posicion):
@@ -67,7 +83,11 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
         return f"{posicion}."
 
     def crear_tabla_ranking(parent, titulo, ranking, clave_victorias, fila_inicial):
+<<<<<<< ours
         tk.Label(parent, text=titulo, bg=COLOR_TARJETA, fg=COLOR_PRIMARIO, font=("Arial", 15, "bold"), anchor="w").grid(
+=======
+        tk.Label(parent, text=titulo, bg=COLOR_TARJETA, fg="#f5f7fb", font=("Arial", 15, "bold"), anchor="w").grid(
+>>>>>>> theirs
             row=fila_inicial, column=0, columnspan=3, sticky="ew", padx=24, pady=(14, 6)
         )
         encabezados = ["#", "Jugador", "Victorias"]
@@ -113,7 +133,11 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
         text="Puntajes",
         font=("Arial", 34, "bold"),
         bg=COLOR_FONDO,
+<<<<<<< ours
         fg="#111111",
+=======
+        fg="#f5f7fb",
+>>>>>>> theirs
     )
     titulo.place(relx=0.5, y=72, anchor="center")
 
@@ -143,7 +167,11 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
             contenido_mis_puntajes,
             text=f"Jugador: {datos_jugador['nombre_usuario']}",
             bg=COLOR_TARJETA,
+<<<<<<< ours
             fg=COLOR_PRIMARIO,
+=======
+            fg="#f5f7fb",
+>>>>>>> theirs
             font=("Arial", 16, "bold"),
             anchor="w",
         ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 6))
@@ -188,7 +216,11 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
         ventana_todos.title("Todos los puntajes")
         ventana_todos.configure(bg=COLOR_FONDO)
         ventana_todos.geometry("620x520")
+<<<<<<< ours
         tk.Label(ventana_todos, text="Todos los puntajes", font=("Arial", 22, "bold"), bg=COLOR_FONDO, fg=COLOR_PRIMARIO).pack(pady=16)
+=======
+        tk.Label(ventana_todos, text="Todos los puntajes", font=("Arial", 22, "bold"), bg=COLOR_FONDO, fg="#f5f7fb").pack(pady=16)
+>>>>>>> theirs
         marco = tk.Frame(ventana_todos, bg=COLOR_TARJETA, highlightbackground=COLOR_BORDE, highlightthickness=2)
         marco.pack(fill="both", expand=True, padx=24, pady=(0, 24))
         encabezados = ["#", "Jugador", "Def.", "Atq.", "Total"]
