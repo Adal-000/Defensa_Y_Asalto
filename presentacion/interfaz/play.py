@@ -346,11 +346,8 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             pintar_rectangulo(imagen, "#f1bf00", 0, 18, ancho, 54)
             pintar_rectangulo(imagen, "#aa151b", 0, 54, ancho, alto)
         elif codigo == "ENG":
-            pintar_rectangulo(imagen, "#012169", 0, 0, ancho, alto)
-            pintar_rectangulo(imagen, "white", 0, 28, ancho, 44)
-            pintar_rectangulo(imagen, "white", 52, 0, 68, alto)
-            pintar_rectangulo(imagen, "#c8102e", 0, 32, ancho, 40)
-            pintar_rectangulo(imagen, "#c8102e", 56, 0, 64, alto)
+            pintar_rectangulo(imagen, "#cf142b", 0, 28, ancho, 44)
+            pintar_rectangulo(imagen, "#cf142b", 52, 0, 68, alto)
         elif codigo == "ALE":
             pintar_rectangulo(imagen, "#000000", 0, 0, ancho, 24)
             pintar_rectangulo(imagen, "#dd0000", 0, 24, ancho, 48)
