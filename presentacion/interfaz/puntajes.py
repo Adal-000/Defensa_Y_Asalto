@@ -6,21 +6,12 @@ import tkinter as tk
 
 from aplicacion import app
 
-<<<<<<< ours
-COLOR_FONDO = "#eef3f8"
-COLOR_TARJETA = "#ffffff"
-COLOR_PRIMARIO = "#1f4e79"
-COLOR_SECUNDARIO = "#f6b73c"
-COLOR_BORDE = "#b7c7d6"
-COLOR_TEXTO_SUAVE = "#4b5b6b"
-=======
 COLOR_FONDO = "#18202b"
 COLOR_TARJETA = "#243244"
 COLOR_PRIMARIO = "#1f4e79"
 COLOR_SECUNDARIO = "#f6b73c"
 COLOR_BORDE = "#f6b73c"
 COLOR_TEXTO_SUAVE = "#b8c7d9"
->>>>>>> theirs
 
 
 def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
@@ -60,17 +51,30 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
         return tarjeta
 
     def crear_metrica(parent, titulo, valor, color, columna):
-<<<<<<< ours
-        cuadro = tk.Frame(parent, bg="#f8fbff", highlightbackground=color, highlightthickness=2)
+        cuadro = tk.Frame(
+            parent,
+            bg="#31445c",
+            highlightbackground=color,
+            highlightthickness=2
+        )
         cuadro.grid(row=0, column=columna, padx=10, pady=18, sticky="nsew")
-        tk.Label(cuadro, text=titulo, bg="#f8fbff", fg=COLOR_TEXTO_SUAVE, font=("Arial", 11, "bold")).pack(pady=(10, 2))
-        tk.Label(cuadro, text=str(valor), bg="#f8fbff", fg=color, font=("Arial", 28, "bold")).pack(pady=(0, 8))
-=======
-        cuadro = tk.Frame(parent, bg="#31445c", highlightbackground=color, highlightthickness=2)
-        cuadro.grid(row=0, column=columna, padx=10, pady=18, sticky="nsew")
-        tk.Label(cuadro, text=titulo, bg="#31445c", fg=COLOR_TEXTO_SUAVE, font=("Arial", 11, "bold")).pack(pady=(10, 2))
-        tk.Label(cuadro, text=str(valor), bg="#31445c", fg=color, font=("Arial", 28, "bold")).pack(pady=(0, 8))
->>>>>>> theirs
+
+        tk.Label(
+            cuadro,
+            text=titulo,
+            bg="#31445c",
+            fg=COLOR_TEXTO_SUAVE,
+            font=("Arial", 11, "bold")
+        ).pack(pady=(10, 2))
+
+        tk.Label(
+            cuadro,
+            text=str(valor),
+            bg="#31445c",
+            fg=color,
+            font=("Arial", 28, "bold")
+        ).pack(pady=(0, 8))
+
         return cuadro
 
     def medalla(posicion):
@@ -83,36 +87,83 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
         return f"{posicion}."
 
     def crear_tabla_ranking(parent, titulo, ranking, clave_victorias, fila_inicial):
-<<<<<<< ours
-        tk.Label(parent, text=titulo, bg=COLOR_TARJETA, fg=COLOR_PRIMARIO, font=("Arial", 15, "bold"), anchor="w").grid(
-=======
-        tk.Label(parent, text=titulo, bg=COLOR_TARJETA, fg="#f5f7fb", font=("Arial", 15, "bold"), anchor="w").grid(
->>>>>>> theirs
-            row=fila_inicial, column=0, columnspan=3, sticky="ew", padx=24, pady=(14, 6)
+        tk.Label(
+            parent,
+            text=titulo,
+            bg=COLOR_TARJETA,
+            fg="#f5f7fb",
+            font=("Arial", 15, "bold"),
+            anchor="w"
+        ).grid(
+            row=fila_inicial,
+            column=0,
+            columnspan=3,
+            sticky="ew",
+            padx=24,
+            pady=(14, 6)
         )
+
         encabezados = ["#", "Jugador", "Victorias"]
+
         for columna, texto in enumerate(encabezados):
-            tk.Label(parent, text=texto, bg="#dceaf7", fg="#173a59", font=("Arial", 11, "bold"), padx=8, pady=5).grid(
-                row=fila_inicial + 1, column=columna, sticky="ew", padx=(24 if columna == 0 else 0, 24 if columna == 2 else 0)
+            tk.Label(
+                parent,
+                text=texto,
+                bg="#dceaf7",
+                fg="#173a59",
+                font=("Arial", 11, "bold"),
+                padx=8,
+                pady=5
+            ).grid(
+                row=fila_inicial + 1,
+                column=columna,
+                sticky="ew",
+                padx=(24 if columna == 0 else 0, 24 if columna == 2 else 0)
             )
 
         if not ranking:
-            tk.Label(parent, text="Sin jugadores registrados todavía.", bg=COLOR_TARJETA, fg=COLOR_TEXTO_SUAVE, font=("Arial", 11), anchor="w").grid(
-                row=fila_inicial + 2, column=0, columnspan=3, sticky="ew", padx=24, pady=8
+            tk.Label(
+                parent,
+                text="Sin jugadores registrados todavía.",
+                bg=COLOR_TARJETA,
+                fg=COLOR_TEXTO_SUAVE,
+                font=("Arial", 11),
+                anchor="w"
+            ).grid(
+                row=fila_inicial + 2,
+                column=0,
+                columnspan=3,
+                sticky="ew",
+                padx=24,
+                pady=8
             )
             return
 
         for indice, jugador_ranking in enumerate(ranking, start=1):
             fila = fila_inicial + 1 + indice
             fondo = "#fff8e7" if indice == 1 else "#ffffff" if indice % 2 else "#f7f9fb"
+
             valores = [
                 medalla(indice),
                 jugador_ranking["nombre_usuario"],
                 str(jugador_ranking[clave_victorias]),
             ]
+
             for columna, texto in enumerate(valores):
-                tk.Label(parent, text=texto, bg=fondo, fg="black", font=("Arial", 11, "bold" if indice <= 3 else "normal"), padx=8, pady=5, anchor="w" if columna == 1 else "center").grid(
-                    row=fila, column=columna, sticky="ew", padx=(24 if columna == 0 else 0, 24 if columna == 2 else 0)
+                tk.Label(
+                    parent,
+                    text=texto,
+                    bg=fondo,
+                    fg="black",
+                    font=("Arial", 11, "bold" if indice <= 3 else "normal"),
+                    padx=8,
+                    pady=5,
+                    anchor="w" if columna == 1 else "center"
+                ).grid(
+                    row=fila,
+                    column=columna,
+                    sticky="ew",
+                    padx=(24 if columna == 0 else 0, 24 if columna == 2 else 0)
                 )
 
     boton_volver = tk.Button(
@@ -133,11 +184,7 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
         text="Puntajes",
         font=("Arial", 34, "bold"),
         bg=COLOR_FONDO,
-<<<<<<< ours
-        fg="#111111",
-=======
         fg="#f5f7fb",
->>>>>>> theirs
     )
     titulo.place(relx=0.5, y=72, anchor="center")
 
@@ -150,8 +197,24 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
     )
     subtitulo.place(relx=0.5, y=112, anchor="center")
 
-    tarjeta_mis_puntajes = crear_tarjeta(window_puntajes, 105, 160, 420, 390, "Mis puntajes")
-    tarjeta_ranking = crear_tarjeta(window_puntajes, 585, 160, 470, 390, "Puntajes mundiales", COLOR_SECUNDARIO)
+    tarjeta_mis_puntajes = crear_tarjeta(
+        window_puntajes,
+        105,
+        160,
+        420,
+        390,
+        "Mis puntajes"
+    )
+
+    tarjeta_ranking = crear_tarjeta(
+        window_puntajes,
+        585,
+        160,
+        470,
+        390,
+        "Puntajes mundiales",
+        COLOR_SECUNDARIO
+    )
 
     nombre_usuario_actual = obtener_usuario_actual()
     datos_jugador = app.obtener_jugador(nombre_usuario_actual) if nombre_usuario_actual else None
@@ -163,20 +226,32 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
 
     if datos_jugador is not None:
         total_victorias = datos_jugador["victorias_defensor"] + datos_jugador["victorias_atacante"]
+
         tk.Label(
             contenido_mis_puntajes,
             text=f"Jugador: {datos_jugador['nombre_usuario']}",
             bg=COLOR_TARJETA,
-<<<<<<< ours
-            fg=COLOR_PRIMARIO,
-=======
             fg="#f5f7fb",
->>>>>>> theirs
             font=("Arial", 16, "bold"),
             anchor="w",
         ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 6))
-        crear_metrica(contenido_mis_puntajes, "Defensor", datos_jugador["victorias_defensor"], "#1976d2", 0)
-        crear_metrica(contenido_mis_puntajes, "Atacante", datos_jugador["victorias_atacante"], "#ef6c00", 1)
+
+        crear_metrica(
+            contenido_mis_puntajes,
+            "Defensor",
+            datos_jugador["victorias_defensor"],
+            "#1976d2",
+            0
+        )
+
+        crear_metrica(
+            contenido_mis_puntajes,
+            "Atacante",
+            datos_jugador["victorias_atacante"],
+            "#ef6c00",
+            1
+        )
+
         tk.Label(
             contenido_mis_puntajes,
             text=f"Total de victorias: {total_victorias}",
@@ -185,6 +260,7 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
             font=("Arial", 15, "bold"),
             pady=12,
         ).grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(18, 8))
+
         tk.Label(
             contenido_mis_puntajes,
             text="Gana rondas completas para sumar victorias en tu perfil.",
@@ -194,6 +270,7 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
             wraplength=340,
             justify="center",
         ).grid(row=3, column=0, columnspan=2, pady=(12, 0))
+
     else:
         tk.Label(
             contenido_mis_puntajes,
@@ -216,34 +293,100 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
         ventana_todos.title("Todos los puntajes")
         ventana_todos.configure(bg=COLOR_FONDO)
         ventana_todos.geometry("620x520")
-<<<<<<< ours
-        tk.Label(ventana_todos, text="Todos los puntajes", font=("Arial", 22, "bold"), bg=COLOR_FONDO, fg=COLOR_PRIMARIO).pack(pady=16)
-=======
-        tk.Label(ventana_todos, text="Todos los puntajes", font=("Arial", 22, "bold"), bg=COLOR_FONDO, fg="#f5f7fb").pack(pady=16)
->>>>>>> theirs
-        marco = tk.Frame(ventana_todos, bg=COLOR_TARJETA, highlightbackground=COLOR_BORDE, highlightthickness=2)
+
+        tk.Label(
+            ventana_todos,
+            text="Todos los puntajes",
+            font=("Arial", 22, "bold"),
+            bg=COLOR_FONDO,
+            fg="#f5f7fb"
+        ).pack(pady=16)
+
+        marco = tk.Frame(
+            ventana_todos,
+            bg=COLOR_TARJETA,
+            highlightbackground=COLOR_BORDE,
+            highlightthickness=2
+        )
         marco.pack(fill="both", expand=True, padx=24, pady=(0, 24))
+
         encabezados = ["#", "Jugador", "Def.", "Atq.", "Total"]
+
         for columna, texto in enumerate(encabezados):
-            tk.Label(marco, text=texto, bg="#dceaf7", fg="#173a59", font=("Arial", 11, "bold"), padx=8, pady=6).grid(row=0, column=columna, sticky="ew")
+            tk.Label(
+                marco,
+                text=texto,
+                bg="#dceaf7",
+                fg="#173a59",
+                font=("Arial", 11, "bold"),
+                padx=8,
+                pady=6
+            ).grid(row=0, column=columna, sticky="ew")
+
         for columna in range(5):
             marco.grid_columnconfigure(columna, weight=1 if columna == 1 else 0)
+
         todos = app.obtener_todos_puntajes()
+
         if not todos:
-            tk.Label(marco, text="Sin jugadores registrados todavía.", bg=COLOR_TARJETA, fg=COLOR_TEXTO_SUAVE, font=("Arial", 12)).grid(row=1, column=0, columnspan=5, pady=24)
+            tk.Label(
+                marco,
+                text="Sin jugadores registrados todavía.",
+                bg=COLOR_TARJETA,
+                fg=COLOR_TEXTO_SUAVE,
+                font=("Arial", 12)
+            ).grid(row=1, column=0, columnspan=5, pady=24)
+
         for indice, jugador in enumerate(todos, start=1):
             fondo = "#fff8e7" if indice == 1 else "#ffffff" if indice % 2 else "#f7f9fb"
-            valores = [indice, jugador["nombre_usuario"], jugador["victorias_defensor"], jugador["victorias_atacante"], jugador["total_victorias"]]
-            for columna, valor in enumerate(valores):
-                tk.Label(marco, text=str(valor), bg=fondo, fg="black", font=("Arial", 10, "bold" if indice <= 5 else "normal"), padx=8, pady=5, anchor="w" if columna == 1 else "center").grid(row=indice, column=columna, sticky="ew")
 
-    boton_ver_todos = tk.Button(tarjeta_ranking, text="Ver todos los puntajes", font=("Arial", 10, "bold"), bg="#dceaf7", command=abrir_todos_los_puntajes)
+            valores = [
+                indice,
+                jugador["nombre_usuario"],
+                jugador["victorias_defensor"],
+                jugador["victorias_atacante"],
+                jugador["total_victorias"]
+            ]
+
+            for columna, valor in enumerate(valores):
+                tk.Label(
+                    marco,
+                    text=str(valor),
+                    bg=fondo,
+                    fg="black",
+                    font=("Arial", 10, "bold" if indice <= 5 else "normal"),
+                    padx=8,
+                    pady=5,
+                    anchor="w" if columna == 1 else "center"
+                ).grid(row=indice, column=columna, sticky="ew")
+
+    boton_ver_todos = tk.Button(
+        tarjeta_ranking,
+        text="Ver todos los puntajes",
+        font=("Arial", 10, "bold"),
+        bg="#dceaf7",
+        command=abrir_todos_los_puntajes
+    )
     boton_ver_todos.place(relx=0.5, rely=0.94, anchor="center")
 
     top_defensores = app.obtener_top_defensores()
     top_atacantes = app.obtener_top_atacantes()
-    crear_tabla_ranking(contenido_ranking, "Mejores 5 defensores", top_defensores, "victorias_defensor", 0)
-    crear_tabla_ranking(contenido_ranking, "Mejores 5 atacantes", top_atacantes, "victorias_atacante", 8)
+
+    crear_tabla_ranking(
+        contenido_ranking,
+        "Mejores 5 defensores",
+        top_defensores,
+        "victorias_defensor",
+        0
+    )
+
+    crear_tabla_ranking(
+        contenido_ranking,
+        "Mejores 5 atacantes",
+        top_atacantes,
+        "victorias_atacante",
+        8
+    )
 
     pie = tk.Label(
         window_puntajes,
