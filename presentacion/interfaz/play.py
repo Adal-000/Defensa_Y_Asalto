@@ -291,8 +291,14 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             caja_info_facciones.insert(tk.END, f"Seleccionada: {faccion_temporal.get()}")
         else:
             caja_info_facciones.insert(tk.END, "Debe elegir una facción.")
+        resumen_red = adaptador.cliente.obtener_resumen_red()
+        usuarios_por_rol = resumen_red.get("usuarios_por_rol", {})
+        if usuarios_por_rol:
+            caja_info_facciones.insert(tk.END, "Jugadores conectados:")
+            for rol in ("defensor", "atacante"):
+                caja_info_facciones.insert(tk.END, f"{rol}: {usuarios_por_rol.get(rol, 'pendiente')}")
         for rol, faccion in obtener_datos_sala()["facciones"].items():
-            caja_info_facciones.insert(tk.END, f"{rol}: {faccion}")
+            caja_info_facciones.insert(tk.END, f"facción {rol}: {faccion}")
 
     def texto_boton_faccion(nombre_faccion, ocupada=False, seleccionada=False):
         datos_faccion = datos_facciones_por_nombre.get(nombre_faccion, {})
@@ -539,10 +545,12 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                 estado_red["jugadores_conectados"] = int(datos.get("jugadores_conectados", estado_red["jugadores_conectados"]))
                 estado_red["rol"] = datos.get("rol_cliente", datos.get("rol", estado_red["rol"]))
                 sincronizar_lobby_remoto(datos)
-                roles_ocupados = set(datos.get("roles_ocupados", []))
-                roles_faltantes = [rol for rol in ("defensor", "atacante") if rol not in roles_ocupados]
+                roles_faltantes = datos.get("roles_faltantes", [])
+                mensaje_sala = datos.get("mensaje_sala", "")
                 if roles_faltantes:
                     texto_espera.config(text="Falta: " + ", ".join(roles_faltantes))
+                elif mensaje_sala:
+                    texto_espera.config(text=mensaje_sala)
                 refrescar_botones()
                 if hay_dos_jugadores():
                     etiqueta_conexion.config(text="Sala completa: 2 jugadores conectados.", fg="green")

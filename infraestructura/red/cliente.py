@@ -59,6 +59,10 @@ class ClientePartida:
         self.combate_activo = False
         self.ultimo_error = None
         self.ultimos_mensajes = []
+        self.usuarios_por_rol = {}
+        self.roles_faltantes = []
+        self.sala_lista = False
+        self.mensaje_sala = ""
         self.bloqueo = threading.Lock()
 
     def conectar(self, host, usuario, puerto=PUERTO_PREDETERMINADO, rol=""):
@@ -167,6 +171,14 @@ class ClientePartida:
                     self.fase_actual = datos["fase_actual"]
                 if "combate_activo" in datos:
                     self.combate_activo = bool(datos["combate_activo"])
+                if "usuarios_por_rol" in datos and isinstance(datos["usuarios_por_rol"], dict):
+                    self.usuarios_por_rol = datos["usuarios_por_rol"].copy()
+                if "roles_faltantes" in datos and isinstance(datos["roles_faltantes"], list):
+                    self.roles_faltantes = list(datos["roles_faltantes"])
+                if "sala_lista" in datos:
+                    self.sala_lista = bool(datos["sala_lista"])
+                if "mensaje_sala" in datos:
+                    self.mensaje_sala = str(datos["mensaje_sala"])
 
         if self.callback_mensaje is not None:
             self.callback_mensaje(mensaje)
@@ -409,6 +421,10 @@ class ClientePartida:
                 "combate_activo": self.combate_activo,
                 "ultimo_error": self.ultimo_error,
                 "tiene_estado": self.ultimo_estado is not None,
+                "usuarios_por_rol": self.usuarios_por_rol.copy(),
+                "roles_faltantes": list(self.roles_faltantes),
+                "sala_lista": self.sala_lista,
+                "mensaje_sala": self.mensaje_sala,
             }
 
 

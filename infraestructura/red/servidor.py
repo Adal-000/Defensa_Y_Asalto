@@ -462,35 +462,47 @@ class ServidorPartida:
             ),
         )
 
+    def _usuarios_por_rol(self):
+        return {
+            rol: cliente.usuario
+            for rol, cliente in self.clientes_por_rol.items()
+            if cliente is not None and cliente.conectado
+        }
+
+    def _roles_faltantes(self):
+        return [
+            rol for rol, cliente in self.clientes_por_rol.items()
+            if cliente is None or not cliente.conectado
+        ]
+
+    def _mensaje_sala(self):
+        faltantes = self._roles_faltantes()
+        if not faltantes:
+            return "Sala lista: defensor y atacante conectados."
+        return "Esperando: " + ", ".join(faltantes)
+
     def _crear_datos_estado(self, cliente=None, accion=None, resultado_combate=None):
         """
         Descripcion:
             Construye un bloque de datos estandar para todas las
-            respuestas del servidor, de forma que la interfaz reciba
-            siempre campos consistentes sobre rol, fase y conexion.
-
-        Entradas:
-            cliente (ClienteConectado): Cliente destinatario de la
-                respuesta. Puede ser None al enviar a todos.
-            accion (str): Accion que provoco la respuesta.
-            resultado_combate (dict): Resultado del turno de combate,
-                si aplica.
-
-        Salidas:
-            dict: Datos listos para agregarse a una respuesta JSON.
-
-        Restricciones:
-            Ninguna.
+            respuestas del servidor, incluyendo los usuarios por rol
+            para que ambos dispositivos vean la misma sala.
         """
+        usuarios_por_rol = self._usuarios_por_rol()
+        roles_faltantes = self._roles_faltantes()
         datos = {
             "combate_activo": self.combate_activo,
             "fase_actual": self._obtener_fase_actual(),
             "partida_creada": self.partida is not None,
             "jugadores_conectados": self._contar_jugadores_conectados(),
-            "roles_ocupados": [
-                rol for rol, cliente_conectado in self.clientes_por_rol.items()
-                if cliente_conectado is not None and cliente_conectado.conectado
-            ],
+            "roles_ocupados": list(usuarios_por_rol.keys()),
+            "roles_faltantes": roles_faltantes,
+            "usuarios_por_rol": usuarios_por_rol,
+            "usuarios_conectados": list(usuarios_por_rol.values()),
+            "defensor": usuarios_por_rol.get(ROL_DEFENSOR, ""),
+            "atacante": usuarios_por_rol.get(ROL_ATACANTE, ""),
+            "sala_lista": len(roles_faltantes) == 0,
+            "mensaje_sala": self._mensaje_sala(),
             "facciones_lobby": self.facciones_lobby.copy(),
             "listos_lobby": list(self.listos_lobby),
         }
@@ -510,6 +522,26 @@ class ServidorPartida:
         datos["acciones_permitidas"] = self._acciones_permitidas_para_cliente(cliente)
 
         return datos
+
+
+    def _validar_asignacion_rol(self, usuario, rol_solicitado=""):
+        usuario_normalizado = str(usuario).strip().lower()
+        for cliente in self.clientes_por_rol.values():
+            if cliente is not None and cliente.conectado and cliente.usuario.strip().lower() == usuario_normalizado:
+                return False, None, "Ese usuario ya está conectado en esta sala. Use otro usuario para el segundo jugador."
+
+        rol_solicitado = str(rol_solicitado).strip().lower()
+        if rol_solicitado in self.clientes_por_rol:
+            if self.clientes_por_rol[rol_solicitado] is None:
+                return True, rol_solicitado, f"Rol {rol_solicitado} disponible."
+            usuario_ocupante = self.clientes_por_rol[rol_solicitado].usuario
+            return False, None, f"El rol {rol_solicitado} ya está ocupado por {usuario_ocupante}. Elija el rol contrario."
+
+        if self.clientes_por_rol[ROL_DEFENSOR] is None:
+            return True, ROL_DEFENSOR, "Rol defensor asignado automáticamente."
+        if self.clientes_por_rol[ROL_ATACANTE] is None:
+            return True, ROL_ATACANTE, "Rol atacante asignado automáticamente."
+        return False, None, "La sala ya está llena."
 
     def _preparar_cliente(self, conexion, direccion):
         """
@@ -556,12 +588,17 @@ class ServidorPartida:
                 return
 
             with self.bloqueo:
-                rol_asignado = self._asignar_rol(usuario, rol_solicitado)
+                asignacion_valida, rol_asignado, mensaje_asignacion = self._validar_asignacion_rol(usuario, rol_solicitado)
 
-                if rol_asignado is None:
+                if not asignacion_valida:
                     enviar_mensaje(
                         conexion,
-                        crear_respuesta(TIPO_ERROR, False, "No se pudo asignar rol: sala llena, rol ocupado o usuario repetido."),
+                        crear_respuesta(
+                            TIPO_ERROR,
+                            False,
+                            mensaje_asignacion,
+                            datos=self._crear_datos_estado(),
+                        ),
                     )
                     conexion.close()
                     return

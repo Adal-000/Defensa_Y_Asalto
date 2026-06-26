@@ -183,10 +183,35 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
     contenido_ranking.grid_columnconfigure(1, weight=1)
     contenido_ranking.grid_columnconfigure(2, minsize=100)
 
+    def abrir_todos_los_puntajes():
+        ventana_todos = tk.Toplevel(window_puntajes)
+        ventana_todos.title("Todos los puntajes")
+        ventana_todos.configure(bg=COLOR_FONDO)
+        ventana_todos.geometry("620x520")
+        tk.Label(ventana_todos, text="Todos los puntajes", font=("Arial", 22, "bold"), bg=COLOR_FONDO, fg=COLOR_PRIMARIO).pack(pady=16)
+        marco = tk.Frame(ventana_todos, bg=COLOR_TARJETA, highlightbackground=COLOR_BORDE, highlightthickness=2)
+        marco.pack(fill="both", expand=True, padx=24, pady=(0, 24))
+        encabezados = ["#", "Jugador", "Def.", "Atq.", "Total"]
+        for columna, texto in enumerate(encabezados):
+            tk.Label(marco, text=texto, bg="#dceaf7", fg="#173a59", font=("Arial", 11, "bold"), padx=8, pady=6).grid(row=0, column=columna, sticky="ew")
+        for columna in range(5):
+            marco.grid_columnconfigure(columna, weight=1 if columna == 1 else 0)
+        todos = app.obtener_todos_puntajes()
+        if not todos:
+            tk.Label(marco, text="Sin jugadores registrados todavía.", bg=COLOR_TARJETA, fg=COLOR_TEXTO_SUAVE, font=("Arial", 12)).grid(row=1, column=0, columnspan=5, pady=24)
+        for indice, jugador in enumerate(todos, start=1):
+            fondo = "#fff8e7" if indice == 1 else "#ffffff" if indice % 2 else "#f7f9fb"
+            valores = [indice, jugador["nombre_usuario"], jugador["victorias_defensor"], jugador["victorias_atacante"], jugador["total_victorias"]]
+            for columna, valor in enumerate(valores):
+                tk.Label(marco, text=str(valor), bg=fondo, fg="black", font=("Arial", 10, "bold" if indice <= 5 else "normal"), padx=8, pady=5, anchor="w" if columna == 1 else "center").grid(row=indice, column=columna, sticky="ew")
+
+    boton_ver_todos = tk.Button(tarjeta_ranking, text="Ver todos los puntajes", font=("Arial", 10, "bold"), bg="#dceaf7", command=abrir_todos_los_puntajes)
+    boton_ver_todos.place(relx=0.5, rely=0.94, anchor="center")
+
     top_defensores = app.obtener_top_defensores()
     top_atacantes = app.obtener_top_atacantes()
-    crear_tabla_ranking(contenido_ranking, "Top defensores", top_defensores, "victorias_defensor", 0)
-    crear_tabla_ranking(contenido_ranking, "Top atacantes", top_atacantes, "victorias_atacante", 8)
+    crear_tabla_ranking(contenido_ranking, "Mejores 5 defensores", top_defensores, "victorias_defensor", 0)
+    crear_tabla_ranking(contenido_ranking, "Mejores 5 atacantes", top_atacantes, "victorias_atacante", 8)
 
     pie = tk.Label(
         window_puntajes,
