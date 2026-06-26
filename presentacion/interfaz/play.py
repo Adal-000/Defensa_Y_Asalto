@@ -83,7 +83,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     cola_mensajes = queue.Queue()
     adaptador = AdaptadorClienteTkinter(cola_mensajes)
     servidor_local = {"instancia": None, "hilo": None}
-    control_ventana = {"cerrando": False, "after_id": None}
+    control_ventana = {"cerrando": False, "after_id": None, "after_conexion_id": None}
     preferencias = app.obtener_configuracion()
 
     estado_red = {
@@ -175,12 +175,13 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         if control_ventana["cerrando"]:
             return
         control_ventana["cerrando"] = True
-        if control_ventana["after_id"] is not None:
-            try:
-                window2.after_cancel(control_ventana["after_id"])
-            except tk.TclError:
-                pass
-            control_ventana["after_id"] = None
+        for clave_after in ("after_id", "after_conexion_id"):
+            if control_ventana[clave_after] is not None:
+                try:
+                    window2.after_cancel(control_ventana[clave_after])
+                except tk.TclError:
+                    pass
+                control_ventana[clave_after] = None
         adaptador.cerrar()
         detener_servidor_local()
         try:
@@ -190,6 +191,15 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             pass
         if destruir_aplicacion:
             cerrar_todo()
+
+    def ventana_activa():
+        if control_ventana["cerrando"]:
+            return False
+        try:
+            return bool(window2.winfo_exists())
+        except tk.TclError:
+            control_ventana["cerrando"] = True
+            return False
 
     def GoMainR():
         cerrar_sala()
@@ -279,11 +289,25 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     caja_eventos.place(x=610, y=600)
 
     def agregar_evento(texto):
-        if texto:
+        if texto and ventana_activa():
+            try:
+                if not caja_eventos.winfo_exists():
+                    return
+            except tk.TclError:
+                control_ventana["cerrando"] = True
+                return
             caja_eventos.insert(tk.END, texto)
             caja_eventos.yview(tk.END)
 
     def actualizar_info_facciones(texto=None):
+        if not ventana_activa():
+            return
+        try:
+            if not caja_info_facciones.winfo_exists():
+                return
+        except tk.TclError:
+            control_ventana["cerrando"] = True
+            return
         caja_info_facciones.delete(0, tk.END)
         if texto:
             caja_info_facciones.insert(tk.END, texto)
@@ -355,7 +379,15 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         return imagen
 
     def refrescar_botones():
+        if not ventana_activa():
+            return
         for nombre_faccion, boton in botones_faccion.items():
+            try:
+                if not boton.winfo_exists():
+                    continue
+            except tk.TclError:
+                control_ventana["cerrando"] = True
+                return
             ocupada = faccion_esta_ocupada_por_otro(nombre_faccion)
             seleccionada = nombre_faccion == faccion_temporal.get()
             color = "#ffc7c7" if ocupada else COLOR_FONDO
@@ -512,6 +544,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             puerto = int(campo_puerto.get())
 
             def conectar_local_demorado():
+                control_ventana["after_conexion_id"] = None
                 if control_ventana["cerrando"]:
                     return
                 try:
@@ -520,7 +553,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                 except tk.TclError:
                     control_ventana["cerrando"] = True
 
-            window2.after(250, conectar_local_demorado)
+            control_ventana["after_conexion_id"] = window2.after(250, conectar_local_demorado)
             return
         conectar_cliente(host, usuario, rol, puerto)
 
@@ -537,7 +570,11 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     boton_iniciar_combate.place(x=1010, y=610)
 
     def procesar_mensajes_red():
+        if not ventana_activa():
+            return
         while not cola_mensajes.empty():
+            if not ventana_activa():
+                return
             mensaje = cola_mensajes.get()
             texto = mensaje.get("mensaje", "")
             if texto:
@@ -560,6 +597,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                     etiqueta_conexion.config(text="Conectado. Esperando al segundo jugador.", fg="orange")
             if estado_red["en_espera"] and facciones_validas_en_sala() and roles_necesarios_listos():
                 GoMapaR()
+                return
         if not control_ventana["cerrando"]:
             try:
                 if window2.winfo_exists():

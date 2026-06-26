@@ -41,6 +41,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     seleccion_actual = {"tipo": None, "clave": None, "nombre": None}
     ultimo_estado = {"datos": {}}
     botones_compra = []
+    control_combate = {"activo": False, "after_id": None, "cerrando": False}
 
     preferencias = app.obtener_configuracion()
     mostrar_cuadricula = bool(preferencias.get("mostrar_cuadricula", True))
@@ -48,17 +49,56 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
     app.crear_partida(nombre_defensor, nombre_atacante)
 
+    def ventana_activa():
+        if control_combate["cerrando"]:
+            return False
+        try:
+            return bool(window_mapa.winfo_exists())
+        except tk.TclError:
+            control_combate["cerrando"] = True
+            return False
+
+    def detener_combate_programado():
+        control_combate["activo"] = False
+        if control_combate["after_id"] is not None:
+            try:
+                window_mapa.after_cancel(control_combate["after_id"])
+            except tk.TclError:
+                pass
+            control_combate["after_id"] = None
+
+    def cerrar_mapa(volver_a_play=False):
+        if control_combate["cerrando"]:
+            return
+        control_combate["cerrando"] = True
+        detener_combate_programado()
+        try:
+            if window_mapa.winfo_exists():
+                window_mapa.destroy()
+        except tk.TclError:
+            pass
+        if volver_a_play:
+            GoPlay()
+
     def GoPlayR():
-        window_mapa.destroy()
-        GoPlay()
+        cerrar_mapa(volver_a_play=True)
+
+    def cerrar_ventana():
+        cerrar_mapa()
+        cerrar_todo()
 
     def escribir_evento(texto):
-        if not texto:
+        if not texto or not ventana_activa():
             return
-        caja_eventos.config(state="normal")
-        caja_eventos.insert(tk.END, f"• {texto}\n")
-        caja_eventos.see(tk.END)
-        caja_eventos.config(state="disabled")
+        try:
+            if not caja_eventos.winfo_exists():
+                return
+            caja_eventos.config(state="normal")
+            caja_eventos.insert(tk.END, f"• {texto}\n")
+            caja_eventos.see(tk.END)
+            caja_eventos.config(state="disabled")
+        except tk.TclError:
+            control_combate["cerrando"] = True
 
     def obtener_catalogo_compras():
         if rol_jugador == "atacante":
@@ -83,6 +123,8 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return compras
 
     def seleccionar_compra(compra):
+        if not ventana_activa():
+            return
         seleccion_actual["tipo"] = compra["tipo"]
         seleccion_actual["clave"] = compra["clave"]
         seleccion_actual["nombre"] = compra["nombre"]
@@ -126,7 +168,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return abs(fila_a - fila_b) + abs(columna_a - columna_b)
 
     def animar_proyectiles(estado):
-        if not mostrar_proyectiles:
+        if not mostrar_proyectiles or not ventana_activa():
             return
         proyectiles = []
         for torre in estado.get("torres", []):
@@ -153,7 +195,16 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
                 proyectiles.append(cuadro_mapa.create_line(x1, y1, x2, y2, fill="#d32f2f", width=3, dash=(5, 3)))
 
         if proyectiles:
-            window_mapa.after(450, lambda: [cuadro_mapa.delete(item) for item in proyectiles])
+            def borrar_proyectiles():
+                if not ventana_activa():
+                    return
+                try:
+                    for item in proyectiles:
+                        cuadro_mapa.delete(item)
+                except tk.TclError:
+                    control_combate["cerrando"] = True
+
+            window_mapa.after(450, borrar_proyectiles)
 
     def comprar_en_casilla(evento):
         if seleccion_actual["clave"] is None:
@@ -176,13 +227,39 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         escribir_evento(mensaje)
         actualizar_vista()
 
-    def ejecutar_turno_click():
+    def ejecutar_pulso_combate():
+        if not ventana_activa():
+            return False
         estado_antes = app.obtener_estado_partida()
         animar_proyectiles(estado_antes)
         resultado = app.ejecutar_combate()
         for evento in resultado.get("eventos", []):
             escribir_evento(evento)
         actualizar_vista()
+        return not resultado.get("ronda_finalizada", False)
+
+    def ejecutar_combate_en_tiempo_real():
+        if not control_combate["activo"] or not ventana_activa():
+            return
+        continua = ejecutar_pulso_combate()
+        if continua and control_combate["activo"]:
+            control_combate["after_id"] = window_mapa.after(900, ejecutar_combate_en_tiempo_real)
+        else:
+            control_combate["activo"] = False
+            control_combate["after_id"] = None
+            if ventana_activa():
+                boton_turno.config(text="Iniciar combate", bg="#ffb74d")
+
+    def alternar_combate_click():
+        if control_combate["activo"]:
+            detener_combate_programado()
+            boton_turno.config(text="Iniciar combate", bg="#ffb74d")
+            escribir_evento("Combate pausado.")
+            return
+        control_combate["activo"] = True
+        boton_turno.config(text="Pausar combate", bg="#90caf9")
+        escribir_evento("Combate en tiempo real iniciado.")
+        ejecutar_combate_en_tiempo_real()
 
     def dibujar_zonas():
         cuadro_mapa.delete("all")
@@ -247,7 +324,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             tk.END,
             "Colocación: defensor en zona azul; atacante en zona naranja. "
             "Haz clic en una compra y luego en una casilla válida. "
-            "Los proyectiles de torre se ven como líneas de color.",
+            "Al iniciar combate, la simulación avanza automáticamente en tiempo real.",
         )
         caja_informacion_contrincante.config(state="disabled")
 
@@ -291,7 +368,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         boton_compra.place(x=35, y=y_base)
         botones_compra.append((boton_compra, compra))
 
-    boton_turno = tk.Button(window_mapa, text="Ejecutar turno", font=("Arial", 11, "bold"), width=18, bg="#ffb74d", command=ejecutar_turno_click)
+    boton_turno = tk.Button(window_mapa, text="Iniciar combate", font=("Arial", 11, "bold"), width=18, bg="#ffb74d", command=alternar_combate_click)
     boton_turno.place(x=95, y=655)
 
     # --- Zona derecha: tablero del mapa ----------------------------------
@@ -307,4 +384,4 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     caja_informacion_contrincante.place(x=405, y=600)
 
     actualizar_vista()
-    window_mapa.protocol("WM_DELETE_WINDOW", cerrar_todo)
+    window_mapa.protocol("WM_DELETE_WINDOW", cerrar_ventana)

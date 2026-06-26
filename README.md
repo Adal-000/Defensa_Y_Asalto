@@ -185,8 +185,8 @@ estado
 salir
 ```
 
-Para tiempo real, se usa `iniciar`. Desde ese momento el servidor ejecuta
-un turno de combate automaticamente cada segundo y envia el estado
+Para tiempo real, se usa `iniciar`. Desde ese momento el servidor avanza
+la simulacion de combate automaticamente cada segundo y envia el estado
 actualizado a ambos clientes.
 
 ### Conexion con Tkinter
@@ -217,7 +217,7 @@ Las facciones de `Play` son visuales: se cargan desde `aplicacion.obtener_catalo
 El servidor envia en `datos` campos estandar para facilitar la interfaz:
 
 - `fase_actual`: `esperando_jugadores`, `preparacion`, `combate` o `finalizada`.
-- `combate_activo`: indica si el servidor esta avanzando turnos automaticamente.
+- `combate_activo`: indica si el servidor esta avanzando la simulacion automaticamente.
 - `partida_creada`: indica si ya se conectaron defensor y atacante.
 - `jugadores_conectados`: cantidad de clientes activos.
 - `roles_ocupados`: roles actualmente conectados.
@@ -272,14 +272,14 @@ python demo_consola.py
 
 ### Configuración de interfaz
 
-La pantalla `Config` permite ajustar preferencias de la sesión: tema visual, mostrar u ocultar cuadrícula del mapa, mostrar u ocultar proyectiles al ejecutar turnos, IP predeterminada y puerto predeterminado para abrir `Play`. Estas opciones no cambian reglas del juego; solo afectan la interfaz y valores sugeridos.
+La pantalla `Config` permite ajustar preferencias de la sesión: tema visual, mostrar u ocultar cuadrícula del mapa, mostrar u ocultar proyectiles durante el combate, IP predeterminada y puerto predeterminado para abrir `Play`. Estas opciones no cambian reglas del juego; solo afectan la interfaz y valores sugeridos.
 
 ## Nota para la interfaz gráfica
 
 `play.py` ya permite crear un servidor local, unirse a un servidor remoto,
 comprar torres, comprar muros, comprar unidades, iniciar/pausar combate
 y actualizar el tablero
-usando el estado oficial recibido por red. La pantalla `Mapa` ya permite una preparación jugable local: muestra compras con nombres reales de tropas para el atacante y defensas para el defensor, permite colocar piezas haciendo clic en casillas válidas, marca zonas de colocación por rol y dibuja proyectiles de combate como líneas de color antes de resolver cada turno.
+usando el estado oficial recibido por red. La pantalla `Mapa` ya permite una preparación jugable local: muestra compras con nombres reales de tropas para el atacante y defensas para el defensor, permite colocar piezas haciendo clic en casillas válidas, marca zonas de colocación por rol e inicia/pausa una simulacion de combate en tiempo real con proyectiles visibles.
 
 La interfaz debe seguir
 limitandose a mostrar datos y enviar acciones; el calculo de combate,
