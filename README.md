@@ -264,6 +264,11 @@ Actualmente las pruebas cubren:
 python demo_consola.py
 ```
 
+
+### Configuración de interfaz
+
+La pantalla `Config` permite ajustar preferencias de la sesión: tema visual, mostrar u ocultar cuadrícula del mapa, mostrar u ocultar proyectiles al ejecutar turnos, IP predeterminada y puerto predeterminado para abrir `Play`. Estas opciones no cambian reglas del juego; solo afectan la interfaz y valores sugeridos.
+
 ## Nota para la interfaz gráfica
 
 `play.py` ya permite crear un servidor local, unirse a un servidor remoto,

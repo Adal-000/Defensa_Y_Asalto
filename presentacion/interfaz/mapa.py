@@ -42,6 +42,10 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     ultimo_estado = {"datos": {}}
     botones_compra = []
 
+    preferencias = app.obtener_configuracion()
+    mostrar_cuadricula = bool(preferencias.get("mostrar_cuadricula", True))
+    mostrar_proyectiles = bool(preferencias.get("mostrar_proyectiles", True))
+
     app.crear_partida(nombre_defensor, nombre_atacante)
 
     def GoPlayR():
@@ -122,6 +126,8 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return abs(fila_a - fila_b) + abs(columna_a - columna_b)
 
     def animar_proyectiles(estado):
+        if not mostrar_proyectiles:
+            return
         proyectiles = []
         for torre in estado.get("torres", []):
             objetivo = None
@@ -191,10 +197,11 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
                 color = COLOR_ATAQUE
             cuadro_mapa.create_rectangle(0, y1, ANCHO_TABLERO, y2, fill=color, outline="")
 
-        for x in range(0, ANCHO_TABLERO + 1, ANCHO_CELDA):
-            cuadro_mapa.create_line(x, 0, x, ALTO_TABLERO, fill="#cccccc")
-        for y in range(0, ALTO_TABLERO + 1, ALTO_CELDA):
-            cuadro_mapa.create_line(0, y, ANCHO_TABLERO, y, fill="#cccccc")
+        if mostrar_cuadricula:
+            for x in range(0, ANCHO_TABLERO + 1, ANCHO_CELDA):
+                cuadro_mapa.create_line(x, 0, x, ALTO_TABLERO, fill="#cccccc")
+            for y in range(0, ALTO_TABLERO + 1, ALTO_CELDA):
+                cuadro_mapa.create_line(0, y, ANCHO_TABLERO, y, fill="#cccccc")
 
         cuadro_mapa.create_text(ANCHO_TABLERO // 2, ALTO_CELDA // 2, text="BASE", font=("Arial", 13, "bold"), fill="#9a0000")
         cuadro_mapa.create_text(10, ALTO_CELDA * 4, text="Zona defensor", angle=90, anchor="w", fill="#005b96", font=("Arial", 10, "bold"))

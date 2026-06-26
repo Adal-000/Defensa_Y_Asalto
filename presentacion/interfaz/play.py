@@ -84,6 +84,8 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     adaptador = AdaptadorClienteTkinter(cola_mensajes)
     servidor_local = {"instancia": None, "hilo": None}
     control_ventana = {"cerrando": False, "after_id": None}
+    preferencias = app.obtener_configuracion()
+
     estado_red = {
         "conectado": False,
         "jugadores_conectados": 0,
@@ -228,7 +230,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
 
     tk.Label(panel_superior, text="IP servidor:", font=("Arial", 11), bg=COLOR_PANEL).grid(row=1, column=0, padx=4)
     campo_ip = tk.Entry(panel_superior, font=("Arial", 11), width=15)
-    campo_ip.insert(0, "127.0.0.1")
+    campo_ip.insert(0, preferencias.get("ip_servidor_predeterminada", "127.0.0.1"))
     campo_ip.grid(row=1, column=1, padx=4)
 
     tk.Label(panel_superior, text="Usuario:", font=("Arial", 11), bg=COLOR_PANEL).grid(row=1, column=2, padx=4)
@@ -241,7 +243,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
 
     tk.Label(panel_superior, text="Puerto:", font=("Arial", 11), bg=COLOR_PANEL).grid(row=1, column=6, padx=4)
     campo_puerto = tk.Entry(panel_superior, font=("Arial", 11), width=7)
-    campo_puerto.insert(0, str(PUERTO_PREDETERMINADO))
+    campo_puerto.insert(0, str(preferencias.get("puerto_predeterminado", PUERTO_PREDETERMINADO)))
     campo_puerto.grid(row=1, column=7, padx=4)
 
     etiqueta_conexion = tk.Label(window2, text="Sin conexión.", font=("Arial", 12, "bold"), fg="red", bg=COLOR_FONDO)

@@ -21,6 +21,9 @@ from aplicacion.partida import crear_partida as _crear_partida
 from aplicacion.ranking import obtener_top_defensores as _obtener_top_defensores
 from aplicacion.ranking import obtener_top_atacantes as _obtener_top_atacantes
 from aplicacion.facciones import obtener_catalogo_facciones as _obtener_catalogo_facciones
+from aplicacion.configuracion import obtener_configuracion as _obtener_configuracion
+from aplicacion.configuracion import actualizar_configuracion as _actualizar_configuracion
+from aplicacion.configuracion import restablecer_configuracion as _restablecer_configuracion
 
 _partida_actual = None
 
@@ -386,3 +389,18 @@ def obtener_todos_puntajes():
         }
         for jugador in jugadores_ordenados
     ]
+
+
+def obtener_configuracion():
+    """Devuelve las preferencias actuales de interfaz y conexion."""
+    return _obtener_configuracion()
+
+
+def actualizar_configuracion(**opciones):
+    """Actualiza preferencias conocidas de interfaz y conexion."""
+    return _actualizar_configuracion(**opciones)
+
+
+def restablecer_configuracion():
+    """Restaura las preferencias predeterminadas."""
+    return _restablecer_configuracion()
