@@ -16,6 +16,7 @@ from infraestructura.persistencia import archivos
 from infraestructura.persistencia.archivos import registrar_jugador as _registrar_jugador
 from infraestructura.persistencia.archivos import validar_login as _validar_login
 from infraestructura.persistencia.archivos import buscar_jugador as _buscar_jugador
+from infraestructura.persistencia.archivos import cargar_jugadores as _cargar_jugadores
 from aplicacion.partida import crear_partida as _crear_partida
 from aplicacion.ranking import obtener_top_defensores as _obtener_top_defensores
 from aplicacion.ranking import obtener_top_atacantes as _obtener_top_atacantes
@@ -353,3 +354,35 @@ def obtener_catalogo_facciones():
         Ninguna.
     """
     return _obtener_catalogo_facciones()
+
+
+def obtener_todos_puntajes():
+    """
+    Descripcion:
+        Devuelve todos los jugadores registrados con sus victorias de
+        defensor, atacante y total, ordenados por total de victorias.
+
+    Entradas:
+        Ninguna.
+
+    Salidas:
+        list[dict]: Puntajes completos de todos los jugadores.
+
+    Restricciones:
+        Ninguna.
+    """
+    jugadores = _cargar_jugadores()
+    jugadores_ordenados = sorted(
+        jugadores,
+        key=lambda jugador: (jugador.total_victorias(), jugador.victorias_defensor, jugador.victorias_atacante),
+        reverse=True,
+    )
+    return [
+        {
+            "nombre_usuario": jugador.nombre_usuario,
+            "victorias_defensor": jugador.victorias_defensor,
+            "victorias_atacante": jugador.victorias_atacante,
+            "total_victorias": jugador.total_victorias(),
+        }
+        for jugador in jugadores_ordenados
+    ]
