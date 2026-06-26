@@ -4,181 +4,300 @@
 
 import tkinter as tk
 
+from aplicacion import app
+
+FILAS_TABLERO = 11
+COLUMNAS_TABLERO = 6
+ANCHO_CELDA = 115
+ALTO_CELDA = 39
+ANCHO_TABLERO = COLUMNAS_TABLERO * ANCHO_CELDA
+ALTO_TABLERO = FILAS_TABLERO * ALTO_CELDA
+FILA_BASE = 0
+FILAS_DEFENSOR = range(1, 8)
+FILAS_ATACANTE = range(8, 11)
+COLOR_DEFENSA = "#e8f2ff"
+COLOR_ATAQUE = "#fff0df"
+COLOR_BASE = "#ffe0e0"
+COLOR_BORDE = "#666666"
+
 
 def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=None):
     """
     Descripción:
-        Crea la ventana base del mapa. Esta pantalla es un esqueleto
-        visual para la futura partida tipo tower defense: incluye una
-        franja superior con el botón para volver, paneles de información,
-        controles de compra y un área central para dibujar el mapa.
-
-    Entradas:
-        root: ventana raíz oculta.
-        GoPlay: función para volver a la ventana Play.
-        cerrar_todo: función para cerrar completamente el programa.
-        configurar_ventana: función que centra y configura la ventana.
-
-    Salidas:
-        No retorna ningún valor.
-
-    Restricciones:
-        El botón Volver destruye esta ventana y abre nuevamente Play.
-        Por ahora los botones de compra son solamente visuales.
+        Crea una pantalla de mapa jugable. El usuario elige una pieza
+        en el panel de compras y luego hace clic en una casilla válida
+        del tablero para colocar tropas o defensas. La lógica oficial
+        de dinero, compras, posiciones ocupadas y combate se ejecuta
+        mediante aplicacion.app.
     """
 
     window_mapa = tk.Toplevel(root)
     configurar_ventana(window_mapa, "Mapa")
     datos_partida = obtener_datos_partida() if obtener_datos_partida is not None else {}
-    nombre_jugador = datos_partida.get("jugador") or "Jugador"
-    nombre_contrincante = datos_partida.get("contrincante") or "Contrincante"
+    rol_jugador = datos_partida.get("rol") or "defensor"
+    nombre_usuario = datos_partida.get("usuario") or datos_partida.get("jugador") or "Jugador"
+    nombre_defensor = nombre_usuario if rol_jugador == "defensor" else "Defensor"
+    nombre_atacante = nombre_usuario if rol_jugador == "atacante" else "Atacante"
+    seleccion_actual = {"tipo": None, "clave": None, "nombre": None}
+    ultimo_estado = {"datos": {}}
+    botones_compra = []
+
+    app.crear_partida(nombre_defensor, nombre_atacante)
 
     def GoPlayR():
         window_mapa.destroy()
         GoPlay()
 
-    # --- Franja superior -------------------------------------------------
+    def escribir_evento(texto):
+        if not texto:
+            return
+        caja_eventos.config(state="normal")
+        caja_eventos.insert(tk.END, f"• {texto}\n")
+        caja_eventos.see(tk.END)
+        caja_eventos.config(state="disabled")
 
-    boton_volver = tk.Button(
-        window_mapa,
-        text="Volver",
-        font=("Arial", 12, "bold"),
-        width=10,
-        height=2,
-        bg="red",
-        command=GoPlayR
-    )
+    def obtener_catalogo_compras():
+        if rol_jugador == "atacante":
+            return [
+                {"tipo": "unidad", **unidad}
+                for unidad in app.obtener_catalogo_unidades()
+            ]
+        compras = [
+            {"tipo": "torre", **torre}
+            for torre in app.obtener_catalogo_torres()
+        ]
+        compras.append({
+            "tipo": "muro",
+            "clave": "muro",
+            "nombre": "Muro",
+            "costo": 50,
+            "vida": 160,
+            "dano": 0,
+            "alcance": 0,
+            "habilidad": "bloqueo",
+        })
+        return compras
+
+    def seleccionar_compra(compra):
+        seleccion_actual["tipo"] = compra["tipo"]
+        seleccion_actual["clave"] = compra["clave"]
+        seleccion_actual["nombre"] = compra["nombre"]
+        etiqueta_seleccion.config(text=f"Seleccionado: {compra['nombre']}")
+        for boton, compra_boton in botones_compra:
+            boton.config(relief="sunken" if compra_boton is compra else "raised")
+
+    def posicion_permitida_por_rol(fila, columna):
+        if fila == FILA_BASE:
+            return False, "La base no se puede ocupar."
+        if rol_jugador == "defensor" and fila not in FILAS_DEFENSOR:
+            return False, "El defensor solo puede colocar en la zona azul."
+        if rol_jugador == "atacante" and fila not in FILAS_ATACANTE:
+            return False, "El atacante solo puede colocar tropas en la zona naranja."
+        return True, "Posición válida."
+
+    def convertir_click_a_casilla(evento):
+        columna = evento.x // ANCHO_CELDA
+        fila = evento.y // ALTO_CELDA
+        if fila < 0 or fila >= FILAS_TABLERO or columna < 0 or columna >= COLUMNAS_TABLERO:
+            return None, None
+        return fila, columna
+
+    def color_proyectil(nombre_torre):
+        nombre = nombre_torre.lower()
+        if "cañon" in nombre or "canon" in nombre:
+            return "#ff7a00"
+        if "hielo" in nombre:
+            return "#00bcd4"
+        if "soporte" in nombre:
+            return "#9c27b0"
+        return "#f2c200"
+
+    def centro_casilla(fila, columna):
+        return (
+            columna * ANCHO_CELDA + ANCHO_CELDA // 2,
+            fila * ALTO_CELDA + ALTO_CELDA // 2,
+        )
+
+    def distancia(fila_a, columna_a, fila_b, columna_b):
+        return abs(fila_a - fila_b) + abs(columna_a - columna_b)
+
+    def animar_proyectiles(estado):
+        proyectiles = []
+        for torre in estado.get("torres", []):
+            objetivo = None
+            for unidad in estado.get("unidades", []):
+                if distancia(torre["fila"], torre["columna"], unidad["fila"], unidad["columna"]) <= torre.get("alcance", 0):
+                    objetivo = unidad
+                    break
+            if objetivo is not None:
+                x1, y1 = centro_casilla(torre["fila"], torre["columna"])
+                x2, y2 = centro_casilla(objetivo["fila"], objetivo["columna"])
+                color = color_proyectil(torre["nombre"])
+                proyectiles.append(cuadro_mapa.create_line(x1, y1, x2, y2, fill=color, width=4, arrow=tk.LAST))
+                proyectiles.append(cuadro_mapa.create_oval(x2 - 6, y2 - 6, x2 + 6, y2 + 6, fill=color, outline="black"))
+
+        for unidad in estado.get("unidades", []):
+            objetivo = next(
+                (torre for torre in estado.get("torres", []) if torre["fila"] == unidad["fila"] - 1 and torre["columna"] == unidad["columna"]),
+                None,
+            )
+            if objetivo is not None:
+                x1, y1 = centro_casilla(unidad["fila"], unidad["columna"])
+                x2, y2 = centro_casilla(objetivo["fila"], objetivo["columna"])
+                proyectiles.append(cuadro_mapa.create_line(x1, y1, x2, y2, fill="#d32f2f", width=3, dash=(5, 3)))
+
+        if proyectiles:
+            window_mapa.after(450, lambda: [cuadro_mapa.delete(item) for item in proyectiles])
+
+    def comprar_en_casilla(evento):
+        if seleccion_actual["clave"] is None:
+            escribir_evento("Primero selecciona una compra del panel izquierdo.")
+            return
+        fila, columna = convertir_click_a_casilla(evento)
+        if fila is None:
+            return
+        permitido, mensaje = posicion_permitida_por_rol(fila, columna)
+        if not permitido:
+            escribir_evento(mensaje)
+            return
+
+        if seleccion_actual["tipo"] == "torre":
+            exito, mensaje = app.comprar_torre(seleccion_actual["clave"], fila, columna)
+        elif seleccion_actual["tipo"] == "muro":
+            exito, mensaje = app.comprar_muro(fila, columna)
+        else:
+            exito, mensaje = app.comprar_unidad(seleccion_actual["clave"], fila, columna)
+        escribir_evento(mensaje)
+        actualizar_vista()
+
+    def ejecutar_turno_click():
+        estado_antes = app.obtener_estado_partida()
+        animar_proyectiles(estado_antes)
+        resultado = app.ejecutar_combate()
+        for evento in resultado.get("eventos", []):
+            escribir_evento(evento)
+        actualizar_vista()
+
+    def dibujar_zonas():
+        cuadro_mapa.delete("all")
+        for fila in range(FILAS_TABLERO):
+            y1 = fila * ALTO_CELDA
+            y2 = y1 + ALTO_CELDA
+            if fila == FILA_BASE:
+                color = COLOR_BASE
+            elif fila in FILAS_DEFENSOR:
+                color = COLOR_DEFENSA
+            else:
+                color = COLOR_ATAQUE
+            cuadro_mapa.create_rectangle(0, y1, ANCHO_TABLERO, y2, fill=color, outline="")
+
+        for x in range(0, ANCHO_TABLERO + 1, ANCHO_CELDA):
+            cuadro_mapa.create_line(x, 0, x, ALTO_TABLERO, fill="#cccccc")
+        for y in range(0, ALTO_TABLERO + 1, ALTO_CELDA):
+            cuadro_mapa.create_line(0, y, ANCHO_TABLERO, y, fill="#cccccc")
+
+        cuadro_mapa.create_text(ANCHO_TABLERO // 2, ALTO_CELDA // 2, text="BASE", font=("Arial", 13, "bold"), fill="#9a0000")
+        cuadro_mapa.create_text(10, ALTO_CELDA * 4, text="Zona defensor", angle=90, anchor="w", fill="#005b96", font=("Arial", 10, "bold"))
+        cuadro_mapa.create_text(10, ALTO_CELDA * 9, text="Zona atacante", angle=90, anchor="w", fill="#b05a00", font=("Arial", 10, "bold"))
+
+    def dibujar_estado(estado):
+        vida_base = estado.get("vida_base", 0)
+        vida_maxima_base = estado.get("vida_maxima_base", 1)
+        ancho_vida = int((vida_base / max(1, vida_maxima_base)) * (ANCHO_TABLERO - 40))
+        cuadro_mapa.create_rectangle(20, 6, ANCHO_TABLERO - 20, 16, fill="#ffcdd2", outline="black")
+        cuadro_mapa.create_rectangle(20, 6, 20 + ancho_vida, 16, fill="#e53935", outline="")
+
+        for muro in estado.get("muros", []):
+            x, y = centro_casilla(muro["fila"], muro["columna"])
+            cuadro_mapa.create_rectangle(x - 32, y - 12, x + 32, y + 12, fill="#8d6e63", outline="black", width=2)
+            cuadro_mapa.create_text(x, y, text="MURO", font=("Arial", 8, "bold"), fill="white")
+
+        for torre in estado.get("torres", []):
+            x, y = centro_casilla(torre["fila"], torre["columna"])
+            color = color_proyectil(torre["nombre"])
+            cuadro_mapa.create_rectangle(x - 20, y - 18, x + 20, y + 18, fill=color, outline="black", width=2)
+            cuadro_mapa.create_text(x, y - 3, text="T", font=("Arial", 14, "bold"), fill="black")
+            cuadro_mapa.create_text(x, y + 13, text=str(torre["vida"]), font=("Arial", 8, "bold"), fill="black")
+
+        for unidad in estado.get("unidades", []):
+            x, y = centro_casilla(unidad["fila"], unidad["columna"])
+            cuadro_mapa.create_oval(x - 20, y - 17, x + 20, y + 17, fill="#ff7043", outline="black", width=2)
+            cuadro_mapa.create_text(x, y - 3, text="U", font=("Arial", 14, "bold"), fill="white")
+            cuadro_mapa.create_text(x, y + 13, text=str(unidad["vida"]), font=("Arial", 8, "bold"), fill="white")
+
+    def actualizar_panel_estado(estado):
+        caja_informacion_superior.config(
+            text=(
+                f"Rol: {rol_jugador.upper()} | Ronda {estado.get('numero_ronda', 1)} | "
+                f"Defensor ${estado.get('dinero_defensor', 0)} | "
+                f"Atacante ${estado.get('dinero_atacante', 0)} | "
+                f"Base {estado.get('vida_base', 0)}/{estado.get('vida_maxima_base', 0)}"
+            )
+        )
+        caja_informacion_contrincante.config(state="normal")
+        caja_informacion_contrincante.delete("1.0", tk.END)
+        caja_informacion_contrincante.insert(
+            tk.END,
+            "Colocación: defensor en zona azul; atacante en zona naranja. "
+            "Haz clic en una compra y luego en una casilla válida. "
+            "Los proyectiles de torre se ven como líneas de color.",
+        )
+        caja_informacion_contrincante.config(state="disabled")
+
+    def actualizar_vista():
+        estado = app.obtener_estado_partida()
+        ultimo_estado["datos"] = estado
+        dibujar_zonas()
+        dibujar_estado(estado)
+        actualizar_panel_estado(estado)
+
+    # --- Franja superior -------------------------------------------------
+    boton_volver = tk.Button(window_mapa, text="Volver", font=("Arial", 12, "bold"), width=10, height=2, bg="red", command=GoPlayR)
     boton_volver.place(x=20, y=20)
 
-    caja_informacion_superior = tk.Label(
-        window_mapa,
-        text=f"Jugador: {nombre_jugador}",
-        font=("Arial", 14, "bold"),
-        width=88,
-        height=2,
-        relief="solid",
-        bd=2,
-        anchor="w",
-        padx=14
-    )
+    caja_informacion_superior = tk.Label(window_mapa, text="", font=("Arial", 12, "bold"), width=88, height=2, relief="solid", bd=2, anchor="w", padx=14)
     caja_informacion_superior.place(x=160, y=20)
 
-    titulo = tk.Label(
-        window_mapa,
-        text="Mapa",
-        font=("Arial", 28, "bold")
-    )
-    titulo.place(relx=0.5, y=105, anchor="center")
+    titulo = tk.Label(window_mapa, text="Mapa de batalla", font=("Arial", 24, "bold"))
+    titulo.place(relx=0.5, y=95, anchor="center")
 
     # --- Columna izquierda: eventos e información ------------------------
+    etiqueta_eventos = tk.Label(window_mapa, text="Eventos", font=("Arial", 13, "bold"))
+    etiqueta_eventos.place(x=35, y=125)
 
-    etiqueta_eventos = tk.Label(
-        window_mapa,
-        text="Información de la partida",
-        font=("Arial", 13, "bold")
-    )
-    etiqueta_eventos.place(x=40, y=135)
-
-    caja_eventos = tk.Text(
-        window_mapa,
-        font=("Consolas", 11),
-        width=34,
-        height=15,
-        relief="solid",
-        bd=2,
-        wrap="word"
-    )
-    caja_eventos.insert(
-        tk.END,
-        "Aquí aparecerán las cosas que pasen durante la partida. "
-        "Si el texto llega al borde, continúa automáticamente en el "
-        "siguiente renglón."
-    )
+    caja_eventos = tk.Text(window_mapa, font=("Consolas", 10), width=35, height=14, relief="solid", bd=2, wrap="word")
     caja_eventos.config(state="disabled")
-    caja_eventos.place(x=40, y=165)
+    caja_eventos.place(x=35, y=155)
+    escribir_evento("Partida creada. Selecciona una compra y una casilla.")
 
     # --- Columna izquierda inferior: compras -----------------------------
+    etiqueta_compras = tk.Label(window_mapa, text="Tropas" if rol_jugador == "atacante" else "Defensas", font=("Arial", 13, "bold"))
+    etiqueta_compras.place(x=35, y=435)
 
-    etiqueta_compras = tk.Label(
-        window_mapa,
-        text="Compras",
-        font=("Arial", 13, "bold")
-    )
-    etiqueta_compras.place(x=40, y=465)
+    etiqueta_seleccion = tk.Label(window_mapa, text="Seleccionado: nada", font=("Arial", 10, "bold"), width=34, anchor="w")
+    etiqueta_seleccion.place(x=35, y=462)
 
-    nombres_botones = [
-        "Comprar 1",
-        "Comprar 2",
-        "Comprar 3"
-    ]
+    for indice, compra in enumerate(obtener_catalogo_compras()):
+        y_base = 490 + (indice * 34)
+        descripcion = f"{compra['nombre']}  ${compra['costo']}"
+        boton_compra = tk.Button(window_mapa, text=descripcion, font=("Arial", 9, "bold"), width=28, command=lambda compra=compra: seleccionar_compra(compra))
+        boton_compra.place(x=35, y=y_base)
+        botones_compra.append((boton_compra, compra))
 
-    for indice, nombre_boton in enumerate(nombres_botones):
-        x_base = 40
-        y_base = 500 + (indice * 48)
-
-        boton_compra = tk.Button(
-            window_mapa,
-            text=nombre_boton,
-            font=("Arial", 10, "bold"),
-            width=11,
-            height=1
-        )
-        boton_compra.place(x=x_base, y=y_base)
-
-        campo_cantidad = tk.Entry(
-            window_mapa,
-            font=("Arial", 11),
-            width=4,
-            justify="center"
-        )
-        campo_cantidad.insert(0, "#")
-        campo_cantidad.place(x=x_base + 105, y=y_base + 2)
+    boton_turno = tk.Button(window_mapa, text="Ejecutar turno", font=("Arial", 11, "bold"), width=18, bg="#ffb74d", command=ejecutar_turno_click)
+    boton_turno.place(x=95, y=655)
 
     # --- Zona derecha: tablero del mapa ----------------------------------
+    etiqueta_tablero = tk.Label(window_mapa, text="Área del mapa", font=("Arial", 13, "bold"))
+    etiqueta_tablero.place(x=405, y=125)
 
-    etiqueta_tablero = tk.Label(
-        window_mapa,
-        text="Área del mapa",
-        font=("Arial", 13, "bold")
-    )
-    etiqueta_tablero.place(x=430, y=135)
+    cuadro_mapa = tk.Canvas(window_mapa, width=ANCHO_TABLERO, height=ALTO_TABLERO, bg="white", relief="solid", bd=3, highlightthickness=0)
+    cuadro_mapa.place(x=405, y=155)
+    cuadro_mapa.bind("<Button-1>", comprar_en_casilla)
 
-    cuadro_mapa = tk.Canvas(
-        window_mapa,
-        width=660,
-        height=405,
-        bg="white",
-        relief="solid",
-        bd=3,
-        highlightthickness=0
-    )
-    cuadro_mapa.place(x=430, y=165)
-
-    # Líneas guía temporales para visualizar el espacio de juego.
-    for x in range(0, 661, 60):
-        cuadro_mapa.create_line(x, 0, x, 405, fill="#dddddd")
-    for y in range(0, 406, 45):
-        cuadro_mapa.create_line(0, y, 660, y, fill="#dddddd")
-
-    cuadro_mapa.create_text(
-        330,
-        202,
-        text="Espacio reservado para el mapa tower defense",
-        font=("Arial", 16, "bold"),
-        fill="gray35"
-    )
-
-    caja_informacion_contrincante = tk.Text(
-        window_mapa,
-        font=("Arial", 12),
-        width=77,
-        height=3,
-        relief="solid",
-        bd=2,
-        wrap="word"
-    )
-    caja_informacion_contrincante.insert(tk.END, f"Contrincante: {nombre_contrincante}")
+    caja_informacion_contrincante = tk.Text(window_mapa, font=("Arial", 11), width=78, height=3, relief="solid", bd=2, wrap="word")
     caja_informacion_contrincante.config(state="disabled")
-    caja_informacion_contrincante.place(x=430, y=595)
+    caja_informacion_contrincante.place(x=405, y=600)
 
+    actualizar_vista()
     window_mapa.protocol("WM_DELETE_WINDOW", cerrar_todo)

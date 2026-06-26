@@ -245,7 +245,7 @@ def obtener_catalogo_torres():
     Restricciones:
         Ninguna.
     """
-    from defensa_y_asalto.dominio.entidades.torre import FABRICANTES_TORRES
+    from dominio.entidades.torre import FABRICANTES_TORRES
 
     catalogo = []
     for clave, fabricante in FABRICANTES_TORRES.items():
@@ -280,7 +280,7 @@ def obtener_catalogo_unidades():
     Restricciones:
         Ninguna.
     """
-    from defensa_y_asalto.dominio.entidades.unidad import FABRICANTES_UNIDADES
+    from dominio.entidades.unidad import FABRICANTES_UNIDADES
 
     catalogo = []
     for clave, fabricante in FABRICANTES_UNIDADES.items():

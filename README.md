@@ -207,7 +207,7 @@ resumen_red = cliente.obtener_resumen_red()
 
 Si el puerto escrito no esta disponible al crear servidor desde `Play`, la interfaz prueba puertos alternativos cercanos y actualiza el campo `Puerto` con el que debe usar el segundo jugador. La pantalla tambien muestra de forma destacada la IP local y el puerto que el anfitrion debe compartir.
 
-Las facciones de `Play` son visuales: se cargan desde `aplicacion.obtener_catalogo_facciones()`, usan imagenes existentes de `Imagenes/Soldados/` y no cambian dinero, daño, vida, velocidad, habilidades, rondas ni victoria.
+Las facciones de `Play` son visuales: se cargan desde `aplicacion.obtener_catalogo_facciones()`, usan imagenes existentes de `Imagenes/Soldados/`, dibujan una bandera dentro del boton de pais, muestran su codigo y no cambian dinero, daño, vida, velocidad, habilidades, rondas ni victoria.
 
 El servidor envia en `datos` campos estandar para facilitar la interfaz:
 
@@ -269,6 +269,8 @@ python demo_consola.py
 `play.py` ya permite crear un servidor local, unirse a un servidor remoto,
 comprar torres, comprar muros, comprar unidades, iniciar/pausar combate
 y actualizar el tablero
-usando el estado oficial recibido por red. La interfaz debe seguir
+usando el estado oficial recibido por red. La pantalla `Mapa` ya permite una preparación jugable local: muestra compras con nombres reales de tropas para el atacante y defensas para el defensor, permite colocar piezas haciendo clic en casillas válidas, marca zonas de colocación por rol y dibuja proyectiles de combate como líneas de color antes de resolver cada turno.
+
+La interfaz debe seguir
 limitandose a mostrar datos y enviar acciones; el calculo de combate,
 dinero, rondas y victoria permanece en `Logica/` y en el servidor.
