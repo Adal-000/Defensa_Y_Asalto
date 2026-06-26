@@ -10,6 +10,7 @@ import socket
 import sys
 import threading
 
+from infraestructura.persistencia.archivos import sincronizar_victoria_red
 from infraestructura.red.protocolo import (
     ACCION_COMPRAR_MURO,
     ACCION_COMPRAR_TORRE,
@@ -63,6 +64,7 @@ class ClientePartida:
         self.roles_faltantes = []
         self.sala_lista = False
         self.mensaje_sala = ""
+        self.victorias_sincronizadas = set()
         self.bloqueo = threading.Lock()
 
     def conectar(self, host, usuario, puerto=PUERTO_PREDETERMINADO, rol=""):
@@ -157,6 +159,7 @@ class ClientePartida:
 
             if "estado" in mensaje and mensaje["estado"] is not None:
                 self.ultimo_estado = mensaje["estado"]
+                self._sincronizar_victoria_si_finalizo(mensaje["estado"])
 
             if mensaje.get("exito") is False:
                 self.ultimo_error = mensaje.get("mensaje")
@@ -182,6 +185,34 @@ class ClientePartida:
 
         if self.callback_mensaje is not None:
             self.callback_mensaje(mensaje)
+
+    def _sincronizar_victoria_si_finalizo(self, estado):
+        """
+        Descripcion:
+            Cuando el servidor avisa que la partida terminó, guarda
+            esa victoria en el jugadores.json local de esta computadora.
+            Se hace una sola vez por partida para no duplicar contador.
+        """
+        if not isinstance(estado, dict):
+            return
+
+        if not estado.get("partida_finalizada"):
+            return
+
+        ganador = estado.get("ganador_partida")
+        rol = estado.get("rol_ganador_partida")
+        numero_ronda = estado.get("numero_ronda")
+        llave = (ganador, rol, numero_ronda)
+
+        if not ganador or rol not in ("defensor", "atacante"):
+            return
+
+        if llave in self.victorias_sincronizadas:
+            return
+
+        if sincronizar_victoria_red(ganador, rol):
+            self.victorias_sincronizadas.add(llave)
+
 
     def enviar_accion(self, accion, **datos):
         """

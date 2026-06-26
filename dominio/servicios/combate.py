@@ -100,27 +100,41 @@ def _muro_en_posicion(lista_muros, fila, columna):
     return None
 
 
-def mover_unidad(unidad, fila_objetivo, lista_muros=None):
+def _torre_en_posicion(lista_torres, fila, columna):
     """
     Descripcion:
-        Mueve una unidad hacia la base del defensor, avanzando segun
-        su velocidad actual. Si encuentra un muro en su camino, se
-        detiene en la posicion del muro para atacarlo durante la fase
-        de ataque.
+        Busca una torre viva en una posicion especifica del tablero.
+        Se usa para evitar que una unidad atraviese una estructura
+        defensiva y para permitirle atacarla desde la casilla anterior.
+    """
+    if lista_torres is None:
+        return None
 
-    Entradas:
-        unidad (Unidad): Unidad que se va a mover.
-        fila_objetivo (int): Fila en la que se encuentra la base
-            central, limite del movimiento de la unidad.
-        lista_muros (list[Muro]): Muros actuales de la ronda. Puede
-            ser None si la partida no usa muros.
+    for torre in lista_torres:
+        if not torre.esta_destruida() and torre.fila == fila and torre.columna == columna:
+            return torre
+    return None
 
-    Salidas:
-        None: Modifica el atributo fila de la unidad.
 
-    Restricciones:
-        - Si la unidad esta congelada, no se desplaza en este turno.
-        - La unidad avanza por su misma columna.
+def _estructura_en_posicion(lista_torres, lista_muros, fila, columna):
+    torre = _torre_en_posicion(lista_torres, fila, columna)
+    if torre is not None:
+        return "torre", torre
+
+    muro = _muro_en_posicion(lista_muros, fila, columna)
+    if muro is not None:
+        return "muro", muro
+
+    return None, None
+
+
+def mover_unidad(unidad, fila_objetivo, lista_muros=None, lista_torres=None):
+    """
+    Descripcion:
+        Mueve una unidad hacia la base del defensor. La unidad avanza
+        por su columna, pero no entra en la casilla de una torre o un
+        muro. Si una estructura esta justo al frente, se queda en su
+        casilla actual para atacarla durante la fase de ataque.
     """
     velocidad_actual = unidad.calcular_velocidad_actual()
 
@@ -137,14 +151,19 @@ def mover_unidad(unidad, fila_objetivo, lista_muros=None):
         elif direccion == 1 and siguiente_fila > fila_objetivo:
             siguiente_fila = fila_objetivo
 
-        unidad.fila = siguiente_fila
-
-        if _muro_en_posicion(lista_muros, unidad.fila, unidad.columna) is not None:
+        if siguiente_fila == fila_objetivo:
             break
+
+        _, estructura = _estructura_en_posicion(
+            lista_torres, lista_muros, siguiente_fila, unidad.columna
+        )
+        if estructura is not None:
+            break
+
+        unidad.fila = siguiente_fila
 
         if unidad.fila == fila_objetivo:
             break
-
 
 def activar_habilidades_inicio_turno(lista_unidades, registrador_eventos=None):
     """
@@ -319,38 +338,34 @@ def fase_ataque_torres(lista_torres, lista_unidades, registrador_eventos=None):
 def _buscar_objetivo_unidad(unidad, lista_torres, lista_muros, base, fila_base):
     """
     Descripcion:
-        Determina que objetivo debe atacar una unidad: primero una
-        torre en su misma posicion, luego un muro en su misma
-        posicion y finalmente la base si ya llego a ella.
-
-    Entradas:
-        unidad (Unidad): Unidad atacante que buscara objetivo.
-        lista_torres (list[Torre]): Torres actuales del defensor.
-        lista_muros (list[Muro]): Muros actuales del defensor.
-        base (Base): Base central del defensor.
-        fila_base (int): Fila de la base central.
-
-    Salidas:
-        tuple[str, object]: Tipo de objetivo y objeto encontrado.
-        Si no hay objetivo, retorna (None, None).
-
-    Restricciones:
-        Ninguna.
+        Determina que objetivo debe atacar una unidad. Primero revisa
+        si ya esta sobre una estructura por compatibilidad con estados
+        anteriores; luego revisa la casilla que tiene al frente. Esto
+        hace que las tropas no atraviesen torres o muros: se detienen
+        y atacan desde la casilla anterior.
     """
-    for torre in lista_torres:
-        if (not torre.esta_destruida() and torre.fila == unidad.fila
-                and torre.columna == unidad.columna):
-            return "torre", torre
+    tipo, objetivo = _estructura_en_posicion(
+        lista_torres, lista_muros, unidad.fila, unidad.columna
+    )
+    if objetivo is not None:
+        return tipo, objetivo
 
-    muro = _muro_en_posicion(lista_muros, unidad.fila, unidad.columna)
-    if muro is not None:
-        return "muro", muro
+    direccion = -1 if unidad.fila > fila_base else 1
+    fila_frente = unidad.fila + direccion
+
+    if direccion == -1 and fila_frente <= fila_base:
+        return "base", base
+
+    tipo, objetivo = _estructura_en_posicion(
+        lista_torres, lista_muros, fila_frente, unidad.columna
+    )
+    if objetivo is not None:
+        return tipo, objetivo
 
     if unidad_llego_a_base(unidad, fila_base):
         return "base", base
 
     return None, None
-
 
 def _calcular_dano_unidad(unidad, tipo_objetivo):
     """
@@ -577,7 +592,7 @@ def ejecutar_turno_de_combate(lista_torres, lista_unidades, base, fila_base,
 
     for unidad in lista_unidades:
         if not unidad.esta_eliminada():
-            mover_unidad(unidad, fila_base, lista_muros)
+            mover_unidad(unidad, fila_base, lista_muros, lista_torres)
 
     fase_ataque_torres(lista_torres, lista_unidades, registrador_eventos)
     fase_ataque_unidades(

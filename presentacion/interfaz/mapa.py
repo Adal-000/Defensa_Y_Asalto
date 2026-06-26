@@ -7,6 +7,13 @@ import os
 import tkinter as tk
 from tkinter import messagebox
 
+try:
+    from PIL import Image, ImageOps, ImageTk
+except ImportError:
+    Image = None
+    ImageOps = None
+    ImageTk = None
+
 from aplicacion import app
 
 
@@ -28,8 +35,8 @@ COLOR_PANEL = "#f7f7f7"
 COLOR_TEXTO = "#222222"
 
 TIEMPO_PREPARACION_SEGUNDOS = 15
-INTERVALO_POLLING_MS = 350
-INTERVALO_COMBATE_LOCAL_MS = 900
+INTERVALO_POLLING_MS = 250
+INTERVALO_COMBATE_LOCAL_MS = 750
 RONDAS_PARA_GANAR = 3
 
 
@@ -125,6 +132,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         "after_timer": None,
         "after_combate": None,
         "after_volver": None,
+        "after_ocultar_resultado": None,
         "combate_local_activo": False,
     }
     estado_ui = {
@@ -162,7 +170,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
     def detener_todo():
         control["combate_local_activo"] = False
-        for clave in ("after_polling", "after_timer", "after_combate", "after_volver"):
+        for clave in ("after_polling", "after_timer", "after_combate", "after_volver", "after_ocultar_resultado"):
             cancelar_after(clave)
 
     def cerrar_mapa(volver_a_play=False):
@@ -229,9 +237,29 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
                     return os.path.join(raiz, archivo)
         return None
 
-    def cargar_photoimage(ruta, ancho_max=None, alto_max=None):
+    def cargar_photoimage(ruta, ancho_max=None, alto_max=None, ajustar_exactamente=False):
         if not ruta or not os.path.exists(ruta):
             return None
+
+        if Image is not None and ImageTk is not None and ancho_max and alto_max:
+            try:
+                imagen_pil = Image.open(ruta).convert("RGBA")
+                if ajustar_exactamente:
+                    imagen_pil = ImageOps.fit(
+                        imagen_pil,
+                        (int(ancho_max), int(alto_max)),
+                        method=Image.Resampling.LANCZOS,
+                        centering=(0.5, 0.5),
+                    )
+                else:
+                    imagen_pil.thumbnail(
+                        (int(ancho_max), int(alto_max)),
+                        Image.Resampling.LANCZOS,
+                    )
+                return ImageTk.PhotoImage(imagen_pil, master=window_mapa)
+            except Exception:
+                pass
+
         try:
             imagen = tk.PhotoImage(master=window_mapa, file=ruta)
             if ancho_max and alto_max:
@@ -350,7 +378,12 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         ruta = buscar_archivo_por_nombre(RUTA_IMAGENES, "mapa")
         if ruta is None:
             ruta = os.path.join(RUTA_IMAGENES, "Fondo.png")
-        imagenes[llave] = cargar_photoimage(ruta, ANCHO_TABLERO, ALTO_TABLERO)
+        imagenes[llave] = cargar_photoimage(
+            ruta,
+            ANCHO_TABLERO,
+            ALTO_TABLERO,
+            ajustar_exactamente=True,
+        )
         return imagenes[llave]
 
     # -----------------------------------------------------------------
@@ -441,6 +474,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             titulo = "Resultado de ronda"
 
         etiqueta_resultado.config(text=texto, bg=color, fg="white")
+        etiqueta_resultado.place(relx=0.5, y=350, anchor="center")
         etiqueta_resultado.lift()
         escribir_evento(detalle)
         try:
@@ -453,7 +487,11 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             boton_turno.config(text="Partida terminada", bg="#9e9e9e", state="disabled")
             control["after_volver"] = window_mapa.after(2500, lambda: cerrar_mapa(volver_a_play=True))
         else:
-            control["after_volver"] = window_mapa.after(1300, lambda: etiqueta_resultado.config(text="", bg=COLOR_PANEL, fg=COLOR_PANEL))
+            def ocultar_resultado():
+                if ventana_activa():
+                    etiqueta_resultado.place_forget()
+                    etiqueta_resultado.config(text="", bg=COLOR_PANEL, fg=COLOR_PANEL)
+            control["after_ocultar_resultado"] = window_mapa.after(1300, ocultar_resultado)
 
     def detectar_resultado(estado):
         vic_def = int(estado.get("rondas_ganadas_defensor", 0))
@@ -713,27 +751,42 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
     def animar_proyectiles(estado):
         proyectiles = []
+        if estado.get("fase_ronda") != "combate":
+            return
+
         for torre in estado.get("torres", []):
             objetivo = None
             for unidad in estado.get("unidades", []):
                 if distancia(torre["fila"], torre["columna"], unidad["fila"], unidad["columna"]) <= torre.get("alcance", 0):
                     objetivo = unidad
                     break
+
             if objetivo:
                 x1, y1 = centro_casilla(torre["fila"], torre["columna"])
                 x2, y2 = centro_casilla(objetivo["fila"], objetivo["columna"])
                 color = color_proyectil(torre.get("nombre", ""))
-                proyectiles.append(cuadro_mapa.create_line(x1, y1, x2, y2, fill=color, width=4, arrow=tk.LAST))
+                proyectiles.append(
+                    cuadro_mapa.create_line(
+                        x1, y1 - 6, x2, y2 - 6,
+                        fill=color, width=4, arrow=tk.LAST, tags="proyectil",
+                    )
+                )
+                proyectiles.append(
+                    cuadro_mapa.create_oval(
+                        x2 - 9, y2 - 15, x2 + 9, y2 + 3,
+                        outline=color, width=3, tags="proyectil",
+                    )
+                )
+
         if proyectiles:
             def borrar():
                 if not ventana_activa():
                     return
-                for item in proyectiles:
-                    try:
-                        cuadro_mapa.delete(item)
-                    except tk.TclError:
-                        pass
-            window_mapa.after(350, borrar)
+                try:
+                    cuadro_mapa.delete("proyectil")
+                except tk.TclError:
+                    pass
+            window_mapa.after(520, borrar)
 
     def actualizar_panel_estado(estado):
         datos_red = obtener_ultimos_datos_red()
@@ -748,11 +801,14 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
                 f"Base {estado.get('vida_base', 0)}/{estado.get('vida_maxima_base', 0)}"
             )
         )
+        segundos_refuerzo = estado.get("segundos_refuerzo_atacante")
         texto = (
             "Reglas: 15 segundos de preparación. El atacante puede comprar tropas también durante el combate. "
-            "El defensor gana si la base vive y el atacante no tiene unidades/dinero o no coloca unidades a tiempo. "
+            "Si sus unidades caen, tiene 5 segundos para colocar otra tropa si aún tiene dinero. "
             "El atacante gana la ronda si destruye la base. "
         )
+        if segundos_refuerzo is not None:
+            texto += f"Refuerzo atacante: {segundos_refuerzo}s. "
         if usuarios:
             texto += f"Jugadores: defensor={usuarios.get('defensor', 'pendiente')} | atacante={usuarios.get('atacante', 'pendiente')}"
         caja_informacion_contrincante.config(state="normal")
@@ -771,6 +827,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         actualizar_marcador(estado)
         detectar_resultado(estado)
         reiniciar_temporizador_si_cambio_ronda(estado)
+        animar_proyectiles(estado)
 
     # -----------------------------------------------------------------
     # Combate local y polling red
@@ -789,8 +846,6 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     def ejecutar_pulso_combate_local():
         if not ventana_activa() or not control["combate_local_activo"]:
             return
-        estado_antes = app.obtener_estado_partida()
-        animar_proyectiles(estado_antes)
         resultado = app.ejecutar_combate()
         for evento in resultado.get("eventos", []):
             escribir_evento(evento)
@@ -813,8 +868,6 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         try:
             estado = adaptador_red.cliente.obtener_ultimo_estado_local()
             if estado:
-                if estado != ultimo_estado["datos"]:
-                    animar_proyectiles(estado)
                 actualizar_vista()
         except Exception:
             pass
@@ -865,7 +918,9 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         relief="solid",
         bd=2,
     )
-    etiqueta_resultado.place(relx=0.5, y=350, anchor="center")
+    # Se mantiene oculta mientras no haya resultado. Antes quedaba
+    # un cuadro blanco encima del mapa.
+    etiqueta_resultado.place_forget()
 
     etiqueta_eventos = tk.Label(window_mapa, text="Eventos", font=("Arial", 13, "bold"), bg=COLOR_PANEL)
     etiqueta_eventos.place(x=35, y=175)

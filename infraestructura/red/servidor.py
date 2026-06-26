@@ -694,7 +694,15 @@ class ServidorPartida:
             atacante = self.clientes_por_rol[ROL_ATACANTE]
 
             if self.partida is None and defensor is not None and atacante is not None:
-                self.partida = crear_partida(defensor.usuario, atacante.usuario)
+                # En red no guarda la victoria directamente aquí.
+                # Cada cliente sincroniza el resultado en su jugadores.json
+                # cuando recibe el estado final, así no se duplica el perfil
+                # del host y ambos equipos ven el mismo ranking global.
+                self.partida = crear_partida(
+                    defensor.usuario,
+                    atacante.usuario,
+                    guardar_victorias=False,
+                )
                 print("Partida creada correctamente.")
 
     def _escuchar_cliente(self, cliente):

@@ -271,3 +271,44 @@ def actualizar_victoria(nombre_usuario, rol,
             return True
 
     return False
+
+
+def sincronizar_victoria_red(nombre_usuario, rol,
+                             ruta_archivo=RUTA_ARCHIVO_JUGADORES):
+    """
+    Descripcion:
+        Actualiza una victoria recibida desde una partida en red. Si
+        el jugador ganador no existe en el jugadores.json local, se
+        crea un registro publico con contrasena vacia solo para que
+        aparezca en ranking y puntajes globales de esta computadora.
+
+    Entradas:
+        nombre_usuario (str): Usuario que gano la partida.
+        rol (str): Rol con el que gano, defensor o atacante.
+
+    Salidas:
+        bool: True si el archivo local fue actualizado.
+
+    Restricciones:
+        - Esta funcion se usa para sincronizar puntajes entre dos
+          computadoras; no reemplaza el registro normal de login.
+    """
+    nombre_usuario = _preparar_texto_credencial(nombre_usuario)
+    rol = _preparar_texto_credencial(rol).lower()
+
+    if nombre_usuario == "" or rol not in ("defensor", "atacante"):
+        return False
+
+    lista_jugadores = cargar_jugadores(ruta_archivo)
+
+    for jugador in lista_jugadores:
+        if jugador.nombre_usuario == nombre_usuario:
+            jugador.sumar_victoria(rol)
+            guardar_jugadores(lista_jugadores, ruta_archivo)
+            return True
+
+    jugador_publico = Jugador(nombre_usuario, "")
+    jugador_publico.sumar_victoria(rol)
+    lista_jugadores.append(jugador_publico)
+    guardar_jugadores(lista_jugadores, ruta_archivo)
+    return True

@@ -6,6 +6,8 @@ Descripcion:
     combate y condiciones de victoria.
 """
 
+import time
+
 from dominio.entidades.base import Base
 from dominio.entidades.torre import crear_torre_por_tipo
 from dominio.entidades.unidad import crear_unidad_por_tipo
@@ -17,6 +19,7 @@ DINERO_INICIAL_DEFENSOR = 360
 DINERO_INICIAL_ATACANTE = 360
 DINERO_EXTRA_POR_RONDA = 80
 RONDAS_PARA_GANAR_PARTIDA = 3
+SEGUNDOS_ESPERA_REFUERZO_ATACANTE = 5
 FILA_BASE = 0
 MAXIMO_TURNOS_POR_RONDA = 30
 CANTIDAD_FILAS_TABLERO = 11
@@ -56,9 +59,10 @@ class Partida:
         - nombre_defensor y nombre_atacante no deben ser iguales.
     """
 
-    def __init__(self, nombre_defensor, nombre_atacante):
+    def __init__(self, nombre_defensor, nombre_atacante, guardar_victorias=True):
         self.nombre_defensor = nombre_defensor
         self.nombre_atacante = nombre_atacante
+        self.guardar_victorias = guardar_victorias
 
         self.dinero_defensor = 0
         self.dinero_atacante = 0
@@ -74,6 +78,8 @@ class Partida:
         self.turnos_en_ronda_actual = 0
         self.fase_ronda = FASE_CONSTRUCCION_DEFENSOR
         self.rol_ganador_ultima_ronda = None
+        self.esperando_refuerzo_atacante = False
+        self.tiempo_inicio_espera_refuerzo = None
 
         self.partida_finalizada = False
         self.ganador_partida = None
@@ -109,6 +115,8 @@ class Partida:
         self.unidades = []
         self.base.reiniciar()
         self.fase_ronda = FASE_CONSTRUCCION_DEFENSOR
+        self.esperando_refuerzo_atacante = False
+        self.tiempo_inicio_espera_refuerzo = None
 
         self.dinero_defensor = DINERO_INICIAL_DEFENSOR + (
             DINERO_EXTRA_POR_RONDA * (self.numero_ronda - 1)
@@ -166,6 +174,8 @@ class Partida:
             return False, "No se puede iniciar combate sin unidades atacantes."
 
         self.fase_ronda = FASE_COMBATE
+        self.esperando_refuerzo_atacante = False
+        self.tiempo_inicio_espera_refuerzo = None
         mensaje = "Inicia la fase de combate."
         self.historial_eventos.append(mensaje)
         return True, mensaje
@@ -450,6 +460,8 @@ class Partida:
 
         self.dinero_atacante -= nueva_unidad.costo
         self.unidades.append(nueva_unidad)
+        self.esperando_refuerzo_atacante = False
+        self.tiempo_inicio_espera_refuerzo = None
         self.historial_eventos.append(
             f"El atacante compra {nueva_unidad.nombre} en ({fila}, {columna})."
         )
@@ -635,19 +647,31 @@ class Partida:
             self._finalizar_ronda("atacante")
             return True
 
-        if self.base.vida > 0 and self.dinero_atacante <= 0 and len(self.unidades) == 0:
-            self.historial_eventos.append(
-                "El atacante se queda sin dinero y sin unidades. El defensor gana la ronda."
-            )
-            self._finalizar_ronda("defensor")
-            return True
-
         if self.base.vida > 0 and len(self.unidades) == 0 and self.turnos_en_ronda_actual > 0:
-            self.historial_eventos.append(
-                "Todas las unidades atacantes fueron eliminadas y la base sigue en pie. El defensor gana la ronda."
-            )
-            self._finalizar_ronda("defensor")
-            return True
+            if self.dinero_atacante <= 0:
+                self.historial_eventos.append(
+                    "El atacante se queda sin dinero y sin unidades. El defensor gana la ronda."
+                )
+                self._finalizar_ronda("defensor")
+                return True
+
+            if not self.esperando_refuerzo_atacante:
+                self.esperando_refuerzo_atacante = True
+                self.tiempo_inicio_espera_refuerzo = time.time()
+                self.historial_eventos.append(
+                    "Todas las unidades atacantes fueron eliminadas. Tiene 5 segundos para colocar refuerzos."
+                )
+                return False
+
+            tiempo_esperado = time.time() - (self.tiempo_inicio_espera_refuerzo or time.time())
+            if tiempo_esperado >= SEGUNDOS_ESPERA_REFUERZO_ATACANTE:
+                self.historial_eventos.append(
+                    "El atacante no colocó refuerzos en 5 segundos. El defensor gana la ronda."
+                )
+                self._finalizar_ronda("defensor")
+                return True
+
+            return False
 
         if self.turnos_en_ronda_actual >= MAXIMO_TURNOS_POR_RONDA:
             self._finalizar_ronda("defensor")
@@ -723,7 +747,22 @@ class Partida:
             f"{self.ganador_partida} gana la partida completa como {rol_ganador}."
         )
 
-        actualizar_victoria(self.ganador_partida, rol_ganador)
+        if self.guardar_victorias:
+            actualizar_victoria(self.ganador_partida, rol_ganador)
+
+    def _segundos_restantes_refuerzo(self):
+        """
+        Descripcion:
+            Devuelve los segundos que le quedan al atacante para
+            colocar otra unidad cuando se quedó sin tropas en combate.
+        """
+        if not self.esperando_refuerzo_atacante or self.tiempo_inicio_espera_refuerzo is None:
+            return None
+
+        transcurrido = time.time() - self.tiempo_inicio_espera_refuerzo
+        restante = SEGUNDOS_ESPERA_REFUERZO_ATACANTE - int(transcurrido)
+        return max(0, restante)
+
 
     def obtener_estado_partida(self):
         """
@@ -754,6 +793,8 @@ class Partida:
             "rondas_ganadas_atacante": self.rondas_ganadas_atacante,
             "rondas_para_ganar_partida": RONDAS_PARA_GANAR_PARTIDA,
             "rol_ganador_ultima_ronda": self.rol_ganador_ultima_ronda,
+            "esperando_refuerzo_atacante": self.esperando_refuerzo_atacante,
+            "segundos_refuerzo_atacante": self._segundos_restantes_refuerzo(),
             "vida_base": self.base.vida,
             "vida_maxima_base": self.base.vida_maxima,
             "base_destruida": self.base.fue_destruida(),
@@ -802,7 +843,7 @@ class Partida:
         }
 
 
-def crear_partida(nombre_defensor, nombre_atacante):
+def crear_partida(nombre_defensor, nombre_atacante, guardar_victorias=True):
     """
     Descripcion:
         Funcion de conveniencia para crear una nueva partida entre
@@ -821,4 +862,4 @@ def crear_partida(nombre_defensor, nombre_atacante):
     Restricciones:
         - nombre_defensor y nombre_atacante deben ser distintos.
     """
-    return Partida(nombre_defensor, nombre_atacante)
+    return Partida(nombre_defensor, nombre_atacante, guardar_victorias)

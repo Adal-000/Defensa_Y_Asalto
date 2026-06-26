@@ -246,7 +246,7 @@ class Unidad:
             mensaje = f"{self.nombre} se cura un poco."
 
         elif self.habilidad == "aumento_velocidad":
-            self.velocidad_extra_temporal = self.velocidad
+            self.velocidad_extra_temporal = 1
             self.turnos_velocidad_extra = 2
             mensaje = f"{self.nombre} aumenta su velocidad temporalmente."
 
@@ -279,9 +279,9 @@ def crear_unidad_soldado(fila=0, columna=0):
     return _asignar_clave(
         Unidad(
             nombre="Soldado base",
-            costo=80,
-            vida=65,
-            dano=12,
+            costo=90,
+            vida=95,
+            dano=13,
             velocidad=1,
             habilidad="ataque_doble",
             turnos_habilidad=4,
@@ -301,10 +301,10 @@ def crear_unidad_rapida(fila=0, columna=0):
     return _asignar_clave(
         Unidad(
             nombre="Soldado rápido",
-            costo=70,
-            vida=45,
-            dano=8,
-            velocidad=2,
+            costo=80,
+            vida=75,
+            dano=9,
+            velocidad=1,
             habilidad="aumento_velocidad",
             turnos_habilidad=4,
             fila=fila,
@@ -323,9 +323,9 @@ def crear_unidad_tanque(fila=0, columna=0):
     return _asignar_clave(
         Unidad(
             nombre="Soldado tanque",
-            costo=130,
-            vida=120,
-            dano=16,
+            costo=145,
+            vida=170,
+            dano=18,
             velocidad=1,
             habilidad="dano_extra_torres",
             turnos_habilidad=5,
