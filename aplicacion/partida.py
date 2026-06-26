@@ -392,6 +392,8 @@ class Partida:
         Restricciones:
             Ninguna.
         """
+        eventos_dinero = []
+
         for identificador_unidad in vida_unidades_antes:
             unidad_actual = next(
                 (unidad for unidad in self.unidades if id(unidad) == identificador_unidad),
@@ -399,6 +401,9 @@ class Partida:
             )
             if unidad_actual is None or unidad_actual.esta_eliminada():
                 self.dinero_defensor += RECOMPENSA_DEFENSOR_POR_UNIDAD
+                eventos_dinero.append(
+                    f"Defensor gana ${RECOMPENSA_DEFENSOR_POR_UNIDAD} por eliminar una unidad."
+                )
 
         for identificador_torre, vida_anterior in vida_torres_antes.items():
             torre_actual = next(
@@ -407,11 +412,22 @@ class Partida:
             )
             if torre_actual is None:
                 self.dinero_atacante += RECOMPENSA_ATACANTE_POR_TORRE_DESTRUIDA
+                eventos_dinero.append(
+                    f"Atacante gana ${RECOMPENSA_ATACANTE_POR_TORRE_DESTRUIDA} por destruir una torre."
+                )
             elif torre_actual.vida < vida_anterior:
                 self.dinero_atacante += RECOMPENSA_ATACANTE_POR_TORRE_DANADA
+                eventos_dinero.append(
+                    f"Atacante gana ${RECOMPENSA_ATACANTE_POR_TORRE_DANADA} por dañar una torre."
+                )
 
         if self.base.vida < vida_base_antes:
             self.dinero_atacante += RECOMPENSA_ATACANTE_POR_BASE_DANADA
+            eventos_dinero.append(
+                f"Atacante gana ${RECOMPENSA_ATACANTE_POR_BASE_DANADA} por dañar la base."
+            )
+
+        return eventos_dinero
 
     def ejecutar_combate(self):
         """
@@ -449,14 +465,17 @@ class Partida:
         )
         self.torres, self.unidades, self.muros = resultado_combate
 
-        self._otorgar_dinero_por_combate(
+        eventos_dinero = self._otorgar_dinero_por_combate(
             vida_torres_antes, vida_unidades_antes, vida_base_antes
         )
+        eventos_turno.extend(eventos_dinero)
 
         self.turnos_en_ronda_actual += 1
         self.historial_eventos.extend(eventos_turno)
 
+        indice_eventos_fin = len(self.historial_eventos)
         ronda_finalizada = self._verificar_fin_de_ronda()
+        eventos_turno.extend(self.historial_eventos[indice_eventos_fin:])
 
         return {
             "eventos": eventos_turno,
@@ -486,14 +505,27 @@ class Partida:
             self._finalizar_ronda("atacante")
             return True
 
-        atacante_sin_dinero_ni_unidades = (
+        atacante_sin_recursos = (
             self.dinero_atacante <= 0 and len(self.unidades) == 0
+        )
+        defensor_sin_recursos = (
+            self.dinero_defensor <= 0 and len(self.torres) == 0 and len(self.muros) == 0
         )
         todas_unidades_eliminadas = (
             len(self.unidades) == 0 and self.turnos_en_ronda_actual > 0
         )
 
-        if atacante_sin_dinero_ni_unidades or todas_unidades_eliminadas:
+        if defensor_sin_recursos:
+            self.historial_eventos.append(
+                "El defensor se queda sin dinero ni defensas. Pierde la ronda."
+            )
+            self._finalizar_ronda("atacante")
+            return True
+
+        if atacante_sin_recursos or todas_unidades_eliminadas:
+            self.historial_eventos.append(
+                "El atacante se queda sin dinero ni unidades. Pierde la ronda."
+            )
             self._finalizar_ronda("defensor")
             return True
 

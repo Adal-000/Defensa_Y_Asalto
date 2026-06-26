@@ -92,6 +92,11 @@ La parte del Desarrollador 2 incluye:
 - Módulo `combate.py` para movimiento, ataques, daño, eliminación y habilidades.
 - Catálogo visual de facciones: España, Inglaterra, Alemania, Rusia, Italia y EE.UU.
 
+
+## Dinero y derrota por recursos
+
+Las compras consumen dinero del rol correspondiente. Durante el combate el defensor gana dinero por eliminar unidades y el atacante gana dinero por dañar/destruir torres o dañar la base. Si el atacante queda sin dinero y sin unidades, pierde la ronda; si el defensor queda sin dinero y sin defensas, pierde la ronda.
+
 ## Sistema de dinero
 
 - El defensor inicia con dinero para comprar torres y muros.
