@@ -5,6 +5,13 @@
 import tkinter as tk
 
 from aplicacion import app
+from infraestructura.red.protocolo import (
+    ACCION_COMPRAR_MURO,
+    ACCION_COMPRAR_TORRE,
+    ACCION_COMPRAR_UNIDAD,
+    ACCION_INICIAR_COMBATE,
+    ACCION_PAUSAR_COMBATE,
+)
 
 FILAS_TABLERO = 11
 COLUMNAS_TABLERO = 6
@@ -21,20 +28,18 @@ COLOR_BASE = "#ffe0e0"
 COLOR_BORDE = "#666666"
 
 # Configuración de rondas
-TIEMPO_ESPERA_RONDA = 15   # segundos antes de iniciar combate automático
-RONDAS_PARA_GANAR = 3      # rondas necesarias para ganar la partida
-BONO_GANADOR = 200         # dinero extra para ganador de ronda
-BONO_PERDEDOR = 100        # dinero de consolación para perdedor de ronda
+TIEMPO_ESPERA_RONDA = 15    # segundos de colocación antes del combate
+RONDAS_PARA_GANAR = 3       # primero en ganar N rondas gana la partida
+INTERVALO_POLLING_MS = 500  # frecuencia de refresco del estado de red
 
 
 def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=None):
     """
     Descripción:
-        Crea una pantalla de mapa jugable. El usuario elige una pieza
-        en el panel de compras y luego hace clic en una casilla válida
-        del tablero para colocar tropas o defensas. La lógica oficial
-        de dinero, compras, posiciones ocupadas y combate se ejecuta
-        mediante aplicacion.app.
+        Crea una pantalla de mapa jugable multijugador en red.
+        Las acciones se envían al servidor mediante el adaptador de red
+        y el estado se actualiza periódicamente para reflejar las
+        jugadas del contrincante en tiempo real.
     """
 
     window_mapa = tk.Toplevel(root)
@@ -44,31 +49,41 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     nombre_usuario = datos_partida.get("usuario") or datos_partida.get("jugador") or "Jugador"
     nombre_defensor = nombre_usuario if rol_jugador == "defensor" else "Defensor"
     nombre_atacante = nombre_usuario if rol_jugador == "atacante" else "Atacante"
+
+    # Adaptador de red pasado desde play.py (puede ser None en modo local)
+    adaptador_red = datos_partida.get("adaptador", None)
+    modo_red = adaptador_red is not None and getattr(adaptador_red.cliente, "conectado", False)
+
     seleccion_actual = {"tipo": None, "clave": None, "nombre": None}
     ultimo_estado = {"datos": {}}
     botones_compra = []
     control_combate = {"activo": False, "after_id": None, "cerrando": False}
+
+    # Polling de red
+    control_polling = {"after_id": None}
 
     # Estado de rondas
     estado_rondas = {
         "ronda_actual": 1,
         "victorias_defensor": 0,
         "victorias_atacante": 0,
-        "historial": [],          # lista de resultados: "defensor" o "atacante"
         "partida_terminada": False,
         "temporizador_id": None,
         "segundos_restantes": TIEMPO_ESPERA_RONDA,
-        "fase": "espera",         # "espera", "combate", "resultado"
-        "ultimo_resultado": None, # "ganaste_ronda", "perdiste_ronda", "ganaste_partida", "perdiste_partida"
+        "fase": "espera",   # "espera", "combate", "resultado"
     }
 
     preferencias = app.obtener_configuracion()
     mostrar_cuadricula = bool(preferencias.get("mostrar_cuadricula", True))
     mostrar_proyectiles = bool(preferencias.get("mostrar_proyectiles", True))
 
-    app.crear_partida(nombre_defensor, nombre_atacante)
-    if rol_jugador == "atacante":
-        app.iniciar_fase_ataque()
+    # En modo local (sin red) creamos la partida aquí
+    if not modo_red:
+        app.crear_partida(nombre_defensor, nombre_atacante)
+        if rol_jugador == "atacante":
+            app.iniciar_fase_ataque()
+
+    # ---- Utilidades de ventana ------------------------------------------
 
     def ventana_activa():
         if control_combate["cerrando"]:
@@ -88,6 +103,14 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
                 pass
             control_combate["after_id"] = None
 
+    def detener_polling():
+        if control_polling["after_id"] is not None:
+            try:
+                window_mapa.after_cancel(control_polling["after_id"])
+            except tk.TclError:
+                pass
+            control_polling["after_id"] = None
+
     def detener_temporizador():
         if estado_rondas["temporizador_id"] is not None:
             try:
@@ -101,7 +124,14 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             return
         control_combate["cerrando"] = True
         detener_combate_programado()
+        detener_polling()
         detener_temporizador()
+        # Cerrar la conexión de red al salir del mapa
+        if adaptador_red is not None:
+            try:
+                adaptador_red.cerrar()
+            except Exception:
+                pass
         try:
             if window_mapa.winfo_exists():
                 window_mapa.destroy()
@@ -117,6 +147,8 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         cerrar_mapa()
         cerrar_todo()
 
+    # ---- Log de eventos -------------------------------------------------
+
     def escribir_evento(texto):
         if not texto or not ventana_activa():
             return
@@ -130,36 +162,99 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         except tk.TclError:
             control_combate["cerrando"] = True
 
-    def mostrar_resultado_ronda(ganador_ronda, partida_terminada=False, ganador_partida=None):
-        """Muestra la caja de resultado al jugador."""
+    # ---- Polling de red -------------------------------------------------
+
+    def iniciar_polling():
+        """Actualiza el estado desde el servidor cada INTERVALO_POLLING_MS ms."""
+        if not modo_red:
+            return
+        _tick_polling()
+
+    def _tick_polling():
+        if not ventana_activa() or not modo_red:
+            return
+        try:
+            estado_servidor = adaptador_red.cliente.obtener_ultimo_estado_local()
+            if estado_servidor and estado_servidor != ultimo_estado["datos"]:
+                ultimo_estado["datos"] = estado_servidor
+                _aplicar_estado_red(estado_servidor)
+        except Exception:
+            pass
+        control_polling["after_id"] = window_mapa.after(INTERVALO_POLLING_MS, _tick_polling)
+
+    def _aplicar_estado_red(estado):
+        """Aplica el estado recibido del servidor y detecta fin de ronda."""
         if not ventana_activa():
             return
+        dibujar_zonas()
+        dibujar_estado(estado)
+        actualizar_panel_estado(estado)
 
+        # Detectar fin de ronda por los datos del servidor
+        ronda_finalizada = estado.get("ronda_finalizada", False)
+        if ronda_finalizada and estado_rondas["fase"] == "combate":
+            vida_base = estado.get("vida_base", 0)
+            if vida_base <= 0:
+                ganador_ronda = "atacante"
+                escribir_evento("¡Base destruida! Gana el ATACANTE esta ronda.")
+            else:
+                ganador_ronda = "defensor"
+                escribir_evento("Atacante sin tropas. Gana el DEFENSOR esta ronda.")
+            detener_combate_programado()
+            boton_turno.config(text="Iniciar combate", bg="#ffb74d")
+            estado_rondas["fase"] = "resultado"
+            _registrar_victoria_ronda(ganador_ronda)
+
+    # ---- Acción: enviar al servidor o ejecutar local --------------------
+
+    def _accion_comprar_torre(clave, fila, columna):
+        if modo_red:
+            return adaptador_red.cliente.comprar_torre(clave, fila, columna)
+        return app.comprar_torre(clave, fila, columna)
+
+    def _accion_comprar_muro(fila, columna):
+        if modo_red:
+            return adaptador_red.cliente.comprar_muro(fila, columna)
+        return app.comprar_muro(fila, columna)
+
+    def _accion_comprar_unidad(clave, fila, columna):
+        if modo_red:
+            return adaptador_red.cliente.comprar_unidad(clave, fila, columna)
+        return app.comprar_unidad(clave, fila, columna)
+
+    def _accion_iniciar_combate():
+        if modo_red:
+            return adaptador_red.cliente.iniciar_combate()
+        return True, "ok"
+
+    def _accion_pausar_combate():
+        if modo_red:
+            return adaptador_red.cliente.pausar_combate()
+        return True, "ok"
+
+    def _obtener_estado():
+        if modo_red:
+            est = adaptador_red.cliente.obtener_ultimo_estado_local()
+            return est if est else {}
+        return app.obtener_estado_partida()
+
+    # ---- Lógica de rondas ----------------------------------------------
+
+    def mostrar_resultado_ronda(ganador_ronda, partida_terminada=False, ganador_partida=None):
+        if not ventana_activa():
+            return
         if partida_terminada:
             if ganador_partida == rol_jugador:
-                texto = "¡GANASTE LA PARTIDA!"
-                color_bg = "#1b5e20"
-                color_fg = "white"
+                texto, color_bg = "¡GANASTE LA PARTIDA!", "#1b5e20"
             else:
-                texto = "PERDISTE LA PARTIDA"
-                color_bg = "#b71c1c"
-                color_fg = "white"
+                texto, color_bg = "PERDISTE LA PARTIDA", "#b71c1c"
         else:
             if ganador_ronda == rol_jugador:
-                texto = "¡GANASTE LA RONDA!"
-                color_bg = "#2e7d32"
-                color_fg = "white"
+                texto, color_bg = "¡GANASTE LA RONDA!", "#2e7d32"
             else:
-                texto = "PERDISTE LA RONDA"
-                color_bg = "#c62828"
-                color_fg = "white"
-
+                texto, color_bg = "PERDISTE LA RONDA", "#c62828"
         try:
-            etiqueta_resultado.config(
-                text=texto,
-                bg=color_bg,
-                fg=color_fg,
-            )
+            etiqueta_resultado.config(text=texto, bg=color_bg, fg="white")
             etiqueta_resultado.lift()
         except tk.TclError:
             pass
@@ -194,8 +289,8 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             seg = estado_rondas["segundos_restantes"]
             if estado_rondas["fase"] == "espera":
                 etiqueta_temporizador.config(
-                    text=f"⏱ Tiempo de colocación: {seg}s",
-                    fg="#e65100" if seg <= 5 else "#333333"
+                    text=f"⏱ Colocación: {seg}s",
+                    fg="#e65100" if seg <= 5 else "#333333",
                 )
             elif estado_rondas["fase"] == "combate":
                 etiqueta_temporizador.config(text="⚔ Combate en curso...", fg="#1565c0")
@@ -204,30 +299,26 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         except tk.TclError:
             pass
 
-    # ---- Lógica de rondas -----------------------------------------------
-
     def iniciar_siguiente_ronda():
-        """Prepara la siguiente ronda: reinicia partida y temporizador."""
         if not ventana_activa():
             return
         ocultar_resultado()
         estado_rondas["fase"] = "espera"
         estado_rondas["segundos_restantes"] = TIEMPO_ESPERA_RONDA
 
-        # Reiniciar la partida para la nueva ronda
-        app.crear_partida(nombre_defensor, nombre_atacante)
-        if rol_jugador == "atacante":
-            app.iniciar_fase_ataque()
+        if not modo_red:
+            app.crear_partida(nombre_defensor, nombre_atacante)
+            if rol_jugador == "atacante":
+                app.iniciar_fase_ataque()
 
         actualizar_vista()
         actualizar_marcador()
         escribir_evento(f"─── Ronda {estado_rondas['ronda_actual']} iniciada ───")
-        escribir_evento("Tienes 15 segundos para colocar tropas/defensas.")
+        escribir_evento(f"Tienes {TIEMPO_ESPERA_RONDA}s para colocar tropas/defensas.")
         boton_turno.config(text="Iniciar combate", bg="#ffb74d", state="normal")
         iniciar_temporizador_espera()
 
     def iniciar_temporizador_espera():
-        """Cuenta regresiva de 15 segundos. Si el atacante no inició, gana el defensor."""
         detener_temporizador()
         estado_rondas["segundos_restantes"] = TIEMPO_ESPERA_RONDA
         actualizar_temporizador_label()
@@ -239,31 +330,21 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         if estado_rondas["fase"] != "espera":
             return
         if estado_rondas["segundos_restantes"] <= 0:
-            # Tiempo agotado sin que el atacante iniciara combate → gana el defensor
-            escribir_evento("¡Tiempo agotado! El atacante no actuó. Gana el DEFENSOR esta ronda.")
-            _finalizar_ronda_por_tiempo()
+            escribir_evento("¡Tiempo agotado! El atacante no actuó → gana el DEFENSOR.")
+            estado_rondas["fase"] = "resultado"
+            _registrar_victoria_ronda("defensor")
             return
         actualizar_temporizador_label()
         estado_rondas["temporizador_id"] = window_mapa.after(1000, _tick_temporizador)
         estado_rondas["segundos_restantes"] -= 1
 
-    def _finalizar_ronda_por_tiempo():
-        """El atacante no actuó, el defensor gana la ronda."""
-        detener_temporizador()
-        estado_rondas["fase"] = "resultado"
-        _registrar_victoria_ronda("defensor")
-
     def _registrar_victoria_ronda(ganador):
-        """Registra quién ganó la ronda y verifica si la partida terminó."""
-        estado_rondas["historial"].append(ganador)
         if ganador == "defensor":
             estado_rondas["victorias_defensor"] += 1
         else:
             estado_rondas["victorias_atacante"] += 1
 
         actualizar_marcador()
-
-        # Determinar si la partida terminó
         vic_def = estado_rondas["victorias_defensor"]
         vic_ata = estado_rondas["victorias_atacante"]
         partida_terminada = vic_def >= RONDAS_PARA_GANAR or vic_ata >= RONDAS_PARA_GANAR
@@ -273,37 +354,24 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             mostrar_resultado_ronda(ganador, partida_terminada=True, ganador_partida=ganador_partida)
             estado_rondas["partida_terminada"] = True
             boton_turno.config(text="Partida terminada", bg="#9e9e9e", state="disabled")
-            escribir_evento(f"═══ PARTIDA TERMINADA ═══")
-            if ganador_partida == "defensor":
-                escribir_evento(f"¡El DEFENSOR gana la partida! ({vic_def}-{vic_ata})")
-            else:
-                escribir_evento(f"¡El ATACANTE gana la partida! ({vic_ata}-{vic_def})")
+            escribir_evento("═══ PARTIDA TERMINADA ═══")
+            rol_ganador = "DEFENSOR" if vic_def >= RONDAS_PARA_GANAR else "ATACANTE"
+            escribir_evento(f"¡Gana el {rol_ganador}! ({vic_def}-{vic_ata})")
         else:
             mostrar_resultado_ronda(ganador)
             estado_rondas["ronda_actual"] += 1
             escribir_evento(f"Ronda ganada por: {ganador.upper()}")
-            # Iniciar siguiente ronda automáticamente luego de 3 segundos
             window_mapa.after(3000, iniciar_siguiente_ronda)
+
+    # ---- Catálogo y selección ------------------------------------------
 
     def obtener_catalogo_compras():
         if rol_jugador == "atacante":
-            return [
-                {"tipo": "unidad", **unidad}
-                for unidad in app.obtener_catalogo_unidades()
-            ]
-        compras = [
-            {"tipo": "torre", **torre}
-            for torre in app.obtener_catalogo_torres()
-        ]
+            return [{"tipo": "unidad", **u} for u in app.obtener_catalogo_unidades()]
+        compras = [{"tipo": "torre", **t} for t in app.obtener_catalogo_torres()]
         compras.append({
-            "tipo": "muro",
-            "clave": "muro",
-            "nombre": "Muro",
-            "costo": 50,
-            "vida": 160,
-            "dano": 0,
-            "alcance": 0,
-            "habilidad": "bloqueo",
+            "tipo": "muro", "clave": "muro", "nombre": "Muro",
+            "costo": 50, "vida": 160, "dano": 0, "alcance": 0, "habilidad": "bloqueo",
         })
         return compras
 
@@ -333,6 +401,8 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             return None, None
         return fila, columna
 
+    # ---- Dibujado -------------------------------------------------------
+
     def color_proyectil(nombre_torre):
         nombre = nombre_torre.lower()
         if "cañon" in nombre or "canon" in nombre:
@@ -344,10 +414,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return "#f2c200"
 
     def centro_casilla(fila, columna):
-        return (
-            columna * ANCHO_CELDA + ANCHO_CELDA // 2,
-            fila * ALTO_CELDA + ALTO_CELDA // 2,
-        )
+        return (columna * ANCHO_CELDA + ANCHO_CELDA // 2, fila * ALTO_CELDA + ALTO_CELDA // 2)
 
     def distancia(fila_a, columna_a, fila_b, columna_b):
         return abs(fila_a - fila_b) + abs(columna_a - columna_b)
@@ -371,7 +438,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
         for unidad in estado.get("unidades", []):
             objetivo = next(
-                (torre for torre in estado.get("torres", []) if torre["fila"] == unidad["fila"] - 1 and torre["columna"] == unidad["columna"]),
+                (t for t in estado.get("torres", []) if t["fila"] == unidad["fila"] - 1 and t["columna"] == unidad["columna"]),
                 None,
             )
             if objetivo is not None:
@@ -388,103 +455,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
                         cuadro_mapa.delete(item)
                 except tk.TclError:
                     control_combate["cerrando"] = True
-
             window_mapa.after(450, borrar_proyectiles)
-
-    def comprar_en_casilla(evento):
-        if estado_rondas["partida_terminada"]:
-            return
-        if estado_rondas["fase"] == "combate":
-            escribir_evento("No puedes colocar durante el combate.")
-            return
-        if seleccion_actual["clave"] is None:
-            escribir_evento("Primero selecciona una compra del panel izquierdo.")
-            return
-        fila, columna = convertir_click_a_casilla(evento)
-        if fila is None:
-            return
-        permitido, mensaje = posicion_permitida_por_rol(fila, columna)
-        if not permitido:
-            escribir_evento(mensaje)
-            return
-
-        if seleccion_actual["tipo"] == "torre":
-            exito, mensaje = app.comprar_torre(seleccion_actual["clave"], fila, columna)
-        elif seleccion_actual["tipo"] == "muro":
-            exito, mensaje = app.comprar_muro(fila, columna)
-        else:
-            exito, mensaje = app.comprar_unidad(seleccion_actual["clave"], fila, columna)
-        escribir_evento(mensaje)
-        actualizar_vista()
-
-    def ejecutar_pulso_combate():
-        if not ventana_activa():
-            return False
-        estado_antes = app.obtener_estado_partida()
-        animar_proyectiles(estado_antes)
-        resultado = app.ejecutar_combate()
-        for evento in resultado.get("eventos", []):
-            escribir_evento(evento)
-        actualizar_vista()
-
-        ronda_finalizada = resultado.get("ronda_finalizada", False)
-        if ronda_finalizada:
-            # Determinar ganador de la ronda según el estado
-            estado_actual = app.obtener_estado_partida()
-            vida_base = estado_actual.get("vida_base", 0)
-            din_ata = estado_actual.get("dinero_atacante", 0)
-
-            # Atacante destruyó la base → gana el atacante
-            if vida_base <= 0:
-                ganador_ronda = "atacante"
-                escribir_evento("¡Base destruida! Gana el ATACANTE esta ronda.")
-            else:
-                # Atacante sin dinero suficiente para más tropas → gana el defensor
-                ganador_ronda = "defensor"
-                escribir_evento("El atacante no puede enviar más tropas. Gana el DEFENSOR esta ronda.")
-
-            return False, ganador_ronda
-
-        return True, None
-
-    def ejecutar_combate_en_tiempo_real():
-        if not control_combate["activo"] or not ventana_activa():
-            return
-        resultado_tuple = ejecutar_pulso_combate()
-        if isinstance(resultado_tuple, tuple):
-            continua, ganador_ronda = resultado_tuple
-        else:
-            continua, ganador_ronda = resultado_tuple, None
-
-        if continua and control_combate["activo"]:
-            control_combate["after_id"] = window_mapa.after(900, ejecutar_combate_en_tiempo_real)
-        else:
-            control_combate["activo"] = False
-            control_combate["after_id"] = None
-            estado_rondas["fase"] = "resultado"
-            if ventana_activa():
-                boton_turno.config(text="Iniciar combate", bg="#ffb74d")
-            if ganador_ronda is not None:
-                _registrar_victoria_ronda(ganador_ronda)
-
-    def alternar_combate_click():
-        if estado_rondas["partida_terminada"]:
-            return
-        if estado_rondas["fase"] == "resultado":
-            return
-        if control_combate["activo"]:
-            detener_combate_programado()
-            boton_turno.config(text="Iniciar combate", bg="#ffb74d")
-            escribir_evento("Combate pausado.")
-            return
-        # El atacante inicia el combate → detener temporizador de espera
-        detener_temporizador()
-        estado_rondas["fase"] = "combate"
-        actualizar_temporizador_label()
-        control_combate["activo"] = True
-        boton_turno.config(text="Pausar combate", bg="#90caf9")
-        escribir_evento("Combate en tiempo real iniciado.")
-        ejecutar_combate_en_tiempo_real()
 
     def dibujar_zonas():
         cuadro_mapa.delete("all")
@@ -543,28 +514,133 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
                 f"Base {estado.get('vida_base', 0)}/{estado.get('vida_maxima_base', 0)}"
             )
         )
+        modo_txt = "🌐 Red" if modo_red else "💻 Local"
         caja_informacion_contrincante.config(state="normal")
         caja_informacion_contrincante.delete("1.0", tk.END)
         caja_informacion_contrincante.insert(
             tk.END,
-            "Colocación: defensor en zona azul; atacante en zona naranja. "
-            "Haz clic en una compra y luego en una casilla válida. "
-            "Al iniciar combate, la simulación avanza automáticamente en tiempo real.",
+            f"{modo_txt} | Defensor: zona azul · Atacante: zona naranja. "
+            "Selecciona una compra y haz clic en una casilla válida. "
+            "Al iniciar combate, la simulación avanza en tiempo real.",
         )
         caja_informacion_contrincante.config(state="disabled")
 
     def actualizar_vista():
-        estado = app.obtener_estado_partida()
-        ultimo_estado["datos"] = estado
-        dibujar_zonas()
-        dibujar_estado(estado)
-        actualizar_panel_estado(estado)
+        estado = _obtener_estado()
+        if estado:
+            ultimo_estado["datos"] = estado
+            dibujar_zonas()
+            dibujar_estado(estado)
+            actualizar_panel_estado(estado)
+
+    # ---- Comprar en casilla ---------------------------------------------
+
+    def comprar_en_casilla(evento):
+        if estado_rondas["partida_terminada"]:
+            return
+        if estado_rondas["fase"] == "combate":
+            escribir_evento("No puedes colocar durante el combate.")
+            return
+        if seleccion_actual["clave"] is None:
+            escribir_evento("Primero selecciona una compra del panel izquierdo.")
+            return
+        fila, columna = convertir_click_a_casilla(evento)
+        if fila is None:
+            return
+        permitido, mensaje = posicion_permitida_por_rol(fila, columna)
+        if not permitido:
+            escribir_evento(mensaje)
+            return
+
+        if seleccion_actual["tipo"] == "torre":
+            exito, mensaje = _accion_comprar_torre(seleccion_actual["clave"], fila, columna)
+        elif seleccion_actual["tipo"] == "muro":
+            exito, mensaje = _accion_comprar_muro(fila, columna)
+        else:
+            exito, mensaje = _accion_comprar_unidad(seleccion_actual["clave"], fila, columna)
+
+        escribir_evento(mensaje)
+        # En modo local actualizamos la vista inmediatamente
+        if not modo_red:
+            actualizar_vista()
+
+    # ---- Combate (modo local) -------------------------------------------
+
+    def ejecutar_pulso_combate():
+        if not ventana_activa():
+            return False, None
+        estado_antes = app.obtener_estado_partida()
+        animar_proyectiles(estado_antes)
+        resultado = app.ejecutar_combate()
+        for evento in resultado.get("eventos", []):
+            escribir_evento(evento)
+        actualizar_vista()
+
+        if resultado.get("ronda_finalizada", False):
+            estado_actual = app.obtener_estado_partida()
+            if estado_actual.get("vida_base", 0) <= 0:
+                ganador_ronda = "atacante"
+                escribir_evento("¡Base destruida! Gana el ATACANTE esta ronda.")
+            else:
+                ganador_ronda = "defensor"
+                escribir_evento("Atacante sin tropas. Gana el DEFENSOR esta ronda.")
+            return False, ganador_ronda
+
+        return True, None
+
+    def ejecutar_combate_en_tiempo_real():
+        if not control_combate["activo"] or not ventana_activa():
+            return
+        continua, ganador_ronda = ejecutar_pulso_combate()
+        if continua and control_combate["activo"]:
+            control_combate["after_id"] = window_mapa.after(900, ejecutar_combate_en_tiempo_real)
+        else:
+            control_combate["activo"] = False
+            control_combate["after_id"] = None
+            estado_rondas["fase"] = "resultado"
+            if ventana_activa():
+                boton_turno.config(text="Iniciar combate", bg="#ffb74d")
+            if ganador_ronda is not None:
+                _registrar_victoria_ronda(ganador_ronda)
+
+    def alternar_combate_click():
+        if estado_rondas["partida_terminada"] or estado_rondas["fase"] == "resultado":
+            return
+
+        if modo_red:
+            # En modo red, el servidor maneja el combate
+            if control_combate["activo"]:
+                _accion_pausar_combate()
+                control_combate["activo"] = False
+                boton_turno.config(text="Iniciar combate", bg="#ffb74d")
+                escribir_evento("Combate pausado.")
+            else:
+                detener_temporizador()
+                estado_rondas["fase"] = "combate"
+                actualizar_temporizador_label()
+                _accion_iniciar_combate()
+                control_combate["activo"] = True
+                boton_turno.config(text="Pausar combate", bg="#90caf9")
+                escribir_evento("Combate iniciado en el servidor.")
+        else:
+            # Modo local
+            if control_combate["activo"]:
+                detener_combate_programado()
+                boton_turno.config(text="Iniciar combate", bg="#ffb74d")
+                escribir_evento("Combate pausado.")
+            else:
+                detener_temporizador()
+                estado_rondas["fase"] = "combate"
+                actualizar_temporizador_label()
+                control_combate["activo"] = True
+                boton_turno.config(text="Pausar combate", bg="#90caf9")
+                escribir_evento("Combate en tiempo real iniciado.")
+                ejecutar_combate_en_tiempo_real()
 
     # =========================================================
     # CONSTRUCCIÓN DE WIDGETS
     # =========================================================
 
-    # --- Franja superior -------------------------------------------------
     boton_volver = tk.Button(window_mapa, text="Volver", font=("Arial", 12, "bold"), width=10, height=2, bg="red", command=GoPlayR)
     boton_volver.place(x=20, y=20)
 
@@ -574,42 +650,19 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     titulo = tk.Label(window_mapa, text="Mapa de batalla", font=("Arial", 24, "bold"))
     titulo.place(relx=0.5, y=95, anchor="center")
 
-    # --- Marcador de rondas y temporizador --------------------------------
-    etiqueta_marcador = tk.Label(
-        window_mapa,
-        text="",
-        font=("Arial", 11, "bold"),
-        fg="#333333",
-        width=70,
-        anchor="center",
-    )
+    etiqueta_marcador = tk.Label(window_mapa, text="", font=("Arial", 11, "bold"), fg="#333333", width=70, anchor="center")
     etiqueta_marcador.place(relx=0.5, y=130, anchor="center")
 
-    etiqueta_temporizador = tk.Label(
-        window_mapa,
-        text="",
-        font=("Arial", 11, "bold"),
-        fg="#e65100",
-        width=30,
-        anchor="center",
-    )
+    etiqueta_temporizador = tk.Label(window_mapa, text="", font=("Arial", 11, "bold"), fg="#e65100", width=26, anchor="center")
     etiqueta_temporizador.place(relx=0.75, y=155, anchor="center")
 
-    # --- Caja de resultado de ronda (visible solo al finalizar) -----------
+    # Caja de resultado de ronda/partida (invisible hasta que hay resultado)
     etiqueta_resultado = tk.Label(
-        window_mapa,
-        text="",
-        font=("Arial", 18, "bold"),
-        bg="#f0f0f0",
-        fg="#f0f0f0",
-        width=28,
-        height=2,
-        relief="flat",
-        bd=0,
+        window_mapa, text="", font=("Arial", 18, "bold"),
+        bg="#f0f0f0", fg="#f0f0f0", width=28, height=2, relief="flat",
     )
     etiqueta_resultado.place(relx=0.5, y=700, anchor="center")
 
-    # --- Columna izquierda: eventos e información ------------------------
     etiqueta_eventos = tk.Label(window_mapa, text="Eventos", font=("Arial", 13, "bold"))
     etiqueta_eventos.place(x=35, y=175)
 
@@ -617,7 +670,6 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     caja_eventos.config(state="disabled")
     caja_eventos.place(x=35, y=205)
 
-    # --- Columna izquierda inferior: compras -----------------------------
     etiqueta_compras = tk.Label(window_mapa, text="Tropas" if rol_jugador == "atacante" else "Defensas", font=("Arial", 13, "bold"))
     etiqueta_compras.place(x=35, y=445)
 
@@ -627,14 +679,14 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     for indice, compra in enumerate(obtener_catalogo_compras()):
         y_base = 500 + (indice * 34)
         descripcion = f"{compra['nombre']}  ${compra['costo']}"
-        boton_compra = tk.Button(window_mapa, text=descripcion, font=("Arial", 9, "bold"), width=28, command=lambda compra=compra: seleccionar_compra(compra))
+        boton_compra = tk.Button(window_mapa, text=descripcion, font=("Arial", 9, "bold"), width=28,
+                                 command=lambda c=compra: seleccionar_compra(c))
         boton_compra.place(x=35, y=y_base)
         botones_compra.append((boton_compra, compra))
 
     boton_turno = tk.Button(window_mapa, text="Iniciar combate", font=("Arial", 11, "bold"), width=18, bg="#ffb74d", command=alternar_combate_click)
     boton_turno.place(x=95, y=660)
 
-    # --- Zona derecha: tablero del mapa ----------------------------------
     etiqueta_tablero = tk.Label(window_mapa, text="Área del mapa", font=("Arial", 13, "bold"))
     etiqueta_tablero.place(x=405, y=175)
 
@@ -651,8 +703,12 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     # =========================================================
     actualizar_vista()
     actualizar_marcador()
-    escribir_evento("Partida creada. Selecciona una compra y una casilla.")
-    escribir_evento(f"Tienes {TIEMPO_ESPERA_RONDA} segundos para colocar antes del combate.")
+    escribir_evento(f"Partida iniciada en modo {'🌐 red' if modo_red else '💻 local'}.")
+    escribir_evento("Selecciona una compra y haz clic en el tablero.")
+    escribir_evento(f"Tienes {TIEMPO_ESPERA_RONDA}s para colocar antes del combate automático.")
+
+    # Iniciar polling de red y temporizador de ronda
+    iniciar_polling()
     iniciar_temporizador_espera()
 
     window_mapa.protocol("WM_DELETE_WINDOW", cerrar_ventana)

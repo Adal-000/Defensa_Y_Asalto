@@ -171,7 +171,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                 return True
         return False
 
-    def cerrar_sala(destruir_aplicacion=False, cerrar_red=True, detener_servidor=True):
+    def cerrar_sala(destruir_aplicacion=False):
         if control_ventana["cerrando"]:
             return
         control_ventana["cerrando"] = True
@@ -182,10 +182,8 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                 except tk.TclError:
                     pass
                 control_ventana[clave_after] = None
-        if cerrar_red:
-            adaptador.cerrar()
-        if detener_servidor:
-            detener_servidor_local()
+        adaptador.cerrar()
+        detener_servidor_local()
         try:
             if window2.winfo_exists():
                 window2.destroy()
@@ -213,9 +211,24 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         DATOS_PARTIDA["faccion"] = faccion_confirmada.get()
         DATOS_PARTIDA["puerto"] = estado_red["puerto"]
         DATOS_PARTIDA["modo"] = "red"
-        DATOS_PARTIDA["cliente_red"] = adaptador.cliente
+        # Pasar el adaptador al mapa para mantener la conexión de red activa
+        DATOS_PARTIDA["adaptador"] = adaptador
 
-        cerrar_sala(cerrar_red=False, detener_servidor=False)
+        # Cerrar sala SIN cerrar el adaptador (el mapa lo usará)
+        control_ventana["cerrando"] = True
+        for clave_after in ("after_id", "after_conexion_id"):
+            if control_ventana[clave_after] is not None:
+                try:
+                    window2.after_cancel(control_ventana[clave_after])
+                except tk.TclError:
+                    pass
+                control_ventana[clave_after] = None
+        detener_servidor_local()
+        try:
+            if window2.winfo_exists():
+                window2.destroy()
+        except tk.TclError:
+            pass
         GoMapa()
 
     def detener_servidor_local():
