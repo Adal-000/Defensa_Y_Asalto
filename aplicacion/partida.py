@@ -13,18 +13,20 @@ from dominio.entidades.muro import crear_muro
 from dominio.servicios.combate import ejecutar_turno_de_combate
 from infraestructura.persistencia.archivos import actualizar_victoria
 
-DINERO_INICIAL_DEFENSOR = 300
-DINERO_INICIAL_ATACANTE = 250
-DINERO_EXTRA_POR_RONDA = 100
+DINERO_INICIAL_DEFENSOR = 360
+DINERO_INICIAL_ATACANTE = 360
+DINERO_EXTRA_POR_RONDA = 80
 RONDAS_PARA_GANAR_PARTIDA = 3
 FILA_BASE = 0
 MAXIMO_TURNOS_POR_RONDA = 30
 CANTIDAD_FILAS_TABLERO = 11
 CANTIDAD_COLUMNAS_TABLERO = 6
-RECOMPENSA_DEFENSOR_POR_UNIDAD = 20
-RECOMPENSA_ATACANTE_POR_TORRE_DANADA = 10
-RECOMPENSA_ATACANTE_POR_TORRE_DESTRUIDA = 30
-RECOMPENSA_ATACANTE_POR_BASE_DANADA = 15
+FILAS_DEFENSOR_VALIDAS = range(1, 8)
+FILAS_ATACANTE_VALIDAS = range(8, 11)
+RECOMPENSA_DEFENSOR_POR_UNIDAD = 25
+RECOMPENSA_ATACANTE_POR_TORRE_DANADA = 8
+RECOMPENSA_ATACANTE_POR_TORRE_DESTRUIDA = 35
+RECOMPENSA_ATACANTE_POR_BASE_DANADA = 12
 FASE_CONSTRUCCION_DEFENSOR = "construccion_defensor"
 FASE_ATAQUE_ATACANTE = "ataque_atacante"
 FASE_COMBATE = "combate"
@@ -161,12 +163,6 @@ class Partida:
             return True, "La fase de combate ya está activa."
 
         if len(self.unidades) == 0:
-            if self.dinero_atacante <= 0:
-                self.historial_eventos.append(
-                    "El atacante se queda sin dinero y sin unidades. Pierde la ronda."
-                )
-                self._finalizar_ronda("defensor")
-                return False, "El atacante no tiene unidades: el defensor gana la ronda."
             return False, "No se puede iniciar combate sin unidades atacantes."
 
         self.fase_ronda = FASE_COMBATE
@@ -271,6 +267,9 @@ class Partida:
         if fila == FILA_BASE:
             return False, "No se puede colocar una defensa sobre la base."
 
+        if fila not in FILAS_DEFENSOR_VALIDAS:
+            return False, "Las defensas solo se colocan en las filas 1 a 7."
+
         if self._posicion_defensiva_ocupada(fila, columna):
             return False, "La posicion ya esta ocupada por una defensa."
 
@@ -301,6 +300,9 @@ class Partida:
         if fila == FILA_BASE:
             return False, "No se puede colocar una unidad sobre la base."
 
+        if fila not in FILAS_ATACANTE_VALIDAS:
+            return False, "Las unidades solo se colocan en las filas 8 a 10."
+
         if self._posicion_unidad_ocupada(fila, columna):
             return False, "La posicion ya esta ocupada por una unidad."
 
@@ -328,8 +330,11 @@ class Partida:
             - El defensor debe tener dinero suficiente.
             - La posicion debe estar libre y dentro del tablero.
         """
-        if self.fase_ronda != FASE_CONSTRUCCION_DEFENSOR:
-            return False, "Las torres solo se compran durante la construcción del defensor."
+        if self.partida_finalizada:
+            return False, "La partida ya finalizó."
+
+        if self.fase_ronda == FASE_COMBATE:
+            return False, "Las torres solo se compran durante la preparación."
 
         posicion_valida, mensaje_posicion = self._validar_compra_defensiva(
             fila, columna
@@ -373,8 +378,11 @@ class Partida:
             - El defensor debe tener dinero suficiente.
             - La posicion debe estar libre y dentro del tablero.
         """
-        if self.fase_ronda != FASE_CONSTRUCCION_DEFENSOR:
-            return False, "Los muros solo se compran durante la construcción del defensor."
+        if self.partida_finalizada:
+            return False, "La partida ya finalizó."
+
+        if self.fase_ronda == FASE_COMBATE:
+            return False, "Los muros solo se compran durante la preparación."
 
         posicion_valida, mensaje_posicion = self._validar_compra_defensiva(
             fila, columna
@@ -417,11 +425,14 @@ class Partida:
             - El atacante debe tener dinero suficiente.
             - La posicion debe estar libre y dentro del tablero.
         """
+        if self.partida_finalizada:
+            return False, "La partida ya finalizó."
+
         if self.fase_ronda == FASE_CONSTRUCCION_DEFENSOR:
             self.iniciar_fase_ataque()
 
-        if self.fase_ronda != FASE_ATAQUE_ATACANTE:
-            return False, "Las unidades solo se compran durante la fase de ataque."
+        if self.fase_ronda not in (FASE_ATAQUE_ATACANTE, FASE_COMBATE):
+            return False, "Las unidades solo se compran durante la preparación o el combate."
 
         posicion_valida, mensaje_posicion = self._validar_compra_unidad(
             fila, columna
@@ -573,6 +584,34 @@ class Partida:
             "dinero_atacante": self.dinero_atacante,
         }
 
+    def resolver_preparacion_agotada(self):
+        """
+        Descripcion:
+            Resuelve el final de los 15 segundos de preparación. Si el
+            atacante no colocó ninguna unidad, pierde la ronda por
+            inactividad. Si ya hay unidades, inicia el combate.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            tuple[bool, str]: Exito de la acción y mensaje descriptivo.
+        """
+        if self.partida_finalizada:
+            return False, "La partida ya finalizó."
+
+        if self.fase_ronda == FASE_COMBATE:
+            return True, "El combate ya estaba en curso."
+
+        if len(self.unidades) == 0:
+            self.historial_eventos.append(
+                "El atacante no colocó unidades en 15 segundos. El defensor gana la ronda."
+            )
+            self._finalizar_ronda("defensor")
+            return True, "Tiempo agotado sin unidades: el defensor gana la ronda."
+
+        return self.iniciar_fase_combate()
+
     def _verificar_fin_de_ronda(self):
         """
         Descripcion:
@@ -596,9 +635,9 @@ class Partida:
             self._finalizar_ronda("atacante")
             return True
 
-        if self.base.vida > 0 and self.dinero_atacante <= 0:
+        if self.base.vida > 0 and self.dinero_atacante <= 0 and len(self.unidades) == 0:
             self.historial_eventos.append(
-                "El atacante se queda sin dinero y la base sigue en pie. El defensor gana la ronda."
+                "El atacante se queda sin dinero y sin unidades. El defensor gana la ronda."
             )
             self._finalizar_ronda("defensor")
             return True
@@ -721,6 +760,7 @@ class Partida:
             "torres": [
                 {
                     "nombre": torre.nombre,
+                    "clave": getattr(torre, "clave", ""),
                     "vida": torre.vida,
                     "vida_maxima": torre.vida_maxima,
                     "dano": torre.dano,
@@ -744,6 +784,7 @@ class Partida:
             "unidades": [
                 {
                     "nombre": unidad.nombre,
+                    "clave": getattr(unidad, "clave", ""),
                     "vida": unidad.vida,
                     "vida_maxima": unidad.vida_maxima,
                     "dano": unidad.dano,

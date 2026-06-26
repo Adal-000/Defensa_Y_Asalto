@@ -212,6 +212,18 @@ def iniciar_fase_combate():
     return _partida_actual.iniciar_fase_combate()
 
 
+def resolver_preparacion_agotada():
+    """
+    Descripcion:
+        Resuelve el final de los 15 segundos de preparación. Si no hay
+        unidades atacantes, el defensor gana la ronda; si ya hay unidades,
+        se inicia el combate en tiempo real.
+    """
+    if _partida_actual is None:
+        return False, "No hay una partida activa."
+    return _partida_actual.resolver_preparacion_agotada()
+
+
 def ejecutar_combate():
     """
     Descripcion:
@@ -306,10 +318,11 @@ def obtener_catalogo_unidades():
     Restricciones:
         Ninguna.
     """
-    from dominio.entidades.unidad import FABRICANTES_UNIDADES
+    from dominio.entidades.unidad import FABRICANTES_UNIDADES, CLAVES_CATALOGO_UNIDADES
 
     catalogo = []
-    for clave, fabricante in FABRICANTES_UNIDADES.items():
+    for clave in CLAVES_CATALOGO_UNIDADES:
+        fabricante = FABRICANTES_UNIDADES[clave]
         unidad = fabricante()
         catalogo.append({
             "clave": clave,

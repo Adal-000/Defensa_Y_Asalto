@@ -291,22 +291,17 @@ class ClientePartida:
         """
         return self.enviar_accion("ejecutar_combate")
 
-    def iniciar_combate(self):
+    def iniciar_combate(self, numero_ronda=None):
         """
         Descripcion:
             Solicita al servidor que empiece a ejecutar el combate en
-            tiempo real.
-
-        Entradas:
-            Ninguna.
-
-        Salidas:
-            tuple[bool, str]: Exito del envio y mensaje descriptivo.
-
-        Restricciones:
-            - Debe existir una partida creada en el servidor.
+            tiempo real. El numero de ronda evita que dos temporizadores
+            atrasados inicien o cierren una ronda nueva por accidente.
         """
-        return self.enviar_accion(ACCION_INICIAR_COMBATE)
+        datos = {}
+        if numero_ronda is not None:
+            datos["numero_ronda"] = numero_ronda
+        return self.enviar_accion(ACCION_INICIAR_COMBATE, **datos)
 
     def pausar_combate(self):
         """

@@ -365,6 +365,8 @@ class ServidorPartida:
             return acciones_basicas
 
         if fase_actual == FASE_COMBATE:
+            if cliente is not None and cliente.rol == ROL_ATACANTE:
+                return [ACCION_COMPRAR_UNIDAD, ACCION_PAUSAR_COMBATE] + acciones_basicas
             return [ACCION_PAUSAR_COMBATE] + acciones_basicas
 
         acciones_preparacion = [
@@ -813,7 +815,7 @@ class ServidorPartida:
             )
             return
 
-        if accion in (ACCION_INICIAR_COMBATE, ACCION_EJECUTAR_COMBATE):
+        if accion == ACCION_EJECUTAR_COMBATE:
             puede_iniciar, mensaje_validacion = self._puede_iniciar_combate()
             if not puede_iniciar:
                 self._enviar_error_a_cliente(
@@ -853,9 +855,22 @@ class ServidorPartida:
                 return
 
             elif accion == ACCION_INICIAR_COMBATE:
-                self.combate_activo = True
-                exito = True
-                texto = "Combate en tiempo real iniciado."
+                ronda_solicitada = mensaje.get("numero_ronda", None)
+                if ronda_solicitada is not None:
+                    try:
+                        ronda_solicitada = int(ronda_solicitada)
+                    except (TypeError, ValueError):
+                        ronda_solicitada = None
+
+                if ronda_solicitada is not None and ronda_solicitada != self.partida.numero_ronda:
+                    exito = True
+                    texto = "Solicitud de combate vieja ignorada."
+                elif len(self.partida.unidades) == 0:
+                    exito, texto = self.partida.resolver_preparacion_agotada()
+                    self.combate_activo = False
+                else:
+                    exito, texto = self.partida.iniciar_fase_combate()
+                    self.combate_activo = bool(exito)
 
             elif accion == ACCION_PAUSAR_COMBATE:
                 self.combate_activo = False

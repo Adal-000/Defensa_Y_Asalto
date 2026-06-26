@@ -211,10 +211,12 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         DATOS_PARTIDA["faccion"] = faccion_confirmada.get()
         DATOS_PARTIDA["puerto"] = estado_red["puerto"]
         DATOS_PARTIDA["modo"] = "red"
-        # Pasar el adaptador al mapa para mantener la conexión de red activa
+        DATOS_PARTIDA["es_host"] = variable_modo_conexion.get() == "crear_servidor"
+        # Pasar el adaptador y el servidor al mapa para mantener la conexión activa.
         DATOS_PARTIDA["adaptador"] = adaptador
+        DATOS_PARTIDA["servidor_local"] = servidor_local["instancia"]
 
-        # Cerrar sala SIN cerrar el adaptador (el mapa lo usará)
+        # Cerrar sala SIN cerrar el adaptador NI detener el servidor. El mapa los usará.
         control_ventana["cerrando"] = True
         for clave_after in ("after_id", "after_conexion_id"):
             if control_ventana[clave_after] is not None:
@@ -223,7 +225,6 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                 except tk.TclError:
                     pass
                 control_ventana[clave_after] = None
-        detener_servidor_local()
         try:
             if window2.winfo_exists():
                 window2.destroy()

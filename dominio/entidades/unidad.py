@@ -260,149 +260,102 @@ class Unidad:
         return mensaje
 
 
+def _asignar_clave(unidad, clave):
+    """
+    Descripcion:
+        Guarda una clave corta en la unidad para que la interfaz pueda
+        relacionarla con las imagenes de la carpeta Imagenes/Soldados.
+    """
+    unidad.clave = clave
+    return unidad
+
+
 def crear_unidad_soldado(fila=0, columna=0):
     """
     Descripcion:
-        Crea una unidad de tipo "Soldado", una unidad equilibrada con
-        capacidad de ataque doble.
-
-    Entradas:
-        fila (int): Fila del tablero donde se coloca la unidad.
-        columna (int): Columna del tablero donde se coloca la unidad.
-
-    Salidas:
-        Unidad: Instancia de Unidad configurada como Soldado.
-
-    Restricciones:
-        Ninguna.
+        Crea el soldado base. Es la unidad equilibrada: sirve para
+        presionar carriles sin ser ni muy barata ni muy poderosa.
     """
-    return Unidad(
-        nombre="Soldado",
-        costo=80,
-        vida=60,
-        dano=12,
-        velocidad=1,
-        habilidad="ataque_doble",
-        turnos_habilidad=3,
-        fila=fila,
-        columna=columna,
+    return _asignar_clave(
+        Unidad(
+            nombre="Soldado base",
+            costo=80,
+            vida=65,
+            dano=12,
+            velocidad=1,
+            habilidad="ataque_doble",
+            turnos_habilidad=4,
+            fila=fila,
+            columna=columna,
+        ),
+        "soldado",
     )
 
 
-def crear_unidad_escudero(fila=0, columna=0):
+def crear_unidad_rapida(fila=0, columna=0):
     """
     Descripcion:
-        Crea una unidad de tipo "Escudero", especializada en resistir
-        ataques gracias a su escudo temporal.
-
-    Entradas:
-        fila (int): Fila del tablero donde se coloca la unidad.
-        columna (int): Columna del tablero donde se coloca la unidad.
-
-    Salidas:
-        Unidad: Instancia de Unidad configurada como Escudero.
-
-    Restricciones:
-        Ninguna.
+        Crea el soldado rapido. Tiene menos vida, pero avanza más
+        rápido y obliga al defensor a cubrir carriles abiertos.
     """
-    return Unidad(
-        nombre="Escudero",
-        costo=100,
-        vida=90,
-        dano=8,
-        velocidad=1,
-        habilidad="escudo_temporal",
-        turnos_habilidad=4,
-        fila=fila,
-        columna=columna,
+    return _asignar_clave(
+        Unidad(
+            nombre="Soldado rápido",
+            costo=70,
+            vida=45,
+            dano=8,
+            velocidad=2,
+            habilidad="aumento_velocidad",
+            turnos_habilidad=4,
+            fila=fila,
+            columna=columna,
+        ),
+        "rapido",
     )
 
 
-def crear_unidad_explorador(fila=0, columna=0):
+def crear_unidad_tanque(fila=0, columna=0):
     """
     Descripcion:
-        Crea una unidad de tipo "Explorador", especializada en
-        avanzar rapidamente gracias a su aumento de velocidad.
-
-    Entradas:
-        fila (int): Fila del tablero donde se coloca la unidad.
-        columna (int): Columna del tablero donde se coloca la unidad.
-
-    Salidas:
-        Unidad: Instancia de Unidad configurada como Explorador.
-
-    Restricciones:
-        Ninguna.
+        Crea el soldado tanque. Es caro y lento, pero resiste más daño
+        y pega fuerte contra defensas.
     """
-    return Unidad(
-        nombre="Explorador",
-        costo=70,
-        vida=40,
-        dano=6,
-        velocidad=2,
-        habilidad="aumento_velocidad",
-        turnos_habilidad=3,
-        fila=fila,
-        columna=columna,
-    )
-
-
-def crear_unidad_demoledor(fila=0, columna=0):
-    """
-    Descripcion:
-        Crea una unidad de tipo "Demoledor", especializada en
-        infringir dano extra contra torres.
-
-    Entradas:
-        fila (int): Fila del tablero donde se coloca la unidad.
-        columna (int): Columna del tablero donde se coloca la unidad.
-
-    Salidas:
-        Unidad: Instancia de Unidad configurada como Demoledor.
-
-    Restricciones:
-        Ninguna.
-    """
-    return Unidad(
-        nombre="Demoledor",
-        costo=120,
-        vida=70,
-        dano=18,
-        velocidad=1,
-        habilidad="dano_extra_torres",
-        turnos_habilidad=5,
-        fila=fila,
-        columna=columna,
+    return _asignar_clave(
+        Unidad(
+            nombre="Soldado tanque",
+            costo=130,
+            vida=120,
+            dano=16,
+            velocidad=1,
+            habilidad="dano_extra_torres",
+            turnos_habilidad=5,
+            fila=fila,
+            columna=columna,
+        ),
+        "tanque",
     )
 
 
 FABRICANTES_UNIDADES = {
     "soldado": crear_unidad_soldado,
-    "escudero": crear_unidad_escudero,
-    "explorador": crear_unidad_explorador,
-    "demoledor": crear_unidad_demoledor,
+    "rapido": crear_unidad_rapida,
+    "tanque": crear_unidad_tanque,
+    # Alias para no romper pruebas o botones viejos si existieran.
+    "explorador": crear_unidad_rapida,
+    "escudero": crear_unidad_tanque,
+    "demoledor": crear_unidad_tanque,
 }
+
+
+CLAVES_CATALOGO_UNIDADES = ("soldado", "rapido", "tanque")
 
 
 def crear_unidad_por_tipo(tipo_unidad, fila=0, columna=0):
     """
     Descripcion:
-        Funcion de fabrica que crea una unidad segun el tipo
-        solicitado por nombre clave (por ejemplo, "soldado",
-        "escudero", "explorador" o "demoledor").
-
-    Entradas:
-        tipo_unidad (str): Clave del tipo de unidad a crear.
-        fila (int): Fila del tablero donde se coloca la unidad.
-        columna (int): Columna del tablero donde se coloca la unidad.
-
-    Salidas:
-        Unidad: Nueva instancia de Unidad del tipo solicitado.
-        None: Si el tipo de unidad no existe.
-
-    Restricciones:
-        - tipo_unidad debe ser una de las claves definidas en
-          FABRICANTES_UNIDADES.
+        Funcion de fabrica que crea una unidad segun el tipo solicitado.
+        El catalogo oficial usa soldado, rapido y tanque porque son las
+        tres familias que existen en las imagenes del proyecto.
     """
     fabricante = FABRICANTES_UNIDADES.get(tipo_unidad)
     if fabricante is None:
