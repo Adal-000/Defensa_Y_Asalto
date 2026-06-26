@@ -190,6 +190,28 @@ def comprar_unidad(tipo_unidad, fila, columna):
     return _partida_actual.comprar_unidad(tipo_unidad, fila, columna)
 
 
+def iniciar_fase_ataque():
+    """
+    Descripcion:
+        Finaliza la construccion del defensor y activa la compra y
+        colocacion de unidades del atacante en la partida actual.
+    """
+    if _partida_actual is None:
+        return False, "No hay una partida activa."
+    return _partida_actual.iniciar_fase_ataque()
+
+
+def iniciar_fase_combate():
+    """
+    Descripcion:
+        Inicia la fase de combate de la ronda actual si ya se colocaron
+        unidades atacantes.
+    """
+    if _partida_actual is None:
+        return False, "No hay una partida activa."
+    return _partida_actual.iniciar_fase_combate()
+
+
 def ejecutar_combate():
     """
     Descripcion:

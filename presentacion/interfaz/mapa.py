@@ -48,6 +48,8 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     mostrar_proyectiles = bool(preferencias.get("mostrar_proyectiles", True))
 
     app.crear_partida(nombre_defensor, nombre_atacante)
+    if rol_jugador == "atacante":
+        app.iniciar_fase_ataque()
 
     def ventana_activa():
         if control_combate["cerrando"]:

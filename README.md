@@ -93,9 +93,25 @@ La parte del Desarrollador 2 incluye:
 - Catálogo visual de facciones: España, Inglaterra, Alemania, Rusia, Italia y EE.UU.
 
 
-## Dinero y derrota por recursos
+## Rondas, dinero y condiciones de victoria
 
-Las compras consumen dinero del rol correspondiente. Durante el combate el defensor gana dinero por eliminar unidades y el atacante gana dinero por dañar/destruir torres o dañar la base. Si el atacante queda sin dinero y sin unidades, pierde la ronda; si el defensor queda sin dinero y sin defensas, pierde la ronda.
+Cada partida se juega por rondas y gana la partida completa el primer
+jugador que llegue a 3 rondas ganadas. Cada ronda sigue este orden:
+
+1. El defensor recibe dinero inicial.
+2. El defensor coloca muros y torres.
+3. El atacante recibe dinero inicial.
+4. El atacante compra y coloca unidades.
+5. Se ejecuta la fase de combate.
+6. Se determina el ganador de la ronda.
+7. Se actualiza el marcador.
+8. Si nadie ha ganado 3 rondas, inicia una nueva ronda.
+
+El defensor gana la ronda si la base central sigue en pie y el atacante
+se queda sin dinero o todas sus unidades son eliminadas. El atacante gana
+la ronda si destruye la base central del defensor. Al terminar la partida
+se actualiza el registro de victorias del jugador ganador segun el rol
+utilizado.
 
 ## Sistema de dinero
 
