@@ -38,18 +38,23 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     nombre_usuario = datos_partida.get("usuario") or datos_partida.get("jugador") or "Jugador"
     nombre_defensor = nombre_usuario if rol_jugador == "defensor" else "Defensor"
     nombre_atacante = nombre_usuario if rol_jugador == "atacante" else "Atacante"
+    cliente_red = datos_partida.get("cliente_red")
+    modo_red = cliente_red is not None and getattr(cliente_red, "conectado", False)
     seleccion_actual = {"tipo": None, "clave": None, "nombre": None}
     ultimo_estado = {"datos": {}}
     botones_compra = []
-    control_combate = {"activo": False, "after_id": None, "cerrando": False}
+    control_combate = {"activo": False, "after_id": None, "cuenta_id": None, "cerrando": False, "red_iniciado": False}
 
     preferencias = app.obtener_configuracion()
     mostrar_cuadricula = bool(preferencias.get("mostrar_cuadricula", True))
     mostrar_proyectiles = bool(preferencias.get("mostrar_proyectiles", True))
 
-    app.crear_partida(nombre_defensor, nombre_atacante)
-    if rol_jugador == "atacante":
-        app.iniciar_fase_ataque()
+    if modo_red:
+        cliente_red.obtener_estado()
+    else:
+        app.crear_partida(nombre_defensor, nombre_atacante)
+        if rol_jugador == "atacante":
+            app.iniciar_fase_ataque()
 
     def ventana_activa():
         if control_combate["cerrando"]:
@@ -62,12 +67,14 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
     def detener_combate_programado():
         control_combate["activo"] = False
-        if control_combate["after_id"] is not None:
+        for clave_after in ("after_id", "cuenta_id"):
+            if control_combate[clave_after] is None:
+                continue
             try:
-                window_mapa.after_cancel(control_combate["after_id"])
+                window_mapa.after_cancel(control_combate[clave_after])
             except tk.TclError:
                 pass
-            control_combate["after_id"] = None
+            control_combate[clave_after] = None
 
     def cerrar_mapa(volver_a_play=False):
         if control_combate["cerrando"]:
@@ -221,20 +228,41 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             return
 
         if seleccion_actual["tipo"] == "torre":
-            exito, mensaje = app.comprar_torre(seleccion_actual["clave"], fila, columna)
+            if modo_red:
+                exito, mensaje = cliente_red.comprar_torre(seleccion_actual["clave"], fila, columna)
+            else:
+                exito, mensaje = app.comprar_torre(seleccion_actual["clave"], fila, columna)
         elif seleccion_actual["tipo"] == "muro":
-            exito, mensaje = app.comprar_muro(fila, columna)
+            if modo_red:
+                exito, mensaje = cliente_red.comprar_muro(fila, columna)
+            else:
+                exito, mensaje = app.comprar_muro(fila, columna)
         else:
-            exito, mensaje = app.comprar_unidad(seleccion_actual["clave"], fila, columna)
+            if modo_red:
+                exito, mensaje = cliente_red.comprar_unidad(seleccion_actual["clave"], fila, columna)
+            else:
+                exito, mensaje = app.comprar_unidad(seleccion_actual["clave"], fila, columna)
         escribir_evento(mensaje)
+        if modo_red:
+            cliente_red.obtener_estado()
         actualizar_vista()
 
     def ejecutar_pulso_combate():
         if not ventana_activa():
             return False
-        estado_antes = app.obtener_estado_partida()
+        estado_antes = obtener_estado_visible()
         animar_proyectiles(estado_antes)
-        resultado = app.ejecutar_combate()
+        if modo_red:
+            if not control_combate["red_iniciado"]:
+                _exito, mensaje = cliente_red.iniciar_combate()
+                escribir_evento(mensaje)
+                control_combate["red_iniciado"] = True
+            cliente_red.obtener_estado()
+            actualizar_vista()
+            estado_actual = obtener_estado_visible()
+            return not estado_actual.get("partida_finalizada", False)
+        else:
+            resultado = app.ejecutar_combate()
         for evento in resultado.get("eventos", []):
             escribir_evento(evento)
         actualizar_vista()
@@ -250,16 +278,39 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             control_combate["activo"] = False
             control_combate["after_id"] = None
             if ventana_activa():
-                boton_turno.config(text="Iniciar combate", bg="#ffb74d")
+                etiqueta_cuenta.config(text="Combate finalizado", fg="#1b5e20")
+
+    def iniciar_combate_automatico():
+        if control_combate["activo"]:
+            return
+        control_combate["activo"] = True
+        etiqueta_cuenta.config(text="Combate iniciado", fg="#1b5e20")
+        escribir_evento("Tiempo de preparación terminado. Combate iniciado automáticamente.")
+        ejecutar_combate_en_tiempo_real()
+
+    def actualizar_cuenta_regresiva(segundos_restantes):
+        if not ventana_activa() or control_combate["activo"]:
+            return
+        if segundos_restantes <= 0:
+            control_combate["cuenta_id"] = None
+            iniciar_combate_automatico()
+            return
+        etiqueta_cuenta.config(
+            text=f"Preparación: {segundos_restantes}s",
+            fg="#b05a00" if segundos_restantes <= 10 else "#173a59",
+        )
+        control_combate["cuenta_id"] = window_mapa.after(
+            1000, lambda: actualizar_cuenta_regresiva(segundos_restantes - 1)
+        )
 
     def alternar_combate_click():
         if control_combate["activo"]:
             detener_combate_programado()
-            boton_turno.config(text="Iniciar combate", bg="#ffb74d")
+            etiqueta_cuenta.config(text="Combate pausado", fg="#b05a00")
             escribir_evento("Combate pausado.")
             return
         control_combate["activo"] = True
-        boton_turno.config(text="Pausar combate", bg="#90caf9")
+        etiqueta_cuenta.config(text="Combate iniciado", fg="#1b5e20")
         escribir_evento("Combate en tiempo real iniciado.")
         ejecutar_combate_en_tiempo_real()
 
@@ -320,22 +371,39 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
                 f"Base {estado.get('vida_base', 0)}/{estado.get('vida_maxima_base', 0)}"
             )
         )
+        etiqueta_dinero_defensor.config(text=f"Defensor\n${estado.get('dinero_defensor', 0)}")
+        etiqueta_dinero_atacante.config(text=f"Atacante\n${estado.get('dinero_atacante', 0)}")
         caja_informacion_contrincante.config(state="normal")
         caja_informacion_contrincante.delete("1.0", tk.END)
         caja_informacion_contrincante.insert(
             tk.END,
             "Colocación: defensor en zona azul; atacante en zona naranja. "
             "Haz clic en una compra y luego en una casilla válida. "
-            "Al iniciar combate, la simulación avanza automáticamente en tiempo real.",
+            "El contador inicia el combate automáticamente cuando termina la preparación.",
         )
         caja_informacion_contrincante.config(state="disabled")
 
     def actualizar_vista():
-        estado = app.obtener_estado_partida()
+        estado = obtener_estado_visible()
         ultimo_estado["datos"] = estado
         dibujar_zonas()
         dibujar_estado(estado)
         actualizar_panel_estado(estado)
+
+    def obtener_estado_visible():
+        if modo_red:
+            estado_red = cliente_red.obtener_ultimo_estado_local()
+            if estado_red is None:
+                return ultimo_estado["datos"]
+            return estado_red
+        return app.obtener_estado_partida()
+
+    def refrescar_estado_red():
+        if not modo_red or not ventana_activa():
+            return
+        cliente_red.obtener_estado()
+        actualizar_vista()
+        window_mapa.after(500, refrescar_estado_red)
 
     # --- Franja superior -------------------------------------------------
     boton_volver = tk.Button(window_mapa, text="Volver", font=("Arial", 12, "bold"), width=10, height=2, bg="red", command=GoPlayR)
@@ -346,6 +414,12 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
     titulo = tk.Label(window_mapa, text="Mapa de batalla", font=("Arial", 24, "bold"))
     titulo.place(relx=0.5, y=95, anchor="center")
+
+    etiqueta_dinero_defensor = tk.Label(window_mapa, text="Defensor\n$0", font=("Arial", 15, "bold"), width=12, height=2, bg="#d7ebff", fg="#0d47a1", relief="solid", bd=2)
+    etiqueta_dinero_defensor.place(x=870, y=75)
+
+    etiqueta_dinero_atacante = tk.Label(window_mapa, text="Atacante\n$0", font=("Arial", 15, "bold"), width=12, height=2, bg="#ffe3c2", fg="#bf4e00", relief="solid", bd=2)
+    etiqueta_dinero_atacante.place(x=1010, y=75)
 
     # --- Columna izquierda: eventos e información ------------------------
     etiqueta_eventos = tk.Label(window_mapa, text="Eventos", font=("Arial", 13, "bold"))
@@ -370,8 +444,8 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         boton_compra.place(x=35, y=y_base)
         botones_compra.append((boton_compra, compra))
 
-    boton_turno = tk.Button(window_mapa, text="Iniciar combate", font=("Arial", 11, "bold"), width=18, bg="#ffb74d", command=alternar_combate_click)
-    boton_turno.place(x=95, y=655)
+    etiqueta_cuenta = tk.Label(window_mapa, text="Preparación: 45s", font=("Arial", 13, "bold"), width=22, bg="#fff3bf", fg="#173a59", relief="solid", bd=2)
+    etiqueta_cuenta.place(x=70, y=650)
 
     # --- Zona derecha: tablero del mapa ----------------------------------
     etiqueta_tablero = tk.Label(window_mapa, text="Área del mapa", font=("Arial", 13, "bold"))
@@ -386,4 +460,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     caja_informacion_contrincante.place(x=405, y=600)
 
     actualizar_vista()
+    if modo_red:
+        refrescar_estado_red()
+    actualizar_cuenta_regresiva(45)
     window_mapa.protocol("WM_DELETE_WINDOW", cerrar_ventana)

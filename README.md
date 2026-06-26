@@ -14,7 +14,7 @@ Defensa_Y_Asalto/
 │   ├── perfil.py         # Perfil del jugador
 │   ├── puntajes.py       # Ranking propio y mundial
 │   ├── play.py           # Pantalla de juego
-│   └── config.py         # Configuración de música y conexión
+│   └── config.py         # Configuración de conexión
 ├── Logica/               # Desarrollador 2 — lógica interna del juego
 │   ├── jugador.py        # Clase Jugador
 │   ├── archivos.py       # Registro, login, JSON y victorias
@@ -288,14 +288,14 @@ python demo_consola.py
 
 ### Configuración de interfaz
 
-La pantalla `Config` permite ajustar preferencias de la sesión: música de fondo pensada para cargarse con `pygame.mixer`, volumen, ruta del archivo de música, IP predeterminada y puerto predeterminado para abrir `Play`. Estas opciones no cambian reglas del juego; solo afectan la experiencia de interfaz y valores sugeridos.
+La pantalla `Config` permite ajustar preferencias de la sesión: IP predeterminada y puerto predeterminado para abrir `Play`. Estas opciones no cambian reglas del juego; solo afectan valores sugeridos de conexión.
 
 ## Nota para la interfaz gráfica
 
 `play.py` ya permite crear un servidor local, unirse a un servidor remoto,
 comprar torres, comprar muros, comprar unidades, iniciar/pausar combate
 y actualizar el tablero
-usando el estado oficial recibido por red. La pantalla `Mapa` ya permite una preparación jugable local: muestra compras con nombres reales de tropas para el atacante y defensas para el defensor, permite colocar piezas haciendo clic en casillas válidas, marca zonas de colocación por rol e inicia/pausa una simulacion de combate en tiempo real con proyectiles visibles.
+usando el estado oficial recibido por red. La pantalla `Mapa` muestra el dinero de defensor y atacante en tarjetas visibles, permite colocar piezas haciendo clic en casillas válidas, consulta el estado de red para dibujar lo que ambos jugadores colocan y usa un contador de preparación antes de iniciar el combate automáticamente.
 
 La interfaz debe seguir
 limitandose a mostrar datos y enviar acciones; el calculo de combate,

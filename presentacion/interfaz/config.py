@@ -18,8 +18,8 @@ COLOR_SUAVE = "#b8c7d9"
 def config(root, GoMain, cerrar_todo, configurar_ventana):
     """
     Descripción:
-        Crea la ventana de configuración con preferencias de música
-        y valores predeterminados de conexión.
+        Crea la ventana de configuración con valores predeterminados
+        de conexión para abrir Play.
     """
 
     window3 = tk.Toplevel(root)
@@ -27,9 +27,6 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
     window3.configure(bg=COLOR_FONDO)
 
     configuracion_actual = app.obtener_configuracion()
-    musica_activa_var = tk.BooleanVar(value=configuracion_actual["musica_pygame_activada"])
-    volumen_musica_var = tk.StringVar(value=str(configuracion_actual["volumen_musica"]))
-    ruta_musica_var = tk.StringVar(value=configuracion_actual["ruta_musica"])
     ip_var = tk.StringVar(value=configuracion_actual["ip_servidor_predeterminada"])
     puerto_var = tk.StringVar(value=str(configuracion_actual["puerto_predeterminado"]))
 
@@ -54,20 +51,7 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
             messagebox.showwarning("Puerto inválido", "El puerto debe estar entre 1 y 65535.")
             return
 
-        try:
-            volumen_musica = int(volumen_musica_var.get())
-        except ValueError:
-            messagebox.showwarning("Volumen inválido", "El volumen de música debe ser un número entero.")
-            return
-
-        if volumen_musica < 0 or volumen_musica > 100:
-            messagebox.showwarning("Volumen inválido", "El volumen de música debe estar entre 0 y 100.")
-            return
-
         app.actualizar_configuracion(
-            musica_pygame_activada=musica_activa_var.get(),
-            volumen_musica=volumen_musica,
-            ruta_musica=ruta_musica_var.get().strip(),
             ip_servidor_predeterminada=ip_var.get().strip() or "127.0.0.1",
             puerto_predeterminado=puerto,
         )
@@ -75,9 +59,6 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
 
     def restablecer_configuracion():
         valores = app.restablecer_configuracion()
-        musica_activa_var.set(valores["musica_pygame_activada"])
-        volumen_musica_var.set(str(valores["volumen_musica"]))
-        ruta_musica_var.set(valores["ruta_musica"])
         ip_var.set(valores["ip_servidor_predeterminada"])
         puerto_var.set(str(valores["puerto_predeterminado"]))
         etiqueta_estado.config(text="Configuración restablecida.", fg=COLOR_BORDE)
@@ -100,48 +81,24 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
 
     subtitulo = tk.Label(
         window3,
-        text="Ajusta música con pygame y datos predeterminados de conexión.",
+        text="Ajusta los datos predeterminados para conectarte desde Play.",
         font=("Arial", 13),
         bg=COLOR_FONDO,
         fg=COLOR_SUAVE,
     )
     subtitulo.place(relx=0.5, y=112, anchor="center")
 
-    tarjeta_musica = crear_tarjeta(120, 160, 420, 300, "Música (pygame)")
-    contenido_musica = tk.Frame(tarjeta_musica, bg=COLOR_TARJETA)
-    contenido_musica.pack(fill="both", expand=True, padx=24, pady=20)
-
-    tk.Checkbutton(contenido_musica, text="Activar música de fondo", variable=musica_activa_var, bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 11, "bold")).pack(anchor="w", pady=(0, 14))
-
-    tk.Label(contenido_musica, text="Volumen pygame (0-100)", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 12, "bold"), anchor="w").pack(fill="x")
-    campo_volumen = tk.Entry(contenido_musica, textvariable=volumen_musica_var, font=("Arial", 12), width=8)
-    campo_volumen.pack(anchor="w", pady=(6, 16))
-
-    tk.Label(contenido_musica, text="Ruta del archivo de música", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 12, "bold"), anchor="w").pack(fill="x")
-    campo_ruta_musica = tk.Entry(contenido_musica, textvariable=ruta_musica_var, font=("Arial", 11), width=34)
-    campo_ruta_musica.pack(anchor="w", pady=(6, 14))
-
-    tk.Label(
-        contenido_musica,
-        text="Guarda la ruta que luego podrá cargar pygame.mixer. Formatos recomendados: .ogg, .mp3 o .wav.",
-        bg=COLOR_TARJETA,
-        fg=COLOR_SUAVE,
-        font=("Arial", 10),
-        wraplength=340,
-        justify="left",
-    ).pack(anchor="w")
-
-    tarjeta_red = crear_tarjeta(610, 160, 420, 300, "Conexión")
+    tarjeta_red = crear_tarjeta(365, 170, 420, 300, "Conexión")
     contenido_red = tk.Frame(tarjeta_red, bg=COLOR_TARJETA)
-    contenido_red.pack(fill="both", expand=True, padx=24, pady=20)
+    contenido_red.pack(fill="both", expand=True, padx=24, pady=24)
 
     tk.Label(contenido_red, text="IP predeterminada del servidor", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 12, "bold"), anchor="w").pack(fill="x")
     campo_ip = tk.Entry(contenido_red, textvariable=ip_var, font=("Arial", 12), width=28)
-    campo_ip.pack(anchor="w", pady=(6, 16))
+    campo_ip.pack(anchor="w", pady=(6, 18))
 
     tk.Label(contenido_red, text="Puerto predeterminado", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 12, "bold"), anchor="w").pack(fill="x")
     campo_puerto = tk.Entry(contenido_red, textvariable=puerto_var, font=("Arial", 12), width=12)
-    campo_puerto.pack(anchor="w", pady=(6, 16))
+    campo_puerto.pack(anchor="w", pady=(6, 18))
 
     tk.Label(
         contenido_red,
@@ -154,12 +111,12 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
     ).pack(anchor="w", pady=(8, 0))
 
     boton_aplicar = tk.Button(window3, text="Aplicar", font=("Arial", 13, "bold"), width=14, bg="#81c784", command=aplicar_configuracion)
-    boton_aplicar.place(x=395, y=500)
+    boton_aplicar.place(x=395, y=510)
 
     boton_restaurar = tk.Button(window3, text="Restablecer", font=("Arial", 13, "bold"), width=14, bg="#ffd54f", command=restablecer_configuracion)
-    boton_restaurar.place(x=575, y=500)
+    boton_restaurar.place(x=575, y=510)
 
     etiqueta_estado = tk.Label(window3, text="Los cambios aplican durante la sesión actual.", font=("Arial", 11, "bold"), bg=COLOR_FONDO, fg=COLOR_SUAVE)
-    etiqueta_estado.place(relx=0.5, y=565, anchor="center")
+    etiqueta_estado.place(relx=0.5, y=575, anchor="center")
 
     window3.protocol("WM_DELETE_WINDOW", cerrar_todo)

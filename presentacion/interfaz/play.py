@@ -171,7 +171,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                 return True
         return False
 
-    def cerrar_sala(destruir_aplicacion=False):
+    def cerrar_sala(destruir_aplicacion=False, cerrar_red=True, detener_servidor=True):
         if control_ventana["cerrando"]:
             return
         control_ventana["cerrando"] = True
@@ -182,8 +182,10 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                 except tk.TclError:
                     pass
                 control_ventana[clave_after] = None
-        adaptador.cerrar()
-        detener_servidor_local()
+        if cerrar_red:
+            adaptador.cerrar()
+        if detener_servidor:
+            detener_servidor_local()
         try:
             if window2.winfo_exists():
                 window2.destroy()
@@ -211,8 +213,9 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         DATOS_PARTIDA["faccion"] = faccion_confirmada.get()
         DATOS_PARTIDA["puerto"] = estado_red["puerto"]
         DATOS_PARTIDA["modo"] = "red"
+        DATOS_PARTIDA["cliente_red"] = adaptador.cliente
 
-        cerrar_sala()
+        cerrar_sala(cerrar_red=False, detener_servidor=False)
         GoMapa()
 
     def detener_servidor_local():

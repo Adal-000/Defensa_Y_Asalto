@@ -1,8 +1,8 @@
 """
 Configuracion simple en memoria para preferencias de interfaz.
 
-Estas opciones no cambian reglas del juego; solo ayudan a adaptar la
-experiencia visual y valores predeterminados de conexion durante la sesion.
+Estas opciones no cambian reglas del juego; solo ayudan a adaptar valores
+predeterminados de conexion durante la sesion.
 """
 
 CONFIGURACION_PREDETERMINADA = {
@@ -11,9 +11,6 @@ CONFIGURACION_PREDETERMINADA = {
     "mostrar_proyectiles": True,
     "ip_servidor_predeterminada": "127.0.0.1",
     "puerto_predeterminado": 5000,
-    "musica_pygame_activada": False,
-    "volumen_musica": 70,
-    "ruta_musica": "",
 }
 
 _configuracion_actual = CONFIGURACION_PREDETERMINADA.copy()
