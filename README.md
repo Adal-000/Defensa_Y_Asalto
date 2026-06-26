@@ -14,7 +14,7 @@ Defensa_Y_Asalto/
 │   ├── perfil.py         # Perfil del jugador
 │   ├── puntajes.py       # Ranking propio y mundial
 │   ├── play.py           # Pantalla de juego
-│   └── config.py         # Configuración visual
+│   └── config.py         # Configuración de música y conexión
 ├── Logica/               # Desarrollador 2 — lógica interna del juego
 │   ├── jugador.py        # Clase Jugador
 │   ├── archivos.py       # Registro, login, JSON y victorias
@@ -288,7 +288,7 @@ python demo_consola.py
 
 ### Configuración de interfaz
 
-La pantalla `Config` permite ajustar preferencias de la sesión: tema visual, mostrar u ocultar cuadrícula del mapa, mostrar u ocultar proyectiles durante el combate, IP predeterminada y puerto predeterminado para abrir `Play`. Estas opciones no cambian reglas del juego; solo afectan la interfaz y valores sugeridos.
+La pantalla `Config` permite ajustar preferencias de la sesión: música de fondo pensada para cargarse con `pygame.mixer`, volumen, ruta del archivo de música, IP predeterminada y puerto predeterminado para abrir `Play`. Estas opciones no cambian reglas del juego; solo afectan la experiencia de interfaz y valores sugeridos.
 
 ## Nota para la interfaz gráfica
 

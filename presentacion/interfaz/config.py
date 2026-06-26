@@ -18,8 +18,8 @@ COLOR_SUAVE = "#b8c7d9"
 def config(root, GoMain, cerrar_todo, configurar_ventana):
     """
     Descripción:
-        Crea la ventana de configuración con preferencias de interfaz,
-        mapa y valores predeterminados de conexión.
+        Crea la ventana de configuración con preferencias de música
+        y valores predeterminados de conexión.
     """
 
     window3 = tk.Toplevel(root)
@@ -27,9 +27,9 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
     window3.configure(bg=COLOR_FONDO)
 
     configuracion_actual = app.obtener_configuracion()
-    tema_var = tk.StringVar(value=configuracion_actual["tema"])
-    cuadricula_var = tk.BooleanVar(value=configuracion_actual["mostrar_cuadricula"])
-    proyectiles_var = tk.BooleanVar(value=configuracion_actual["mostrar_proyectiles"])
+    musica_activa_var = tk.BooleanVar(value=configuracion_actual["musica_pygame_activada"])
+    volumen_musica_var = tk.StringVar(value=str(configuracion_actual["volumen_musica"]))
+    ruta_musica_var = tk.StringVar(value=configuracion_actual["ruta_musica"])
     ip_var = tk.StringVar(value=configuracion_actual["ip_servidor_predeterminada"])
     puerto_var = tk.StringVar(value=str(configuracion_actual["puerto_predeterminado"]))
 
@@ -54,10 +54,20 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
             messagebox.showwarning("Puerto inválido", "El puerto debe estar entre 1 y 65535.")
             return
 
+        try:
+            volumen_musica = int(volumen_musica_var.get())
+        except ValueError:
+            messagebox.showwarning("Volumen inválido", "El volumen de música debe ser un número entero.")
+            return
+
+        if volumen_musica < 0 or volumen_musica > 100:
+            messagebox.showwarning("Volumen inválido", "El volumen de música debe estar entre 0 y 100.")
+            return
+
         app.actualizar_configuracion(
-            tema=tema_var.get(),
-            mostrar_cuadricula=cuadricula_var.get(),
-            mostrar_proyectiles=proyectiles_var.get(),
+            musica_pygame_activada=musica_activa_var.get(),
+            volumen_musica=volumen_musica,
+            ruta_musica=ruta_musica_var.get().strip(),
             ip_servidor_predeterminada=ip_var.get().strip() or "127.0.0.1",
             puerto_predeterminado=puerto,
         )
@@ -65,9 +75,9 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
 
     def restablecer_configuracion():
         valores = app.restablecer_configuracion()
-        tema_var.set(valores["tema"])
-        cuadricula_var.set(valores["mostrar_cuadricula"])
-        proyectiles_var.set(valores["mostrar_proyectiles"])
+        musica_activa_var.set(valores["musica_pygame_activada"])
+        volumen_musica_var.set(str(valores["volumen_musica"]))
+        ruta_musica_var.set(valores["ruta_musica"])
         ip_var.set(valores["ip_servidor_predeterminada"])
         puerto_var.set(str(valores["puerto_predeterminado"]))
         etiqueta_estado.config(text="Configuración restablecida.", fg=COLOR_BORDE)
@@ -90,24 +100,36 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
 
     subtitulo = tk.Label(
         window3,
-        text="Ajusta opciones visuales del mapa y datos predeterminados de conexión.",
+        text="Ajusta música con pygame y datos predeterminados de conexión.",
         font=("Arial", 13),
         bg=COLOR_FONDO,
         fg=COLOR_SUAVE,
     )
     subtitulo.place(relx=0.5, y=112, anchor="center")
 
-    tarjeta_visual = crear_tarjeta(120, 160, 420, 300, "Visual y mapa")
-    contenido_visual = tk.Frame(tarjeta_visual, bg=COLOR_TARJETA)
-    contenido_visual.pack(fill="both", expand=True, padx=24, pady=20)
+    tarjeta_musica = crear_tarjeta(120, 160, 420, 300, "Música (pygame)")
+    contenido_musica = tk.Frame(tarjeta_musica, bg=COLOR_TARJETA)
+    contenido_musica.pack(fill="both", expand=True, padx=24, pady=20)
 
-    tk.Label(contenido_visual, text="Tema de interfaz", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 12, "bold"), anchor="w").pack(fill="x", pady=(0, 6))
-    tk.Radiobutton(contenido_visual, text="Claro", variable=tema_var, value="claro", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 11)).pack(anchor="w")
-    tk.Radiobutton(contenido_visual, text="Oscuro", variable=tema_var, value="oscuro", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 11)).pack(anchor="w")
+    tk.Checkbutton(contenido_musica, text="Activar música de fondo", variable=musica_activa_var, bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 11, "bold")).pack(anchor="w", pady=(0, 14))
 
-    tk.Label(contenido_visual, text="Mapa", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 12, "bold"), anchor="w").pack(fill="x", pady=(18, 6))
-    tk.Checkbutton(contenido_visual, text="Mostrar cuadrícula del tablero", variable=cuadricula_var, bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 11)).pack(anchor="w")
-    tk.Checkbutton(contenido_visual, text="Mostrar proyectiles durante el combate", variable=proyectiles_var, bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 11)).pack(anchor="w")
+    tk.Label(contenido_musica, text="Volumen pygame (0-100)", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 12, "bold"), anchor="w").pack(fill="x")
+    campo_volumen = tk.Entry(contenido_musica, textvariable=volumen_musica_var, font=("Arial", 12), width=8)
+    campo_volumen.pack(anchor="w", pady=(6, 16))
+
+    tk.Label(contenido_musica, text="Ruta del archivo de música", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 12, "bold"), anchor="w").pack(fill="x")
+    campo_ruta_musica = tk.Entry(contenido_musica, textvariable=ruta_musica_var, font=("Arial", 11), width=34)
+    campo_ruta_musica.pack(anchor="w", pady=(6, 14))
+
+    tk.Label(
+        contenido_musica,
+        text="Guarda la ruta que luego podrá cargar pygame.mixer. Formatos recomendados: .ogg, .mp3 o .wav.",
+        bg=COLOR_TARJETA,
+        fg=COLOR_SUAVE,
+        font=("Arial", 10),
+        wraplength=340,
+        justify="left",
+    ).pack(anchor="w")
 
     tarjeta_red = crear_tarjeta(610, 160, 420, 300, "Conexión")
     contenido_red = tk.Frame(tarjeta_red, bg=COLOR_TARJETA)
