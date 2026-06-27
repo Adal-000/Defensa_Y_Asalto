@@ -160,6 +160,9 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     def mostrar_proyectiles_activos():
         return bool(app.obtener_configuracion().get("mostrar_proyectiles", True))
 
+    def mostrar_proyectiles_activos():
+        return bool(app.obtener_configuracion().get("mostrar_proyectiles", True))
+
     if not modo_red:
         app.crear_partida(nombre_defensor, nombre_atacante)
 
@@ -885,6 +888,16 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             return "Combate en tiempo real"
         return "Preparación"
 
+    def nombre_fase_preparacion(estado):
+        fase = estado.get("fase_ronda", "")
+        if fase == "ataque_atacante":
+            return "Preparación atacante: coloca tropas"
+        if fase == "construccion_defensor":
+            return "Preparación defensor: coloca defensas"
+        if fase == "combate":
+            return "Combate en tiempo real"
+        return "Preparación"
+
     def ejecutar_pulso_combate():
         if not ventana_activa():
             return False
@@ -1201,6 +1214,6 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
     actualizar_vista()
     if modo_red:
-        refrescar_estado_red()
+        window_mapa.after(100, lambda: refrescar_estado_red())
     actualizar_cuenta_regresiva(SEGUNDOS_PREPARACION_ROL)
     window_mapa.protocol("WM_DELETE_WINDOW", cerrar_ventana)
