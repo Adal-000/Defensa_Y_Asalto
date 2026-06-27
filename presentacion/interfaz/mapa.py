@@ -142,6 +142,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     etiqueta_dinero_defensor = None
     etiqueta_dinero_atacante = None
     etiqueta_resultado = None
+    boton_turno = None
     caja_informacion_contrincante = None
     seleccion_actual = {"tipo": None, "clave": None, "nombre": None}
     ultimo_estado = {"datos": {}}
@@ -149,23 +150,6 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     control_combate = {"activo": False, "after_id": None, "cuenta_id": None, "cerrando": False, "red_iniciado": False}
 
     preferencias = app.obtener_configuracion()
-
-    def obtener_estado_visible():
-        if modo_red:
-            estado_red = cliente_red.obtener_ultimo_estado_local()
-            if estado_red is not None:
-                return estado_red
-            return ultimo_estado["datos"]
-        return app.obtener_estado_partida()
-
-    def refrescar_estado_red():
-        return
-
-    def mostrar_cuadricula_activa():
-        return bool(app.obtener_configuracion().get("mostrar_cuadricula", True))
-
-    def mostrar_proyectiles_activos():
-        return bool(app.obtener_configuracion().get("mostrar_proyectiles", True))
 
     def obtener_estado_visible():
         if modo_red:
@@ -941,6 +925,16 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             return "Combate en tiempo real"
         return "Preparación"
 
+    def nombre_fase_preparacion(estado):
+        fase = estado.get("fase_ronda", "")
+        if fase == "ataque_atacante":
+            return "Preparación atacante: coloca tropas"
+        if fase == "construccion_defensor":
+            return "Preparación defensor: coloca defensas"
+        if fase == "combate":
+            return "Combate en tiempo real"
+        return "Preparación"
+
     def ejecutar_pulso_combate():
         if not ventana_activa():
             return False
@@ -991,6 +985,8 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         etiqueta_resultado.place(relx=0.5, y=575, anchor="center")
         etiqueta_resultado.lift()
         escribir_evento(texto)
+        if estado.get("partida_finalizada") and boton_turno is not None:
+            boton_turno.config(text="Partida terminada", bg="#9e9e9e", state="disabled")
 
     def ejecutar_combate_en_tiempo_real():
         if not control_combate["activo"] or not ventana_activa():
@@ -1258,6 +1254,9 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     etiqueta_temporizador = tk.Label(window_mapa, text=f"Preparación: {SEGUNDOS_PREPARACION_ROL}s", font=("Arial", 13, "bold"), width=26, bg="#fff3bf", fg="#173a59", relief="solid", bd=2)
     etiqueta_temporizador.place(x=70, y=650)
     etiqueta_cuenta = etiqueta_temporizador
+
+    boton_turno = tk.Button(window_mapa, text="Forzar combate", font=("Arial", 11, "bold"), width=20, bg="#ffb74d", command=alternar_combate_click)
+    boton_turno.place(x=70, y=695)
 
     etiqueta_tablero = tk.Label(window_mapa, text="Área del mapa", font=("Arial", 13, "bold"), bg=COLOR_PANEL)
     etiqueta_tablero.place(x=405, y=175)
