@@ -829,6 +829,16 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             return "Combate en tiempo real"
         return "Preparación"
 
+    def nombre_fase_preparacion(estado):
+        fase = estado.get("fase_ronda", "")
+        if fase == "ataque_atacante":
+            return "Preparación atacante: coloca tropas"
+        if fase == "construccion_defensor":
+            return "Preparación defensor: coloca defensas"
+        if fase == "combate":
+            return "Combate en tiempo real"
+        return "Preparación"
+
     def ejecutar_pulso_combate():
         if not ventana_activa():
             return False
@@ -850,7 +860,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         actualizar_vista()
         if resultado.get("fase_ronda") == "construccion_defensor":
             control_combate["activo"] = False
-            etiqueta_cuenta.config(text="Preparación defensor: 45s", fg="#173a59")
+            etiqueta_temporizador.config(text="Preparación defensor: 45s", fg="#173a59")
             actualizar_cuenta_regresiva(45)
             return False
         return not resultado.get("ronda_finalizada", False)
@@ -865,12 +875,16 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             control_combate["activo"] = False
             control_combate["after_id"] = None
             if ventana_activa():
-                if etiqueta_cuenta.cget("text") != "Preparación defensor: 45s":
-                    etiqueta_cuenta.config(text="Combate finalizado", fg="#1b5e20")
+                if etiqueta_temporizador.cget("text") != "Preparación defensor: 45s":
+                    etiqueta_temporizador.config(text="Combate finalizado", fg="#1b5e20")
 
-    # -----------------------------------------------------------------
-    # Dibujo del mapa
-    # -----------------------------------------------------------------
+    def iniciar_combate_automatico():
+        if control_combate["activo"]:
+            return
+        control_combate["activo"] = True
+        etiqueta_temporizador.config(text="Combate iniciado", fg="#1b5e20")
+        escribir_evento("Tiempo de preparación terminado. Combate iniciado automáticamente.")
+        ejecutar_combate_en_tiempo_real()
 
     def actualizar_cuenta_regresiva(segundos_restantes):
         if not ventana_activa() or control_combate["activo"]:
@@ -880,7 +894,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             iniciar_combate_automatico()
             return
         estado_actual = obtener_estado_visible()
-        etiqueta_cuenta.config(
+        etiqueta_temporizador.config(
             text=f"{nombre_fase_preparacion(estado_actual)}: {segundos_restantes}s",
             fg="#b05a00" if segundos_restantes <= 10 else "#173a59",
         )
@@ -888,18 +902,16 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             1000, lambda: actualizar_cuenta_regresiva(segundos_restantes - 1)
         )
 
-    def distancia(fila_a, columna_a, fila_b, columna_b):
-        return abs(fila_a - fila_b) + abs(columna_a - columna_b)
-
-    def color_proyectil(nombre_torre):
-        nombre = str(nombre_torre).lower()
-        if "cañon" in nombre or "canon" in nombre:
-            return "#ff7a00"
-        if "hielo" in nombre:
-            return "#00bcd4"
-        if "soporte" in nombre:
-            return "#9c27b0"
-        return "#f2c200"
+    def alternar_combate_click():
+        if control_combate["activo"]:
+            detener_combate_programado()
+            etiqueta_temporizador.config(text="Combate pausado", fg="#b05a00")
+            escribir_evento("Combate pausado.")
+            return
+        control_combate["activo"] = True
+        etiqueta_temporizador.config(text="Combate iniciado", fg="#1b5e20")
+        escribir_evento("Combate en tiempo real iniciado.")
+        ejecutar_combate_en_tiempo_real()
 
     def dibujar_zonas():
         cuadro_mapa.delete("all")
@@ -1121,8 +1133,9 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         boton_compra.place(x=35, y=y_base)
         botones_compra.append((boton_compra, compra))
 
-    boton_turno = tk.Button(window_mapa, text="Forzar combate", font=("Arial", 11, "bold"), width=18, bg="#ffb74d", command=alternar_combate_click)
-    boton_turno.place(x=95, y=660)
+    etiqueta_temporizador = tk.Label(window_mapa, text="Preparación: 45s", font=("Arial", 13, "bold"), width=22, bg="#fff3bf", fg="#173a59", relief="solid", bd=2)
+    etiqueta_temporizador.place(x=70, y=650)
+    etiqueta_cuenta = etiqueta_temporizador
 
     etiqueta_tablero = tk.Label(window_mapa, text="Área del mapa", font=("Arial", 13, "bold"), bg=COLOR_PANEL)
     etiqueta_tablero.place(x=405, y=175)

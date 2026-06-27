@@ -182,8 +182,16 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                 except tk.TclError:
                     pass
                 control_ventana[clave_after] = None
-        adaptador.cerrar()
-        detener_servidor_local()
+        if cerrar_red:
+            adaptador.cliente.callback_mensaje = None
+            adaptador.cerrar()
+        while not cola_mensajes.empty():
+            try:
+                cola_mensajes.get_nowait()
+            except queue.Empty:
+                break
+        if detener_servidor:
+            detener_servidor_local()
         try:
             if window2.winfo_exists():
                 window2.destroy()
@@ -233,10 +241,14 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         GoMapa()
 
     def detener_servidor_local():
-        if servidor_local["instancia"] is not None:
-            servidor_local["instancia"].detener()
-            servidor_local["instancia"] = None
-            servidor_local["hilo"] = None
+        servidor = servidor_local["instancia"]
+        hilo = servidor_local["hilo"]
+        servidor_local["instancia"] = None
+        servidor_local["hilo"] = None
+        if servidor is not None:
+            servidor.detener()
+        if hilo is not None and hilo.is_alive() and hilo is not threading.current_thread():
+            hilo.join(timeout=0.2)
 
     boton_volver = tk.Button(
         window2, text="Volver", font=("Arial", 12, "bold"), width=10,
