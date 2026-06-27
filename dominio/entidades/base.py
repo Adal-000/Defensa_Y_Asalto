@@ -25,7 +25,7 @@ class Base:
         - vida_inicial debe ser un valor entero positivo.
     """
 
-    def __init__(self, vida_inicial=200):
+    def __init__(self, vida_inicial=300):
         self.vida_maxima = vida_inicial
         self.vida = vida_inicial
 

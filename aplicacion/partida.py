@@ -15,21 +15,21 @@ from dominio.entidades.muro import crear_muro
 from dominio.servicios.combate import ejecutar_turno_de_combate
 from infraestructura.persistencia.archivos import actualizar_victoria
 
-DINERO_INICIAL_DEFENSOR = 360
-DINERO_INICIAL_ATACANTE = 360
-DINERO_EXTRA_POR_RONDA = 80
+DINERO_BASE_RONDA = 500
+BONO_GANADOR_RONDA = 200
+INCREMENTO_DINERO_POR_RONDA = 200
 RONDAS_PARA_GANAR_PARTIDA = 3
 SEGUNDOS_ESPERA_REFUERZO_ATACANTE = 5
 FILA_BASE = 0
 MAXIMO_TURNOS_POR_RONDA = 30
 CANTIDAD_FILAS_TABLERO = 11
 CANTIDAD_COLUMNAS_TABLERO = 6
-FILAS_DEFENSOR_VALIDAS = range(1, 8)
-FILAS_ATACANTE_VALIDAS = range(8, 11)
-RECOMPENSA_DEFENSOR_POR_UNIDAD = 25
-RECOMPENSA_ATACANTE_POR_TORRE_DANADA = 8
-RECOMPENSA_ATACANTE_POR_TORRE_DESTRUIDA = 35
-RECOMPENSA_ATACANTE_POR_BASE_DANADA = 12
+RECOMPENSA_DEFENSOR_POR_UNIDAD = 20
+RECOMPENSA_ATACANTE_POR_TORRE_DANADA = 10
+RECOMPENSA_ATACANTE_POR_TORRE_DESTRUIDA = 30
+RECOMPENSA_ATACANTE_POR_MURO_DANADO = 8
+RECOMPENSA_ATACANTE_POR_MURO_DESTRUIDO = 20
+RECOMPENSA_ATACANTE_POR_BASE_DANADA = 15
 FASE_CONSTRUCCION_DEFENSOR = "construccion_defensor"
 FASE_ATAQUE_ATACANTE = "ataque_atacante"
 FASE_COMBATE = "combate"
@@ -114,20 +114,28 @@ class Partida:
         self.muros = []
         self.unidades = []
         self.base.reiniciar()
-        self.fase_ronda = FASE_CONSTRUCCION_DEFENSOR
-        self.esperando_refuerzo_atacante = False
-        self.tiempo_inicio_espera_refuerzo = None
+        self.fase_ronda = FASE_ATAQUE_ATACANTE
 
-        self.dinero_defensor = DINERO_INICIAL_DEFENSOR + (
-            DINERO_EXTRA_POR_RONDA * (self.numero_ronda - 1)
+        dinero_base = DINERO_BASE_RONDA + (
+            INCREMENTO_DINERO_POR_RONDA * (self.numero_ronda - 1)
         )
-        self.dinero_atacante = 0
+        dinero_ganador = dinero_base + BONO_GANADOR_RONDA
+
+        if self.rol_ganador_ultima_ronda == "defensor":
+            self.dinero_defensor = dinero_ganador
+            self.dinero_atacante = dinero_base
+        elif self.rol_ganador_ultima_ronda == "atacante":
+            self.dinero_defensor = dinero_base
+            self.dinero_atacante = dinero_ganador
+        else:
+            self.dinero_defensor = dinero_base
+            self.dinero_atacante = dinero_base
 
         self.historial_eventos.append(
-            f"Inicia la ronda {self.numero_ronda}: fase de construcción del defensor."
+            f"Inicia la ronda {self.numero_ronda}: ambos jugadores pueden comprar durante la preparación y el combate."
         )
         self.historial_eventos.append(
-            f"Defensor recibe ${self.dinero_defensor} para colocar muros y torres."
+            f"Defensor recibe ${self.dinero_defensor} y atacante recibe ${self.dinero_atacante}."
         )
 
     def iniciar_fase_ataque(self):
@@ -146,11 +154,8 @@ class Partida:
             return False, "No se puede volver a comprar unidades durante el combate."
 
         self.fase_ronda = FASE_ATAQUE_ATACANTE
-        self.dinero_atacante = DINERO_INICIAL_ATACANTE + (
-            DINERO_EXTRA_POR_RONDA * (self.numero_ronda - 1)
-        )
         mensaje = (
-            f"Atacante recibe ${self.dinero_atacante} para comprar y colocar unidades."
+            f"Fase de ataque activa. Atacante disponible: ${self.dinero_atacante}."
         )
         self.historial_eventos.append(mensaje)
         return True, mensaje
@@ -163,9 +168,6 @@ class Partida:
         """
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
-
-        if self.fase_ronda == FASE_CONSTRUCCION_DEFENSOR:
-            return False, "Primero debe terminar la construcción del defensor y la fase de ataque."
 
         if self.fase_ronda == FASE_COMBATE:
             return True, "La fase de combate ya está activa."
@@ -343,9 +345,6 @@ class Partida:
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
 
-        if self.fase_ronda == FASE_COMBATE:
-            return False, "Las torres solo se compran durante la preparación."
-
         posicion_valida, mensaje_posicion = self._validar_compra_defensiva(
             fila, columna
         )
@@ -391,9 +390,6 @@ class Partida:
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
 
-        if self.fase_ronda == FASE_COMBATE:
-            return False, "Los muros solo se compran durante la preparación."
-
         posicion_valida, mensaje_posicion = self._validar_compra_defensiva(
             fila, columna
         )
@@ -438,12 +434,6 @@ class Partida:
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
 
-        if self.fase_ronda == FASE_CONSTRUCCION_DEFENSOR:
-            self.iniciar_fase_ataque()
-
-        if self.fase_ronda not in (FASE_ATAQUE_ATACANTE, FASE_COMBATE):
-            return False, "Las unidades solo se compran durante la preparación o el combate."
-
         posicion_valida, mensaje_posicion = self._validar_compra_unidad(
             fila, columna
         )
@@ -469,7 +459,8 @@ class Partida:
         return True, f"{nueva_unidad.nombre} comprada correctamente."
 
     def _otorgar_dinero_por_combate(self, vida_torres_antes,
-                                     vida_unidades_antes, vida_base_antes):
+                                     vida_unidades_antes, vida_muros_antes,
+                                     vida_base_antes):
         """
         Descripcion:
             Otorga dinero a los jugadores segun lo ocurrido durante
@@ -481,6 +472,8 @@ class Partida:
             vida_torres_antes (dict): Relacion entre id de torre y
                 vida antes del combate.
             vida_unidades_antes (dict): Relacion entre id de unidad y
+                vida antes del combate.
+            vida_muros_antes (dict): Relacion entre id de muro y
                 vida antes del combate.
             vida_base_antes (int): Vida de la base antes del combate.
 
@@ -517,6 +510,22 @@ class Partida:
                 self.dinero_atacante += RECOMPENSA_ATACANTE_POR_TORRE_DANADA
                 eventos_dinero.append(
                     f"Atacante gana ${RECOMPENSA_ATACANTE_POR_TORRE_DANADA} por dañar una torre."
+                )
+
+        for identificador_muro, vida_anterior in vida_muros_antes.items():
+            muro_actual = next(
+                (muro for muro in self.muros if id(muro) == identificador_muro),
+                None,
+            )
+            if muro_actual is None:
+                self.dinero_atacante += RECOMPENSA_ATACANTE_POR_MURO_DESTRUIDO
+                eventos_dinero.append(
+                    f"Atacante gana ${RECOMPENSA_ATACANTE_POR_MURO_DESTRUIDO} por destruir un muro."
+                )
+            elif muro_actual.vida < vida_anterior:
+                self.dinero_atacante += RECOMPENSA_ATACANTE_POR_MURO_DANADO
+                eventos_dinero.append(
+                    f"Atacante gana ${RECOMPENSA_ATACANTE_POR_MURO_DANADO} por dañar un muro."
                 )
 
         if self.base.vida < vida_base_antes:
@@ -561,6 +570,7 @@ class Partida:
 
         vida_torres_antes = {id(torre): torre.vida for torre in self.torres}
         vida_unidades_antes = {id(unidad): unidad.vida for unidad in self.unidades}
+        vida_muros_antes = {id(muro): muro.vida for muro in self.muros}
         vida_base_antes = self.base.vida
 
         eventos_turno = []
@@ -577,7 +587,8 @@ class Partida:
         self.torres, self.unidades, self.muros = resultado_combate
 
         eventos_dinero = self._otorgar_dinero_por_combate(
-            vida_torres_antes, vida_unidades_antes, vida_base_antes
+            vida_torres_antes, vida_unidades_antes, vida_muros_antes,
+            vida_base_antes
         )
         eventos_turno.extend(eventos_dinero)
 
@@ -647,29 +658,17 @@ class Partida:
             self._finalizar_ronda("atacante")
             return True
 
-        if self.base.vida > 0 and len(self.unidades) == 0 and self.turnos_en_ronda_actual > 0:
-            if self.dinero_atacante <= 0:
-                self.historial_eventos.append(
-                    "El atacante se queda sin dinero y sin unidades. El defensor gana la ronda."
-                )
-                self._finalizar_ronda("defensor")
-                return True
-
-            if not self.esperando_refuerzo_atacante:
-                self.esperando_refuerzo_atacante = True
-                self.tiempo_inicio_espera_refuerzo = time.time()
-                self.historial_eventos.append(
-                    "Todas las unidades atacantes fueron eliminadas. Tiene 5 segundos para colocar refuerzos."
-                )
-                return False
-
-            tiempo_esperado = time.time() - (self.tiempo_inicio_espera_refuerzo or time.time())
-            if tiempo_esperado >= SEGUNDOS_ESPERA_REFUERZO_ATACANTE:
-                self.historial_eventos.append(
-                    "El atacante no colocó refuerzos en 5 segundos. El defensor gana la ronda."
-                )
-                self._finalizar_ronda("defensor")
-                return True
+        if (
+            self.base.vida > 0
+            and len(self.unidades) == 0
+            and self.turnos_en_ronda_actual > 0
+            and self.dinero_atacante <= 0
+        ):
+            self.historial_eventos.append(
+                "El atacante se queda sin dinero y sin unidades. El defensor gana la ronda."
+            )
+            self._finalizar_ronda("defensor")
+            return True
 
             return False
 
