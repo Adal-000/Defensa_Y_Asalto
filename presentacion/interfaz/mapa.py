@@ -799,6 +799,26 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             return "Combate en tiempo real"
         return "Preparación"
 
+    def nombre_fase_preparacion(estado):
+        fase = estado.get("fase_ronda", "")
+        if fase == "ataque_atacante":
+            return "Preparación atacante: coloca tropas"
+        if fase == "construccion_defensor":
+            return "Preparación defensor: coloca defensas"
+        if fase == "combate":
+            return "Combate en tiempo real"
+        return "Preparación"
+
+    def nombre_fase_preparacion(estado):
+        fase = estado.get("fase_ronda", "")
+        if fase == "ataque_atacante":
+            return "Preparación atacante: coloca tropas"
+        if fase == "construccion_defensor":
+            return "Preparación defensor: coloca defensas"
+        if fase == "combate":
+            return "Combate en tiempo real"
+        return "Preparación"
+
     def ejecutar_pulso_combate():
         if not ventana_activa():
             return False
@@ -900,9 +920,9 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         else:
             cuadro_mapa.create_text(x_base, y_base, text="BASE", font=("Arial", 13, "bold"), fill="#9a0000")
 
-        imagen_base = cargar_imagen_mapa(datos_faccion_por_rol("defensor").get("estructura_base"), 110, 38)
-        if imagen_base is not None:
-            cuadro_mapa.create_image(ANCHO_TABLERO // 2, ALTO_CELDA // 2 + 3, image=imagen_base)
+        sprite_base_defensor = cargar_imagen_mapa(datos_faccion_por_rol("defensor").get("estructura_base"), 110, 38)
+        if sprite_base_defensor is not None:
+            cuadro_mapa.create_image(ANCHO_TABLERO // 2, ALTO_CELDA // 2 + 3, image=sprite_base_defensor)
         cuadro_mapa.create_text(ANCHO_TABLERO // 2, ALTO_CELDA // 2, text="BASE DEFENSOR", font=("Arial", 12, "bold"), fill="#9a0000")
         cuadro_mapa.create_text(10, ALTO_CELDA * 4, text="Zona defensor", angle=90, anchor="w", fill="#005b96", font=("Arial", 10, "bold"))
         cuadro_mapa.create_text(10, ALTO_CELDA * 9, text="Zona atacante", angle=90, anchor="w", fill="#b05a00", font=("Arial", 10, "bold"))
@@ -1056,20 +1076,17 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     boton_volver = tk.Button(window_mapa, text="Volver", font=("Arial", 12, "bold"), width=10, height=2, bg="red", command=GoPlayR)
     boton_volver.place(x=20, y=20)
 
-    caja_informacion_superior = tk.Label(window_mapa, text="", font=("Arial", 11, "bold"), width=92, height=2, relief="solid", bd=2, anchor="w", padx=10)
-    caja_informacion_superior.place(x=150, y=20)
+    caja_informacion_superior = tk.Label(window_mapa, text="", font=("Arial", 12, "bold"), width=70, height=2, relief="solid", bd=2, anchor="w", padx=14)
+    caja_informacion_superior.place(x=160, y=20)
 
-    titulo = tk.Label(window_mapa, text="Mapa de batalla", font=("Arial", 24, "bold"), bg=COLOR_PANEL)
-    titulo.place(relx=0.5, y=92, anchor="center")
+    titulo = tk.Label(window_mapa, text="Mapa de batalla", font=("Arial", 24, "bold"))
+    titulo.place(relx=0.5, y=112, anchor="center")
 
-    etiqueta_marcador = tk.Label(window_mapa, text="", font=("Arial", 11, "bold"), fg="#333333", bg=COLOR_PANEL, width=78, anchor="center")
-    etiqueta_marcador.place(relx=0.5, y=128, anchor="center")
+    etiqueta_dinero_defensor = tk.Label(window_mapa, text="🪙 Defensor\n$0", font=("Arial", 16, "bold"), width=11, height=2, bg="#d7ebff", fg="#0d47a1", relief="solid", bd=3)
+    etiqueta_dinero_defensor.place(x=830, y=112)
 
-    etiqueta_dinero_defensor = tk.Label(window_mapa, text="🪙 Defensor\n$0", font=("Arial", 17, "bold"), width=14, height=2, bg="#d7ebff", fg="#0d47a1", relief="solid", bd=3)
-    etiqueta_dinero_defensor.place(x=820, y=72)
-
-    etiqueta_dinero_atacante = tk.Label(window_mapa, text="🪙 Atacante\n$0", font=("Arial", 17, "bold"), width=14, height=2, bg="#ffe3c2", fg="#bf4e00", relief="solid", bd=3)
-    etiqueta_dinero_atacante.place(x=1010, y=72)
+    etiqueta_dinero_atacante = tk.Label(window_mapa, text="🪙 Atacante\n$0", font=("Arial", 16, "bold"), width=11, height=2, bg="#ffe3c2", fg="#bf4e00", relief="solid", bd=3)
+    etiqueta_dinero_atacante.place(x=990, y=112)
 
     etiqueta_eventos = tk.Label(window_mapa, text="Eventos", font=("Arial", 13, "bold"), bg=COLOR_PANEL)
     etiqueta_eventos.place(x=35, y=175)

@@ -249,7 +249,7 @@ def crear_torre_arquera(fila=0, columna=0):
         Ninguna.
     """
     return Torre(
-        nombre="Torre Arquera",
+        nombre="Torre normal",
         costo=100,
         vida=130,
         dano=22,
@@ -278,7 +278,7 @@ def crear_torre_cañon(fila=0, columna=0):
         Ninguna.
     """
     return Torre(
-        nombre="Torre Cañon",
+        nombre="Torre pesada",
         costo=150,
         vida=180,
         dano=34,
@@ -307,7 +307,7 @@ def crear_torre_hielo(fila=0, columna=0):
         Ninguna.
     """
     return Torre(
-        nombre="Torre de Hielo",
+        nombre="Torre especial",
         costo=120,
         vida=140,
         dano=16,
@@ -337,7 +337,7 @@ def crear_torre_soporte(fila=0, columna=0):
         Ninguna.
     """
     return Torre(
-        nombre="Torre de Soporte",
+        nombre="Torre soporte",
         costo=130,
         vida=155,
         dano=14,
