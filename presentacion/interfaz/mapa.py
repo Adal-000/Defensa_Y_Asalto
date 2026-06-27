@@ -30,6 +30,7 @@ COLOR_DEFENSA = "#dbeeff"
 COLOR_ATAQUE = "#ffe8cf"
 COLOR_BASE = "#ffd4d4"
 COLOR_BORDE = "#666666"
+COLOR_PANEL = "#ffffff"
 SEGUNDOS_PREPARACION_ROL = 15
 
 TIEMPO_PREPARACION_SEGUNDOS = 15
@@ -149,6 +150,9 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     preferencias = app.obtener_configuracion()
     def mostrar_cuadricula_activa():
         return bool(app.obtener_configuracion().get("mostrar_cuadricula", True))
+
+    def mostrar_proyectiles_activos():
+        return bool(app.obtener_configuracion().get("mostrar_proyectiles", True))
 
     def mostrar_proyectiles_activos():
         return bool(app.obtener_configuracion().get("mostrar_proyectiles", True))
@@ -800,6 +804,16 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             exito, mensaje = _accion_comprar_muro(fila, columna)
         else:
             exito, mensaje = _accion_comprar_unidad(seleccion_actual["clave"], fila, columna)
+
+    def nombre_fase_preparacion(estado):
+        fase = estado.get("fase_ronda", "")
+        if fase == "ataque_atacante":
+            return "Preparación atacante: coloca tropas"
+        if fase == "construccion_defensor":
+            return "Preparación defensor: coloca defensas"
+        if fase == "combate":
+            return "Combate en tiempo real"
+        return "Preparación"
 
     def nombre_fase_preparacion(estado):
         fase = estado.get("fase_ronda", "")

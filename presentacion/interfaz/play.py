@@ -83,7 +83,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     cola_mensajes = queue.Queue()
     adaptador = AdaptadorClienteTkinter(cola_mensajes)
     servidor_local = {"instancia": None, "hilo": None}
-    control_ventana = {"cerrando": False, "after_id": None, "after_conexion_id": None, "conectando": False}
+    control_ventana = {"cerrando": False, "after_id": None, "after_conexion_id": None, "conectando": False, "retorno_id": None}
     preferencias = app.obtener_configuracion()
 
     estado_red = {
@@ -93,6 +93,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         "puerto": PUERTO_PREDETERMINADO,
         "usuario": obtener_usuario_actual() or "Invitado",
         "en_espera": False,
+        "sala_estuvo_completa": False,
     }
 
     catalogo_facciones = app.obtener_catalogo_facciones()
@@ -175,7 +176,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         if control_ventana["cerrando"]:
             return
         control_ventana["cerrando"] = True
-        for clave_after in ("after_id", "after_conexion_id"):
+        for clave_after in ("after_id", "after_conexion_id", "retorno_id"):
             if control_ventana[clave_after] is not None:
                 try:
                     window2.after_cancel(control_ventana[clave_after])
@@ -208,6 +209,27 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         except tk.TclError:
             control_ventana["cerrando"] = True
             return False
+
+
+    def volver_a_main_por_desconexion(mensaje):
+        if control_ventana["cerrando"] or control_ventana.get("retorno_id") is not None:
+            return
+        agregar_evento(mensaje)
+        try:
+            etiqueta_conexion.config(text=mensaje, fg=COLOR_ALERTA)
+            texto_espera.config(text="Volviendo al menú")
+        except tk.TclError:
+            control_ventana["cerrando"] = True
+            return
+
+        def ejecutar_retorno():
+            control_ventana["retorno_id"] = None
+            if control_ventana["cerrando"]:
+                return
+            cerrar_sala(cerrar_red=True, detener_servidor=True)
+            GoMain()
+
+        control_ventana["retorno_id"] = window2.after(1200, ejecutar_retorno)
 
     def GoMainR():
         cerrar_sala()
@@ -626,6 +648,8 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                 estado_red["jugadores_conectados"] = int(datos.get("jugadores_conectados", estado_red["jugadores_conectados"]))
                 estado_red["rol"] = datos.get("rol_cliente", datos.get("rol", estado_red["rol"]))
                 sincronizar_lobby_remoto(datos)
+                if estado_red["jugadores_conectados"] >= 2:
+                    estado_red["sala_estuvo_completa"] = True
                 roles_faltantes = datos.get("roles_faltantes", [])
                 mensaje_sala = datos.get("mensaje_sala", "")
                 if roles_faltantes:
@@ -633,6 +657,12 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                 elif mensaje_sala:
                     texto_espera.config(text=mensaje_sala)
                 refrescar_botones()
+                if datos.get("conexion_perdida"):
+                    volver_a_main_por_desconexion("Se cerró la conexión con la sala.")
+                    return
+                if estado_red["sala_estuvo_completa"] and estado_red["jugadores_conectados"] < 2:
+                    volver_a_main_por_desconexion("El contrincante abandonó la sala. Volviendo al menú.")
+                    return
                 if hay_dos_jugadores():
                     etiqueta_conexion.config(text="Sala completa: 2 jugadores conectados.", fg="green")
                 elif estado_red["conectado"]:

@@ -135,6 +135,13 @@ class ClientePartida:
             except (OSError, ErrorProtocolo):
                 break
 
+        if self.callback_mensaje is not None:
+            self.callback_mensaje({
+                "tipo": "evento",
+                "exito": False,
+                "mensaje": "Conexión cerrada por el servidor.",
+                "datos": {"conexion_perdida": True},
+            })
         self.cerrar()
 
     def _procesar_mensaje_entrante(self, mensaje):
