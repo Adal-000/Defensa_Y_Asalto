@@ -819,6 +819,16 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             return "Combate en tiempo real"
         return "Preparación"
 
+    def nombre_fase_preparacion(estado):
+        fase = estado.get("fase_ronda", "")
+        if fase == "ataque_atacante":
+            return "Preparación atacante: coloca tropas"
+        if fase == "construccion_defensor":
+            return "Preparación defensor: coloca defensas"
+        if fase == "combate":
+            return "Combate en tiempo real"
+        return "Preparación"
+
     def ejecutar_pulso_combate():
         if not ventana_activa():
             return False
@@ -974,11 +984,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             cuadro_mapa.create_text(x, y + 15, text=str(unidad["vida"]), font=("Arial", 8, "bold"), fill="white")
 
     def actualizar_panel_estado(estado):
-        datos_red = obtener_ultimos_datos_red()
-        usuarios = datos_red.get("usuarios_por_rol", {}) if isinstance(datos_red, dict) else {}
-        fase = estado.get("fase_ronda", "preparacion")
-        modo_txt = "🌐 Red" if modo_red else "💻 Local"
-        caja_informacion_superior.config(
+        etiqueta_marcador.config(
             text=(
                 f"Rol: {rol_jugador.upper()} | Fase: {estado.get('fase_ronda', 'preparación')} | Ronda {estado.get('numero_ronda', 1)} | "
                 f"Base {estado.get('vida_base', 0)}/{estado.get('vida_maxima_base', 0)}"
@@ -1076,8 +1082,9 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     boton_volver = tk.Button(window_mapa, text="Volver", font=("Arial", 12, "bold"), width=10, height=2, bg="red", command=GoPlayR)
     boton_volver.place(x=20, y=20)
 
-    caja_informacion_superior = tk.Label(window_mapa, text="", font=("Arial", 12, "bold"), width=70, height=2, relief="solid", bd=2, anchor="w", padx=14)
-    caja_informacion_superior.place(x=160, y=20)
+    etiqueta_marcador = tk.Label(window_mapa, text="", font=("Arial", 12, "bold"), width=70, height=2, relief="solid", bd=2, anchor="w", padx=14)
+    etiqueta_marcador.place(x=160, y=20)
+    caja_informacion_superior = etiqueta_marcador
 
     titulo = tk.Label(window_mapa, text="Mapa de batalla", font=("Arial", 24, "bold"))
     titulo.place(relx=0.5, y=112, anchor="center")
