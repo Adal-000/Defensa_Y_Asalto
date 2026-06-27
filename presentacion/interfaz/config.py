@@ -2,8 +2,10 @@
 # Archivo para manejo de configuracion
 #=======================================#
 
+import importlib.util
+import os
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import filedialog, messagebox
 
 from aplicacion import app
 
@@ -29,8 +31,11 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
     configuracion_actual = app.obtener_configuracion()
     ip_var = tk.StringVar(value=configuracion_actual["ip_servidor_predeterminada"])
     puerto_var = tk.StringVar(value=str(configuracion_actual["puerto_predeterminado"]))
+    musica_var = tk.StringVar(value=configuracion_actual.get("ruta_musica", ""))
+    reproductor_musica = {"pygame": None, "reproduciendo": False}
 
     def GoMainR():
+        detener_musica()
         window3.destroy()
         GoMain()
 
@@ -39,6 +44,52 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
         tarjeta.place(x=x, y=y, width=ancho, height=alto)
         tk.Label(tarjeta, text=titulo, bg=COLOR_PRIMARIO, fg="white", font=("Arial", 16, "bold"), pady=8).pack(fill="x")
         return tarjeta
+
+
+    def seleccionar_musica():
+        ruta = filedialog.askopenfilename(
+            title="Selecciona música",
+            filetypes=(
+                ("Audio", "*.mp3 *.wav *.ogg"),
+                ("Todos los archivos", "*.*"),
+            ),
+        )
+        if ruta:
+            musica_var.set(ruta)
+            etiqueta_estado.config(text="Música seleccionada. Pulsa Reproducir para escucharla.", fg=COLOR_BORDE)
+
+    def obtener_pygame_mixer():
+        if reproductor_musica["pygame"] is not None:
+            return reproductor_musica["pygame"]
+        if importlib.util.find_spec("pygame") is None:
+            return None
+        import pygame
+        pygame.mixer.init()
+        reproductor_musica["pygame"] = pygame
+        return pygame
+
+    def reproducir_musica():
+        ruta = musica_var.get().strip()
+        if not ruta:
+            messagebox.showwarning("Música", "Primero selecciona un archivo de música.")
+            return
+        if not os.path.exists(ruta):
+            messagebox.showwarning("Música", "El archivo seleccionado no existe.")
+            return
+        pygame = obtener_pygame_mixer()
+        if pygame is None:
+            messagebox.showwarning("Música", "Para reproducir audio instala pygame en el entorno de Python.")
+            return
+        pygame.mixer.music.load(ruta)
+        pygame.mixer.music.play(-1)
+        reproductor_musica["reproduciendo"] = True
+        etiqueta_estado.config(text="Reproduciendo música seleccionada.", fg="#8ee08e")
+
+    def detener_musica():
+        pygame = reproductor_musica.get("pygame")
+        if pygame is not None and reproductor_musica.get("reproduciendo"):
+            pygame.mixer.music.stop()
+        reproductor_musica["reproduciendo"] = False
 
     def aplicar_configuracion():
         try:
@@ -54,6 +105,7 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
         app.actualizar_configuracion(
             ip_servidor_predeterminada=ip_var.get().strip() or "127.0.0.1",
             puerto_predeterminado=puerto,
+            ruta_musica=musica_var.get().strip(),
         )
         etiqueta_estado.config(text="Configuración aplicada para esta sesión.", fg="#8ee08e")
 
@@ -61,6 +113,8 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
         valores = app.restablecer_configuracion()
         ip_var.set(valores["ip_servidor_predeterminada"])
         puerto_var.set(str(valores["puerto_predeterminado"]))
+        musica_var.set(valores.get("ruta_musica", ""))
+        detener_musica()
         etiqueta_estado.config(text="Configuración restablecida.", fg=COLOR_BORDE)
 
     boton_volver = tk.Button(
@@ -88,7 +142,7 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
     )
     subtitulo.place(relx=0.5, y=112, anchor="center")
 
-    tarjeta_red = crear_tarjeta(365, 170, 420, 300, "Conexión")
+    tarjeta_red = crear_tarjeta(115, 170, 420, 300, "Conexión")
     contenido_red = tk.Frame(tarjeta_red, bg=COLOR_TARJETA)
     contenido_red.pack(fill="both", expand=True, padx=24, pady=24)
 
@@ -111,6 +165,20 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
     ).pack(anchor="w", pady=(8, 0))
 
     boton_aplicar = tk.Button(window3, text="Aplicar", font=("Arial", 13, "bold"), width=14, bg="#81c784", command=aplicar_configuracion)
+    tarjeta_musica = crear_tarjeta(620, 170, 450, 300, "Música")
+    contenido_musica = tk.Frame(tarjeta_musica, bg=COLOR_TARJETA)
+    contenido_musica.pack(fill="both", expand=True, padx=24, pady=24)
+
+    tk.Label(contenido_musica, text="Archivo de música", bg=COLOR_TARJETA, fg=COLOR_TEXTO, font=("Arial", 12, "bold"), anchor="w").pack(fill="x")
+    campo_musica = tk.Entry(contenido_musica, textvariable=musica_var, font=("Arial", 10), width=46)
+    campo_musica.pack(anchor="w", pady=(6, 10))
+    tk.Button(contenido_musica, text="Seleccionar desde explorador", font=("Arial", 11, "bold"), bg="#90caf9", command=seleccionar_musica).pack(anchor="w", pady=(0, 12))
+    fila_musica = tk.Frame(contenido_musica, bg=COLOR_TARJETA)
+    fila_musica.pack(anchor="w")
+    tk.Button(fila_musica, text="Reproducir", font=("Arial", 11, "bold"), width=12, bg="#81c784", command=reproducir_musica).pack(side="left", padx=(0, 10))
+    tk.Button(fila_musica, text="Detener", font=("Arial", 11, "bold"), width=12, bg="#ef9a9a", command=detener_musica).pack(side="left")
+    tk.Label(contenido_musica, text="La ruta se guarda para esta sesión al pulsar Aplicar.", bg=COLOR_TARJETA, fg=COLOR_SUAVE, font=("Arial", 10), wraplength=380, justify="left").pack(anchor="w", pady=(18, 0))
+
     boton_aplicar.place(x=395, y=510)
 
     boton_restaurar = tk.Button(window3, text="Restablecer", font=("Arial", 13, "bold"), width=14, bg="#ffd54f", command=restablecer_configuracion)
@@ -119,4 +187,8 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
     etiqueta_estado = tk.Label(window3, text="Los cambios aplican durante la sesión actual.", font=("Arial", 11, "bold"), bg=COLOR_FONDO, fg=COLOR_SUAVE)
     etiqueta_estado.place(relx=0.5, y=575, anchor="center")
 
-    window3.protocol("WM_DELETE_WINDOW", cerrar_todo)
+    def cerrar_configuracion():
+        detener_musica()
+        cerrar_todo()
+
+    window3.protocol("WM_DELETE_WINDOW", cerrar_configuracion)

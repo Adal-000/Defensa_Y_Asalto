@@ -11,6 +11,7 @@ CONFIGURACION_PREDETERMINADA = {
     "mostrar_proyectiles": True,
     "ip_servidor_predeterminada": "127.0.0.1",
     "puerto_predeterminado": 5000,
+    "ruta_musica": "",
 }
 
 _configuracion_actual = CONFIGURACION_PREDETERMINADA.copy()
