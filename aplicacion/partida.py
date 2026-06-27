@@ -24,6 +24,7 @@ FILA_BASE = 0
 FILAS_DEFENSOR_VALIDAS = range(1, 8)
 FILAS_ATACANTE_VALIDAS = range(8, 11)
 MAXIMO_TURNOS_POR_RONDA = 30
+TURNOS_ESPERA_ATACANTE_SIN_UNIDADES = 7
 CANTIDAD_FILAS_TABLERO = 11
 CANTIDAD_COLUMNAS_TABLERO = 6
 RECOMPENSA_DEFENSOR_POR_UNIDAD = 20
@@ -78,6 +79,7 @@ class Partida:
         self.rondas_ganadas_atacante = 0
         self.numero_ronda = 0
         self.turnos_en_ronda_actual = 0
+        self.turnos_sin_unidades_atacantes = 0
         self.fase_ronda = FASE_CONSTRUCCION_DEFENSOR
         self.rol_ganador_ultima_ronda = None
         self.esperando_refuerzo_atacante = False
@@ -112,6 +114,7 @@ class Partida:
 
         self.numero_ronda += 1
         self.turnos_en_ronda_actual = 0
+        self.turnos_sin_unidades_atacantes = 0
         self.torres = []
         self.muros = []
         self.unidades = []
@@ -370,6 +373,9 @@ class Partida:
         if self.fase_ronda == FASE_ATAQUE_ATACANTE:
             return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
 
+        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
+            return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
+
         posicion_valida, mensaje_posicion = self._validar_compra_defensiva(
             fila, columna
         )
@@ -414,6 +420,9 @@ class Partida:
         """
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
+
+        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
+            return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
 
         if self.fase_ronda == FASE_ATAQUE_ATACANTE:
             return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
@@ -481,8 +490,7 @@ class Partida:
 
         self.dinero_atacante -= nueva_unidad.costo
         self.unidades.append(nueva_unidad)
-        self.esperando_refuerzo_atacante = False
-        self.tiempo_inicio_espera_refuerzo = None
+        self.turnos_sin_unidades_atacantes = 0
         self.historial_eventos.append(
             f"El atacante compra {nueva_unidad.nombre} en ({fila}, {columna})."
         )
@@ -690,17 +698,30 @@ class Partida:
             self._finalizar_ronda("atacante")
             return True
 
-        if (
-            self.base.vida > 0
-            and len(self.unidades) == 0
-            and self.turnos_en_ronda_actual > 0
-            and self.dinero_atacante <= 0
-        ):
-            self.historial_eventos.append(
-                "El atacante se queda sin dinero y sin unidades. El defensor gana la ronda."
+        if self.base.vida > 0 and len(self.unidades) == 0 and self.turnos_en_ronda_actual > 0:
+            if self.dinero_atacante <= 0:
+                self.historial_eventos.append(
+                    "El atacante se queda sin dinero y sin unidades. El defensor gana la ronda."
+                )
+                self._finalizar_ronda("defensor")
+                return True
+
+            self.turnos_sin_unidades_atacantes += 1
+            turnos_restantes = max(
+                0,
+                TURNOS_ESPERA_ATACANTE_SIN_UNIDADES - self.turnos_sin_unidades_atacantes,
             )
-            self._finalizar_ronda("defensor")
-            return True
+            if self.turnos_sin_unidades_atacantes >= TURNOS_ESPERA_ATACANTE_SIN_UNIDADES:
+                self.historial_eventos.append(
+                    "El atacante no colocó nuevas tropas durante 7 segundos. El defensor gana la ronda."
+                )
+                self._finalizar_ronda("defensor")
+                return True
+            self.historial_eventos.append(
+                f"Atacante sin tropas: tiene {turnos_restantes}s para colocar otra unidad."
+            )
+        else:
+            self.turnos_sin_unidades_atacantes = 0
 
         if self.turnos_en_ronda_actual >= MAXIMO_TURNOS_POR_RONDA:
             self._finalizar_ronda("defensor")
@@ -865,6 +886,8 @@ class Partida:
                 }
                 for unidad in self.unidades
             ],
+            "turnos_sin_unidades_atacantes": self.turnos_sin_unidades_atacantes,
+            "segundos_espera_sin_unidades": max(0, TURNOS_ESPERA_ATACANTE_SIN_UNIDADES - self.turnos_sin_unidades_atacantes),
             "partida_finalizada": self.partida_finalizada,
             "ganador_partida": self.ganador_partida,
             "rol_ganador_partida": self.rol_ganador_partida,

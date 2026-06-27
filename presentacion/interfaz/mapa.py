@@ -30,8 +30,7 @@ COLOR_DEFENSA = "#dbeeff"
 COLOR_ATAQUE = "#ffe8cf"
 COLOR_BASE = "#ffd4d4"
 COLOR_BORDE = "#666666"
-COLOR_PANEL = "#f7f7f7"
-COLOR_TEXTO = "#222222"
+SEGUNDOS_PREPARACION_ROL = 15
 
 TIEMPO_PREPARACION_SEGUNDOS = 15
 INTERVALO_POLLING_MS = 250
@@ -150,6 +149,9 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     preferencias = app.obtener_configuracion()
     def mostrar_cuadricula_activa():
         return bool(app.obtener_configuracion().get("mostrar_cuadricula", True))
+
+    def mostrar_proyectiles_activos():
+        return bool(app.obtener_configuracion().get("mostrar_proyectiles", True))
 
     def mostrar_proyectiles_activos():
         return bool(app.obtener_configuracion().get("mostrar_proyectiles", True))
@@ -859,6 +861,16 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             return "Combate en tiempo real"
         return "Preparación"
 
+    def nombre_fase_preparacion(estado):
+        fase = estado.get("fase_ronda", "")
+        if fase == "ataque_atacante":
+            return "Preparación atacante: coloca tropas"
+        if fase == "construccion_defensor":
+            return "Preparación defensor: coloca defensas"
+        if fase == "combate":
+            return "Combate en tiempo real"
+        return "Preparación"
+
     def ejecutar_pulso_combate():
         if not ventana_activa():
             return False
@@ -872,6 +884,12 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             cliente_red.obtener_estado()
             actualizar_vista()
             estado_actual = obtener_estado_visible()
+            if estado_actual.get("fase_ronda") == "construccion_defensor" and control_combate.get("red_iniciado"):
+                control_combate["activo"] = False
+                control_combate["red_iniciado"] = False
+                etiqueta_temporizador.config(text=f"Preparación defensor: {SEGUNDOS_PREPARACION_ROL}s", fg="#173a59")
+                actualizar_cuenta_regresiva(SEGUNDOS_PREPARACION_ROL)
+                return False
             return not estado_actual.get("partida_finalizada", False)
         else:
             resultado = app.ejecutar_combate()
@@ -880,8 +898,9 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         actualizar_vista()
         if resultado.get("fase_ronda") == "construccion_defensor":
             control_combate["activo"] = False
-            etiqueta_temporizador.config(text="Preparación defensor: 45s", fg="#173a59")
-            actualizar_cuenta_regresiva(45)
+            etiqueta_temporizador.config(text=f"Preparación defensor: {SEGUNDOS_PREPARACION_ROL}s", fg="#173a59")
+            control_combate["red_iniciado"] = False
+            actualizar_cuenta_regresiva(SEGUNDOS_PREPARACION_ROL)
             return False
         return not resultado.get("ronda_finalizada", False)
 
@@ -895,7 +914,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             control_combate["activo"] = False
             control_combate["after_id"] = None
             if ventana_activa():
-                if etiqueta_temporizador.cget("text") != "Preparación defensor: 45s":
+                if etiqueta_temporizador.cget("text") != f"Preparación defensor: {SEGUNDOS_PREPARACION_ROL}s":
                     etiqueta_temporizador.config(text="Combate finalizado", fg="#1b5e20")
 
     def iniciar_combate_automatico():
@@ -1147,7 +1166,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         boton_compra.place(x=35, y=y_base)
         botones_compra.append((boton_compra, compra))
 
-    etiqueta_temporizador = tk.Label(window_mapa, text="Preparación: 45s", font=("Arial", 13, "bold"), width=22, bg="#fff3bf", fg="#173a59", relief="solid", bd=2)
+    etiqueta_temporizador = tk.Label(window_mapa, text=f"Preparación: {SEGUNDOS_PREPARACION_ROL}s", font=("Arial", 13, "bold"), width=26, bg="#fff3bf", fg="#173a59", relief="solid", bd=2)
     etiqueta_temporizador.place(x=70, y=650)
     etiqueta_cuenta = etiqueta_temporizador
 
@@ -1167,10 +1186,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     # -----------------------------------------------------------------
 
     actualizar_vista()
-    escribir_evento(f"Partida iniciada en modo {'red' if modo_red else 'local'}.")
-    escribir_evento("Selecciona una compra y haz clic en una casilla válida.")
-    escribir_evento("Regla principal: 15s de preparación, luego combate automático.")
-    iniciar_polling()
-    iniciar_temporizador_preparacion()
-
+    if modo_red:
+        refrescar_estado_red()
+    actualizar_cuenta_regresiva(SEGUNDOS_PREPARACION_ROL)
     window_mapa.protocol("WM_DELETE_WINDOW", cerrar_ventana)

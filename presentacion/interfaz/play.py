@@ -83,7 +83,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     cola_mensajes = queue.Queue()
     adaptador = AdaptadorClienteTkinter(cola_mensajes)
     servidor_local = {"instancia": None, "hilo": None}
-    control_ventana = {"cerrando": False, "after_id": None, "after_conexion_id": None}
+    control_ventana = {"cerrando": False, "after_id": None, "after_conexion_id": None, "conectando": False}
     preferencias = app.obtener_configuracion()
 
     estado_red = {
@@ -550,9 +550,18 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         agregar_evento(mensaje)
         if exito:
             estado_red["conectado"] = True
+            boton_conectar.config(state="disabled")
             adaptador.cliente.obtener_estado()
+        else:
+            control_ventana["conectando"] = False
+            boton_conectar.config(state="normal")
 
     def conectar_click():
+        if control_ventana["conectando"] or estado_red["conectado"]:
+            agregar_evento("Ya existe una conexión activa en esta sala.")
+            return
+        control_ventana["conectando"] = True
+        boton_conectar.config(state="disabled")
         host = campo_ip.get().strip()
         usuario = estado_red["usuario"]
         rol = variable_rol.get().strip()
@@ -560,12 +569,16 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             puerto = int(campo_puerto.get())
         except ValueError:
             messagebox.showwarning("Puerto inválido", "El puerto debe ser un número entero.")
+            control_ventana["conectando"] = False
+            boton_conectar.config(state="normal")
             return
         if variable_modo_conexion.get() == "crear_servidor":
             exito, mensaje = iniciar_servidor_local(puerto)
             etiqueta_conexion.config(text=mensaje, fg="green" if exito else "red")
             agregar_evento(mensaje)
             if not exito:
+                control_ventana["conectando"] = False
+                boton_conectar.config(state="normal")
                 return
             puerto = int(campo_puerto.get())
 
@@ -582,6 +595,9 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             control_ventana["after_conexion_id"] = window2.after(250, conectar_local_demorado)
             return
         conectar_cliente(host, usuario, rol, puerto)
+        control_ventana["conectando"] = False
+        if not estado_red["conectado"]:
+            boton_conectar.config(state="normal")
 
     boton_conectar = tk.Button(panel_superior, text="Continuar", font=("Arial", 11, "bold"), bg="lightgreen", command=conectar_click)
     boton_conectar.grid(row=1, column=8, padx=8)
