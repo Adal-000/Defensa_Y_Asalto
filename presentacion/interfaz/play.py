@@ -67,13 +67,20 @@ class AdaptadorClienteTkinter:
 def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_actual):
     """
     Descripción:
-        Crea una sola ventana de sala en red: arriba conserva las
-        opciones de conexión y abajo muestra la selección visual de
-        facción. La lógica oficial de red se mantiene en ClientePartida
-        y ServidorPartida; esta pantalla solo agrega validaciones de
-        interfaz para esperar dos jugadores, evitar facciones repetidas
-        en la misma sala local y avanzar al mapa cuando ambos están
-        listos.
+        Crea una sola ventana de sala en red. Maneja correctamente el
+        ciclo de vida de ventanas, servidor y cliente según quién creó
+        la sala y quién se unió.
+
+    Flujo al CREAR sala y pulsar Volver:
+        - Si nadie se unió: cierra servidor, cierra cliente, vuelve a main.
+        - Si había alguien unido: cierra servidor (lo expulsa),
+          ambos vuelven a main. El que se unió recibe aviso de sala cerrada.
+
+    Flujo al UNIRSE a sala y pulsar Volver:
+        - El cliente se desconecta del servidor.
+        - El creador recibe aviso de que el contrincante salió,
+          se le quita la facción elegida si tenía una y vuelve al estado
+          de espera (como si nadie se hubiera unido todavía).
     """
 
     window2 = tk.Toplevel(root)
@@ -83,7 +90,18 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     cola_mensajes = queue.Queue()
     adaptador = AdaptadorClienteTkinter(cola_mensajes)
     servidor_local = {"instancia": None, "hilo": None}
-    control_ventana = {"cerrando": False, "after_id": None, "after_conexion_id": None, "conectando": False, "retorno_id": None}
+
+    # cerrando: flag principal para evitar dobles cierres
+    # after_id / after_conexion_id / retorno_id: IDs de callbacks pendientes
+    # conectando: flag para evitar doble click en Continuar
+    control_ventana = {
+        "cerrando": False,
+        "after_id": None,
+        "after_conexion_id": None,
+        "retorno_id": None,
+        "conectando": False,
+    }
+
     preferencias = app.obtener_configuracion()
 
     estado_red = {
@@ -106,6 +124,10 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     seleccion_bloqueada = tk.BooleanVar(value=False)
     listo_para_mapa = tk.BooleanVar(value=False)
 
+    # ------------------------------------------------------------------ #
+    # Utilidades de red                                                    #
+    # ------------------------------------------------------------------ #
+
     def obtener_ip_local_visible():
         try:
             socket_prueba = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -124,6 +146,10 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         if clave not in LOBBY_LOCAL:
             LOBBY_LOCAL[clave] = {"facciones": {}, "listos": set()}
         return LOBBY_LOCAL[clave]
+
+    def limpiar_sala_local():
+        clave = obtener_clave_sala()
+        LOBBY_LOCAL.pop(clave, None)
 
     def registrar_estado_local(listo=False):
         if not estado_red["conectado"] or not estado_red["rol"]:
@@ -172,34 +198,49 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                 return True
         return False
 
-    def cerrar_sala(destruir_aplicacion=False):
-        if control_ventana["cerrando"]:
-            return
-        control_ventana["cerrando"] = True
-        for clave_after in ("after_id", "after_conexion_id", "retorno_id"):
-            if control_ventana[clave_after] is not None:
+    # ------------------------------------------------------------------ #
+    # Ciclo de vida de la ventana                                          #
+    # ------------------------------------------------------------------ #
+
+    def _cancelar_afters():
+        """Cancela todos los callbacks after pendientes."""
+        for clave in ("after_id", "after_conexion_id", "retorno_id"):
+            if control_ventana[clave] is not None:
                 try:
-                    window2.after_cancel(control_ventana[clave_after])
+                    window2.after_cancel(control_ventana[clave])
                 except tk.TclError:
                     pass
-                control_ventana[clave_after] = None
-        if cerrar_red:
-            adaptador.cliente.callback_mensaje = None
-            adaptador.cerrar()
+                control_ventana[clave] = None
+
+    def _vaciar_cola():
         while not cola_mensajes.empty():
             try:
                 cola_mensajes.get_nowait()
             except queue.Empty:
                 break
-        if detener_servidor:
-            detener_servidor_local()
+
+    def _cerrar_cliente():
+        """Desconecta el cliente (envía SALIR al servidor)."""
+        adaptador.cliente.callback_mensaje = None
+        adaptador.cerrar()
+
+    def _detener_servidor():
+        """Detiene el servidor local si existe."""
+        servidor = servidor_local["instancia"]
+        hilo = servidor_local["hilo"]
+        servidor_local["instancia"] = None
+        servidor_local["hilo"] = None
+        if servidor is not None:
+            servidor.detener()
+        if hilo is not None and hilo.is_alive() and hilo is not threading.current_thread():
+            hilo.join(timeout=0.3)
+
+    def _destruir_ventana():
         try:
             if window2.winfo_exists():
                 window2.destroy()
         except tk.TclError:
             pass
-        if destruir_aplicacion:
-            cerrar_todo()
 
     def ventana_activa():
         if control_ventana["cerrando"]:
@@ -210,30 +251,74 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             control_ventana["cerrando"] = True
             return False
 
+    def cerrar_sala_completa(ir_a_main=True, destruir_app=False):
+        """
+        Cierra TODO: afters, cliente, servidor, sala local y ventana.
+        Luego navega según corresponda.
 
-    def volver_a_main_por_desconexion(mensaje):
-        if control_ventana["cerrando"] or control_ventana.get("retorno_id") is not None:
+        Parámetros:
+            ir_a_main (bool): Si True navega a GoMain al terminar.
+            destruir_app (bool): Si True cierra toda la aplicación.
+        """
+        if control_ventana["cerrando"]:
             return
-        agregar_evento(mensaje)
-        try:
-            etiqueta_conexion.config(text=mensaje, fg=COLOR_ALERTA)
-            texto_espera.config(text="Volviendo al menú")
-        except tk.TclError:
-            control_ventana["cerrando"] = True
-            return
+        control_ventana["cerrando"] = True
 
-        def ejecutar_retorno():
-            control_ventana["retorno_id"] = None
-            if control_ventana["cerrando"]:
-                return
-            cerrar_sala(cerrar_red=True, detener_servidor=True)
+        _cancelar_afters()
+        _vaciar_cola()
+        _cerrar_cliente()
+        _detener_servidor()
+        limpiar_sala_local()
+        _destruir_ventana()
+
+        if destruir_app:
+            cerrar_todo()
+        elif ir_a_main:
             GoMain()
 
-        control_ventana["retorno_id"] = window2.after(1200, ejecutar_retorno)
+    def cerrar_solo_cliente(ir_a_main=True):
+        """
+        Cierra cliente pero NO el servidor (caso: el que se unió vuelve).
+        El servidor sigue vivo y notifica al creador.
+        """
+        if control_ventana["cerrando"]:
+            return
+        control_ventana["cerrando"] = True
+
+        _cancelar_afters()
+        _vaciar_cola()
+        _cerrar_cliente()
+        limpiar_sala_local()
+        _destruir_ventana()
+
+        if ir_a_main:
+            GoMain()
+
+    # ------------------------------------------------------------------ #
+    # Botón Volver                                                         #
+    # ------------------------------------------------------------------ #
 
     def GoMainR():
-        cerrar_sala()
-        GoMain()
+        """
+        Lógica del botón Volver según el rol:
+
+        - Creador del servidor: cierra servidor y cliente → ambos vuelven a main.
+          El que se unió (si había) recibe mensaje de servidor caído.
+        - El que se unió: desconecta solo al cliente.
+          El servidor notifica al creador que el contrincante salió.
+        """
+        es_creador = variable_modo_conexion.get() == "crear_servidor"
+
+        if es_creador:
+            # Cerramos servidor → el otro jugador recibe conexión_perdida
+            cerrar_sala_completa(ir_a_main=True)
+        else:
+            # Solo desconectamos este cliente; el servidor sigue vivo
+            cerrar_solo_cliente(ir_a_main=True)
+
+    # ------------------------------------------------------------------ #
+    # Ir al mapa (ambos jugadores listos)                                 #
+    # ------------------------------------------------------------------ #
 
     def GoMapaR():
         DATOS_PARTIDA["rol"] = estado_red["rol"]
@@ -242,35 +327,119 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         DATOS_PARTIDA["puerto"] = estado_red["puerto"]
         DATOS_PARTIDA["modo"] = "red"
         DATOS_PARTIDA["es_host"] = variable_modo_conexion.get() == "crear_servidor"
-        # Pasar el adaptador y el servidor al mapa para mantener la conexión activa.
+        # El mapa hereda adaptador y servidor para mantener la conexión activa.
         DATOS_PARTIDA["adaptador"] = adaptador
         DATOS_PARTIDA["servidor_local"] = servidor_local["instancia"]
 
-        # Cerrar sala SIN cerrar el adaptador NI detener el servidor. El mapa los usará.
+        # Marcamos cerrando para frenar procesar_mensajes_red pero sin
+        # cerrar cliente ni servidor (el mapa los necesita).
         control_ventana["cerrando"] = True
-        for clave_after in ("after_id", "after_conexion_id"):
-            if control_ventana[clave_after] is not None:
-                try:
-                    window2.after_cancel(control_ventana[clave_after])
-                except tk.TclError:
-                    pass
-                control_ventana[clave_after] = None
-        try:
-            if window2.winfo_exists():
-                window2.destroy()
-        except tk.TclError:
-            pass
+        _cancelar_afters()
+        _vaciar_cola()
+        limpiar_sala_local()
+        _destruir_ventana()
         GoMapa()
 
-    def detener_servidor_local():
-        servidor = servidor_local["instancia"]
-        hilo = servidor_local["hilo"]
-        servidor_local["instancia"] = None
-        servidor_local["hilo"] = None
-        if servidor is not None:
-            servidor.detener()
-        if hilo is not None and hilo.is_alive() and hilo is not threading.current_thread():
-            hilo.join(timeout=0.2)
+    # ------------------------------------------------------------------ #
+    # Retorno automático por desconexión                                   #
+    # ------------------------------------------------------------------ #
+
+    def volver_a_main_por_desconexion(mensaje):
+        """
+        Llamado cuando el servidor notifica que la conexión se perdió
+        o que el contrincante abandonó.
+
+        Casos:
+        A) Éramos el que se unió y el creador cerró la sala:
+           Mostramos messagebox "La sala ha sido cerrada", volvemos a main.
+        B) Éramos el creador y el que se unió se desconectó:
+           Mostramos messagebox "El contrincante salió", reiniciamos UI
+           (quitamos facción, volvemos a espera).
+        """
+        if control_ventana["cerrando"] or control_ventana.get("retorno_id") is not None:
+            return
+
+        agregar_evento(mensaje)
+        try:
+            etiqueta_conexion.config(text=mensaje, fg=COLOR_ALERTA)
+        except tk.TclError:
+            control_ventana["cerrando"] = True
+            return
+
+        es_creador = variable_modo_conexion.get() == "crear_servidor"
+
+        if not es_creador:
+            # Fuimos expulsados porque el servidor se cerró
+            def ejecutar_retorno_unido():
+                control_ventana["retorno_id"] = None
+                if control_ventana["cerrando"]:
+                    return
+                # Cerramos solo cliente (servidor ya no existe)
+                cerrar_sala_completa(ir_a_main=False)
+                messagebox.showinfo(
+                    "Sala cerrada",
+                    "La sala ha sido cerrada por el anfitrión.",
+                    parent=root,
+                )
+                GoMain()
+
+            control_ventana["retorno_id"] = window2.after(800, ejecutar_retorno_unido)
+
+        else:
+            # El contrincante abandonó → reiniciar UI, volver a espera
+            def ejecutar_reinicio_creador():
+                control_ventana["retorno_id"] = None
+                if control_ventana["cerrando"]:
+                    return
+                _reiniciar_ui_tras_salida_contrincante()
+
+            control_ventana["retorno_id"] = window2.after(300, ejecutar_reinicio_creador)
+
+    def _reiniciar_ui_tras_salida_contrincante():
+        """
+        Reinicia el estado de UI del creador cuando el contrincante se va:
+        - Quita facción elegida / seleccionada
+        - Quita estado 'listo'
+        - Actualiza etiquetas
+        - Muestra aviso
+        """
+        if not ventana_activa():
+            return
+
+        # Resetear estado de facción y listo
+        faccion_confirmada.set("")
+        faccion_temporal.set("")
+        seleccion_bloqueada.set(False)
+        listo_para_mapa.set(False)
+        estado_red["en_espera"] = False
+        estado_red["sala_estuvo_completa"] = False
+        estado_red["jugadores_conectados"] = 1
+
+        # Limpiar sala local
+        sala = obtener_datos_sala()
+        sala["facciones"].clear()
+        sala["listos"].clear()
+
+        try:
+            texto_faccion.config(text="Elige una facción", fg="black")
+            texto_espera.config(text="Esperando que alguien se una")
+            etiqueta_conexion.config(
+                text="Conectado. Esperando al segundo jugador.", fg="orange"
+            )
+        except tk.TclError:
+            return
+
+        refrescar_botones()
+
+        messagebox.showinfo(
+            "Contrincante salió",
+            "El contrincante abandonó la sala.\nPuedes esperar a otro jugador.",
+            parent=window2,
+        )
+
+    # ------------------------------------------------------------------ #
+    # UI: Construcción de widgets                                          #
+    # ------------------------------------------------------------------ #
 
     boton_volver = tk.Button(
         window2, text="Volver", font=("Arial", 12, "bold"), width=10,
@@ -338,6 +507,10 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
 
     caja_eventos = tk.Listbox(window2, font=("Consolas", 9), width=48, height=4)
     caja_eventos.place(x=610, y=600)
+
+    # ------------------------------------------------------------------ #
+    # Helpers de UI                                                        #
+    # ------------------------------------------------------------------ #
 
     def agregar_evento(texto):
         if texto and ventana_activa():
@@ -482,6 +655,10 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         boton_faccion.grid(row=fila, column=columna, padx=24, pady=8)
         botones_faccion[nombre_faccion] = boton_faccion
 
+    # ------------------------------------------------------------------ #
+    # Acciones de lobby                                                    #
+    # ------------------------------------------------------------------ #
+
     def elegir_faccion_click():
         if not hay_dos_jugadores():
             texto_faccion.config(text="Esperando al contrincante", fg=COLOR_ALERTA)
@@ -511,7 +688,10 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         registrar_estado_local(False)
         enviar_accion_lobby(ACCION_CAMBIAR_FACCION)
         texto_espera.config(text="")
-        texto_faccion.config(text="Elige una facción" if not faccion_temporal.get() else f"Facción {faccion_temporal.get()}", fg="black")
+        texto_faccion.config(
+            text="Elige una facción" if not faccion_temporal.get() else f"Facción {faccion_temporal.get()}",
+            fg="black"
+        )
 
     def iniciar_combate_click():
         if not hay_dos_jugadores():
@@ -529,6 +709,10 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             return
         texto_espera.config(text="Esperando jugador")
         agregar_evento("Listo. Esperando al contrincante.")
+
+    # ------------------------------------------------------------------ #
+    # Creación de servidor y conexión de cliente                           #
+    # ------------------------------------------------------------------ #
 
     def buscar_puerto_disponible(puerto_preferido):
         puertos_a_probar = [puerto_preferido] + list(range(5001, 5011)) + list(range(5050, 5061))
@@ -594,6 +778,7 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             control_ventana["conectando"] = False
             boton_conectar.config(state="normal")
             return
+
         if variable_modo_conexion.get() == "crear_servidor":
             exito, mensaje = iniciar_servidor_local(puerto)
             etiqueta_conexion.config(text=mensaje, fg="green" if exito else "red")
@@ -616,22 +801,39 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
 
             control_ventana["after_conexion_id"] = window2.after(250, conectar_local_demorado)
             return
+
         conectar_cliente(host, usuario, rol, puerto)
         control_ventana["conectando"] = False
         if not estado_red["conectado"]:
             boton_conectar.config(state="normal")
 
-    boton_conectar = tk.Button(panel_superior, text="Continuar", font=("Arial", 11, "bold"), bg="lightgreen", command=conectar_click)
+    boton_conectar = tk.Button(
+        panel_superior, text="Continuar", font=("Arial", 11, "bold"),
+        bg="lightgreen", command=conectar_click
+    )
     boton_conectar.grid(row=1, column=8, padx=8)
 
-    boton_cambiar_faccion = tk.Button(window2, text="Cambiar facción", font=("Arial", 12, "bold"), width=16, bg="#ffd36b", command=cambiar_faccion_click)
+    boton_cambiar_faccion = tk.Button(
+        window2, text="Cambiar facción", font=("Arial", 12, "bold"),
+        width=16, bg="#ffd36b", command=cambiar_faccion_click
+    )
     boton_cambiar_faccion.place(x=55, y=585)
 
-    boton_elegir_faccion = tk.Button(window2, text="Elegir facción", font=("Arial", 12, "bold"), width=16, bg="lightgreen", command=elegir_faccion_click)
+    boton_elegir_faccion = tk.Button(
+        window2, text="Elegir facción", font=("Arial", 12, "bold"),
+        width=16, bg="lightgreen", command=elegir_faccion_click
+    )
     boton_elegir_faccion.place(x=55, y=635)
 
-    boton_iniciar_combate = tk.Button(window2, text="Jugar", font=("Arial", 13, "bold"), width=18, height=2, bg="orange", command=iniciar_combate_click)
+    boton_iniciar_combate = tk.Button(
+        window2, text="Jugar", font=("Arial", 13, "bold"),
+        width=18, height=2, bg="orange", command=iniciar_combate_click
+    )
     boton_iniciar_combate.place(x=1010, y=610)
+
+    # ------------------------------------------------------------------ #
+    # Loop de procesamiento de mensajes de red                             #
+    # ------------------------------------------------------------------ #
 
     def procesar_mensajes_red():
         if not ventana_activa():
@@ -645,31 +847,50 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                 agregar_evento(texto)
             datos = mensaje.get("datos", {})
             if isinstance(datos, dict):
-                estado_red["jugadores_conectados"] = int(datos.get("jugadores_conectados", estado_red["jugadores_conectados"]))
+                estado_red["jugadores_conectados"] = int(
+                    datos.get("jugadores_conectados", estado_red["jugadores_conectados"])
+                )
                 estado_red["rol"] = datos.get("rol_cliente", datos.get("rol", estado_red["rol"]))
                 sincronizar_lobby_remoto(datos)
+
                 if estado_red["jugadores_conectados"] >= 2:
                     estado_red["sala_estuvo_completa"] = True
+
                 roles_faltantes = datos.get("roles_faltantes", [])
                 mensaje_sala = datos.get("mensaje_sala", "")
                 if roles_faltantes:
                     texto_espera.config(text="Falta: " + ", ".join(roles_faltantes))
                 elif mensaje_sala:
                     texto_espera.config(text=mensaje_sala)
+
                 refrescar_botones()
+
+                # Conexión perdida: el servidor desapareció (nos expulsaron)
                 if datos.get("conexion_perdida"):
                     volver_a_main_por_desconexion("Se cerró la conexión con la sala.")
                     return
-                if estado_red["sala_estuvo_completa"] and estado_red["jugadores_conectados"] < 2:
-                    volver_a_main_por_desconexion("El contrincante abandonó la sala. Volviendo al menú.")
+
+                # El contrincante se desconectó de una sala que estuvo completa
+                if (estado_red["sala_estuvo_completa"]
+                        and estado_red["jugadores_conectados"] < 2):
+                    volver_a_main_por_desconexion(
+                        "El contrincante abandonó la sala."
+                    )
                     return
+
                 if hay_dos_jugadores():
-                    etiqueta_conexion.config(text="Sala completa: 2 jugadores conectados.", fg="green")
+                    etiqueta_conexion.config(
+                        text="Sala completa: 2 jugadores conectados.", fg="green"
+                    )
                 elif estado_red["conectado"]:
-                    etiqueta_conexion.config(text="Conectado. Esperando al segundo jugador.", fg="orange")
+                    etiqueta_conexion.config(
+                        text="Conectado. Esperando al segundo jugador.", fg="orange"
+                    )
+
             if estado_red["en_espera"] and facciones_validas_en_sala() and roles_necesarios_listos():
                 GoMapaR()
                 return
+
         if not control_ventana["cerrando"]:
             try:
                 if window2.winfo_exists():
@@ -677,8 +898,13 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             except tk.TclError:
                 control_ventana["cerrando"] = True
 
+    # ------------------------------------------------------------------ #
+    # Protocolo de cierre de la X de la ventana                           #
+    # ------------------------------------------------------------------ #
+
     def cerrar_ventana():
-        cerrar_sala(destruir_aplicacion=True)
+        """Al cerrar la X de la ventana cerramos todo y destruimos la app."""
+        cerrar_sala_completa(ir_a_main=False, destruir_app=True)
 
     control_ventana["after_id"] = window2.after(300, procesar_mensajes_red)
     window2.protocol("WM_DELETE_WINDOW", cerrar_ventana)

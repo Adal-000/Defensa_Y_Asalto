@@ -19,11 +19,13 @@ DINERO_BASE_RONDA = 500
 BONO_GANADOR_RONDA = 200
 INCREMENTO_DINERO_POR_RONDA = 200
 RONDAS_PARA_GANAR_PARTIDA = 3
-SEGUNDOS_ESPERA_REFUERZO_ATACANTE = 5
+SEGUNDOS_PREPARACION_ATACANTE = 15
+SEGUNDOS_PREPARACION_DEFENSOR = 15
+SEGUNDOS_ESPERA_REFUERZO_ATACANTE = 7
 FILA_BASE = 0
 FILAS_DEFENSOR_VALIDAS = range(1, 8)
 FILAS_ATACANTE_VALIDAS = range(8, 11)
-MAXIMO_TURNOS_POR_RONDA = 30
+MAXIMO_TURNOS_POR_RONDA = 45
 TURNOS_ESPERA_ATACANTE_SIN_UNIDADES = 7
 CANTIDAD_FILAS_TABLERO = 11
 CANTIDAD_COLUMNAS_TABLERO = 6
@@ -81,6 +83,7 @@ class Partida:
         self.turnos_en_ronda_actual = 0
         self.turnos_sin_unidades_atacantes = 0
         self.fase_ronda = FASE_CONSTRUCCION_DEFENSOR
+        self.tiempo_inicio_fase = None
         self.rol_ganador_ultima_ronda = None
         self.esperando_refuerzo_atacante = False
         self.tiempo_inicio_espera_refuerzo = None
@@ -119,7 +122,11 @@ class Partida:
         self.muros = []
         self.unidades = []
         self.base.reiniciar()
+        # Orden de cada ronda: primero el atacante coloca tropas (15s),
+        # despues el atacante queda bloqueado y el defensor coloca sus
+        # defensas (15s) y por ultimo inicia el combate.
         self.fase_ronda = FASE_ATAQUE_ATACANTE
+        self.tiempo_inicio_fase = time.time()
 
         dinero_base = DINERO_BASE_RONDA + (
             INCREMENTO_DINERO_POR_RONDA * (self.numero_ronda - 1)
@@ -159,6 +166,7 @@ class Partida:
             return False, "No se puede volver a comprar unidades durante el combate."
 
         self.fase_ronda = FASE_ATAQUE_ATACANTE
+        self.tiempo_inicio_fase = time.time()
         mensaje = (
             f"Fase de ataque activa. Atacante disponible: ${self.dinero_atacante}."
         )
@@ -167,7 +175,12 @@ class Partida:
 
 
     def iniciar_fase_defensa(self):
-        """Activa la preparacion del defensor despues del ataque inicial."""
+        """
+        Descripcion:
+            Cierra la preparacion del atacante (queda bloqueado para
+            colocar mas tropas hasta el combate) y abre los 15
+            segundos de preparacion del defensor.
+        """
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
 
@@ -178,6 +191,7 @@ class Partida:
             return False, "La defensa inicial ya terminó; durante el combate ambos pueden comprar."
 
         self.fase_ronda = FASE_CONSTRUCCION_DEFENSOR
+        self.tiempo_inicio_fase = time.time()
         mensaje = "Fase de defensa activa: el defensor planea sus estructuras."
         self.historial_eventos.append(mensaje)
         return True, mensaje
@@ -187,6 +201,9 @@ class Partida:
         Descripcion:
             Inicia la fase de combate luego de la construccion del
             defensor y la compra/colocacion de unidades del atacante.
+            Si el atacante no colocó ninguna unidad durante su tiempo
+            de preparacion, el defensor gana la ronda directamente en
+            lugar de iniciar un combate vacio.
         """
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
@@ -198,9 +215,15 @@ class Partida:
             return False, self.iniciar_fase_defensa()[1]
 
         if len(self.unidades) == 0:
-            return False, "No se puede iniciar combate sin unidades atacantes."
+            self.historial_eventos.append(
+                "El atacante no colocó unidades durante la preparación. "
+                "El defensor gana la ronda."
+            )
+            self._finalizar_ronda("defensor")
+            return True, "Sin unidades atacantes: el defensor gana la ronda."
 
         self.fase_ronda = FASE_COMBATE
+        self.tiempo_inicio_fase = time.time()
         self.esperando_refuerzo_atacante = False
         self.tiempo_inicio_espera_refuerzo = None
         mensaje = "Inicia la fase de combate."
@@ -373,9 +396,6 @@ class Partida:
         if self.fase_ronda == FASE_ATAQUE_ATACANTE:
             return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
 
-        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
-            return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
-
         posicion_valida, mensaje_posicion = self._validar_compra_defensiva(
             fila, columna
         )
@@ -420,9 +440,6 @@ class Partida:
         """
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
-
-        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
-            return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
 
         if self.fase_ronda == FASE_ATAQUE_ATACANTE:
             return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
@@ -647,12 +664,69 @@ class Partida:
             "dinero_atacante": self.dinero_atacante,
         }
 
+    def segundos_restantes_preparacion(self):
+        """
+        Descripcion:
+            Calcula cuantos segundos le quedan a la fase de
+            preparacion actual (ataque del atacante o construccion
+            del defensor). Sirve para que la interfaz y el servidor
+            usen el mismo reloj en lugar de temporizadores locales
+            independientes que se desincronizan entre dispositivos.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            int: Segundos restantes (nunca negativo). Devuelve 0 si
+            la fase actual es combate, si la partida finalizo o si
+            todavia no se registro un inicio de fase.
+        """
+        if self.partida_finalizada or self.fase_ronda == FASE_COMBATE:
+            return 0
+
+        if self.tiempo_inicio_fase is None:
+            return SEGUNDOS_PREPARACION_ATACANTE
+
+        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
+            limite = SEGUNDOS_PREPARACION_ATACANTE
+        else:
+            limite = SEGUNDOS_PREPARACION_DEFENSOR
+
+        transcurrido = time.time() - self.tiempo_inicio_fase
+        restante = limite - int(transcurrido)
+        return max(0, restante)
+
+    def tiempo_de_fase_agotado(self):
+        """
+        Descripcion:
+            Indica si el tiempo de la fase de preparacion actual ya
+            se agoto segun el reloj del servidor.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            bool: True si ya no quedan segundos en la fase actual de
+            preparacion, False en caso contrario o si la fase actual
+            es combate.
+        """
+        if self.fase_ronda == FASE_COMBATE or self.partida_finalizada:
+            return False
+        return self.segundos_restantes_preparacion() <= 0
+
     def resolver_preparacion_agotada(self):
         """
         Descripcion:
-            Resuelve el final de los 15 segundos de preparación. Si el
-            atacante no colocó ninguna unidad, pierde la ronda por
-            inactividad. Si ya hay unidades, inicia el combate.
+            Resuelve el final del tiempo de preparacion actual segun
+            la fase en la que se encuentre la ronda:
+
+            - Si el atacante agoto sus 15 segundos: queda bloqueado
+              (ya no puede comprar mas unidades en esta fase) y se
+              abren los 15 segundos de preparacion del defensor,
+              tenga o no unidades colocadas todavia.
+            - Si el defensor agoto sus 15 segundos: si el atacante no
+              colocó ninguna unidad, el defensor gana la ronda de
+              inmediato; si ya hay unidades, inicia el combate.
 
         Entradas:
             Ninguna.
@@ -666,12 +740,12 @@ class Partida:
         if self.fase_ronda == FASE_COMBATE:
             return True, "El combate ya estaba en curso."
 
-        if len(self.unidades) == 0:
+        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
             self.historial_eventos.append(
-                "El atacante no colocó unidades en 15 segundos. El defensor gana la ronda."
+                "Tiempo de preparación del atacante agotado. El atacante "
+                "queda bloqueado y ahora el defensor coloca sus defensas."
             )
-            self._finalizar_ronda("defensor")
-            return True, "Tiempo agotado sin unidades: el defensor gana la ronda."
+            return self.iniciar_fase_defensa()
 
         return self.iniciar_fase_combate()
 
@@ -843,6 +917,7 @@ class Partida:
             "rondas_ganadas_atacante": self.rondas_ganadas_atacante,
             "rondas_para_ganar_partida": RONDAS_PARA_GANAR_PARTIDA,
             "rol_ganador_ultima_ronda": self.rol_ganador_ultima_ronda,
+            "segundos_restantes_preparacion": self.segundos_restantes_preparacion(),
             "esperando_refuerzo_atacante": self.esperando_refuerzo_atacante,
             "segundos_refuerzo_atacante": self._segundos_restantes_refuerzo(),
             "vida_base": self.base.vida,

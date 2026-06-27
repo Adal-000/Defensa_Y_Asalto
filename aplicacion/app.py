@@ -269,9 +269,11 @@ def obtener_estado_partida():
 def obtener_catalogo_torres():
     """
     Descripcion:
-        Devuelve informacion basica de los tipos de torres que puede
-        comprar el defensor. Es util para llenar menus o etiquetas de
-        ayuda en la interfaz grafica.
+        Devuelve informacion basica de los tres tipos de torres que
+        puede comprar el defensor (normal, pesada y especial). Es
+        util para llenar menus o etiquetas de ayuda en la interfaz
+        grafica. Solo se exponen las tres claves oficiales, aunque el
+        dominio reconozca alias adicionales por compatibilidad.
 
     Entradas:
         Ninguna.
@@ -283,11 +285,11 @@ def obtener_catalogo_torres():
     Restricciones:
         Ninguna.
     """
-    from dominio.entidades.torre import FABRICANTES_TORRES
+    from dominio.entidades.torre import FABRICANTES_TORRES, CLAVES_CATALOGO_TORRES
 
     catalogo = []
-    for clave, fabricante in FABRICANTES_TORRES.items():
-        torre = fabricante()
+    for clave in CLAVES_CATALOGO_TORRES:
+        torre = FABRICANTES_TORRES[clave]()
         catalogo.append({
             "clave": clave,
             "nombre": torre.nombre,

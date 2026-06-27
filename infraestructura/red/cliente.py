@@ -458,6 +458,11 @@ class ClientePartida:
                 "roles_faltantes": list(self.roles_faltantes),
                 "sala_lista": self.sala_lista,
                 "mensaje_sala": self.mensaje_sala,
+                "segundos_restantes_preparacion": (
+                    self.ultimo_estado.get("segundos_restantes_preparacion")
+                    if isinstance(self.ultimo_estado, dict)
+                    else None
+                ),
             }
 
 

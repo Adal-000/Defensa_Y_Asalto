@@ -260,38 +260,21 @@ class Unidad:
         return mensaje
 
 
-def _asignar_clave(unidad, clave):
-    """
-    Descripcion:
-        Guarda una clave corta en la unidad para que la interfaz pueda
-        relacionarla con las imagenes de la carpeta Imagenes/Soldados.
-    """
-    return Unidad(
-        nombre="Soldado base",
-        costo=80,
-        vida=60,
-        dano=12,
-        velocidad=1,
-        habilidad="ataque_doble",
-        turnos_habilidad=3,
-        fila=fila,
-        columna=columna,
-    )
-
-
 def crear_unidad_soldado(fila=0, columna=0):
     """
     Descripcion:
-        Crea el soldado base. Es la unidad equilibrada: sirve para
-        presionar carriles sin ser ni muy barata ni muy poderosa.
+        Crea el "Soldado base": la unidad equilibrada del atacante.
+        Sirve para presionar carriles sin ser ni muy barata ni muy
+        poderosa. Corresponde a las imagenes de la carpeta
+        "Soldado base" de cada faccion.
     """
     return Unidad(
-        nombre="Soldado tanque",
-        costo=100,
-        vida=90,
-        dano=8,
+        nombre="Soldado base",
+        costo=90,
+        vida=220,
+        dano=28,
         velocidad=1,
-        habilidad="escudo_temporal",
+        habilidad="ataque_doble",
         turnos_habilidad=4,
         fila=fila,
         columna=columna,
@@ -301,17 +284,19 @@ def crear_unidad_soldado(fila=0, columna=0):
 def crear_unidad_rapida(fila=0, columna=0):
     """
     Descripcion:
-        Crea el soldado rapido. Tiene menos vida, pero avanza más
-        rápido y obliga al defensor a cubrir carriles abiertos.
+        Crea el "Soldado rapido". Tiene menos vida y pega menos
+        fuerte, pero avanza mas rapido y obliga al defensor a cubrir
+        carriles abiertos. Corresponde a las imagenes de la carpeta
+        "Soldado rápido" de cada faccion.
     """
     return Unidad(
         nombre="Soldado rápido",
         costo=70,
-        vida=40,
-        dano=6,
+        vida=150,
+        dano=20,
         velocidad=2,
         habilidad="aumento_velocidad",
-        turnos_habilidad=3,
+        turnos_habilidad=4,
         fila=fila,
         columna=columna,
     )
@@ -320,17 +305,19 @@ def crear_unidad_rapida(fila=0, columna=0):
 def crear_unidad_tanque(fila=0, columna=0):
     """
     Descripcion:
-        Crea el soldado tanque. Es caro y lento, pero resiste más daño
-        y pega fuerte contra defensas.
+        Crea el "Soldado tanque". Es el mas caro y el mas lento, pero
+        resiste mas dano y pega mas fuerte, ademas de hacer dano extra
+        contra torres. Corresponde a las imagenes de la carpeta
+        "Soldado tanque" de cada faccion.
     """
     return Unidad(
-        nombre="Soldado tanque demoledor",
-        costo=120,
-        vida=70,
-        dano=18,
+        nombre="Soldado tanque",
+        costo=130,
+        vida=320,
+        dano=38,
         velocidad=1,
         habilidad="dano_extra_torres",
-        turnos_habilidad=5,
+        turnos_habilidad=4,
         fila=fila,
         columna=columna,
     )
