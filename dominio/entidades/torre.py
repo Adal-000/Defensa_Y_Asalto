@@ -251,11 +251,11 @@ def crear_torre_arquera(fila=0, columna=0):
     return Torre(
         nombre="Torre Arquera",
         costo=100,
-        vida=80,
-        dano=15,
-        alcance=3,
+        vida=130,
+        dano=22,
+        alcance=4,
         habilidad="disparo_doble",
-        turnos_habilidad=3,
+        turnos_habilidad=2,
         fila=fila,
         columna=columna,
     )
@@ -280,11 +280,11 @@ def crear_torre_cañon(fila=0, columna=0):
     return Torre(
         nombre="Torre Cañon",
         costo=150,
-        vida=120,
-        dano=25,
-        alcance=2,
+        vida=180,
+        dano=34,
+        alcance=3,
         habilidad="dano_area",
-        turnos_habilidad=4,
+        turnos_habilidad=3,
         fila=fila,
         columna=columna,
     )
@@ -309,11 +309,11 @@ def crear_torre_hielo(fila=0, columna=0):
     return Torre(
         nombre="Torre de Hielo",
         costo=120,
-        vida=90,
-        dano=10,
-        alcance=3,
+        vida=140,
+        dano=16,
+        alcance=4,
         habilidad="congelar_unidad",
-        turnos_habilidad=4,
+        turnos_habilidad=3,
         fila=fila,
         columna=columna,
     )
@@ -339,11 +339,11 @@ def crear_torre_soporte(fila=0, columna=0):
     return Torre(
         nombre="Torre de Soporte",
         costo=130,
-        vida=100,
-        dano=8,
-        alcance=2,
+        vida=155,
+        dano=14,
+        alcance=3,
         habilidad="reparar_torre_cercana",
-        turnos_habilidad=5,
+        turnos_habilidad=3,
         fila=fila,
         columna=columna,
     )

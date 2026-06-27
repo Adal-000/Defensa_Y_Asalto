@@ -134,7 +134,7 @@ class Partida:
             self.dinero_atacante = dinero_base
 
         self.historial_eventos.append(
-            f"Inicia la ronda {self.numero_ronda}: ambos jugadores pueden comprar durante la preparación y el combate."
+            f"Inicia la ronda {self.numero_ronda}: el atacante prepara tropas primero; luego el defensor planea la defensa."
         )
         self.historial_eventos.append(
             f"Defensor recibe ${self.dinero_defensor} y atacante recibe ${self.dinero_atacante}."
@@ -162,6 +162,23 @@ class Partida:
         self.historial_eventos.append(mensaje)
         return True, mensaje
 
+
+    def iniciar_fase_defensa(self):
+        """Activa la preparacion del defensor despues del ataque inicial."""
+        if self.partida_finalizada:
+            return False, "La partida ya finalizó."
+
+        if self.fase_ronda == FASE_CONSTRUCCION_DEFENSOR:
+            return True, "La fase de defensa ya está activa."
+
+        if self.fase_ronda == FASE_COMBATE:
+            return False, "La defensa inicial ya terminó; durante el combate ambos pueden comprar."
+
+        self.fase_ronda = FASE_CONSTRUCCION_DEFENSOR
+        mensaje = "Fase de defensa activa: el defensor planea sus estructuras."
+        self.historial_eventos.append(mensaje)
+        return True, mensaje
+
     def iniciar_fase_combate(self):
         """
         Descripcion:
@@ -173,6 +190,9 @@ class Partida:
 
         if self.fase_ronda == FASE_COMBATE:
             return True, "La fase de combate ya está activa."
+
+        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
+            return False, self.iniciar_fase_defensa()[1]
 
         if len(self.unidades) == 0:
             return False, "No se puede iniciar combate sin unidades atacantes."
@@ -347,6 +367,9 @@ class Partida:
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
 
+        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
+            return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
+
         posicion_valida, mensaje_posicion = self._validar_compra_defensiva(
             fila, columna
         )
@@ -392,6 +415,9 @@ class Partida:
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
 
+        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
+            return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
+
         posicion_valida, mensaje_posicion = self._validar_compra_defensiva(
             fila, columna
         )
@@ -435,6 +461,9 @@ class Partida:
         """
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
+
+        if self.fase_ronda == FASE_CONSTRUCCION_DEFENSOR:
+            return False, "Ahora el defensor planea la defensa; las tropas vuelven durante el combate."
 
         posicion_valida, mensaje_posicion = self._validar_compra_unidad(
             fila, columna
@@ -568,6 +597,7 @@ class Partida:
                     "vida_base": self.base.vida,
                     "dinero_defensor": self.dinero_defensor,
                     "dinero_atacante": self.dinero_atacante,
+                    "fase_ronda": self.fase_ronda,
                 }
 
         vida_torres_antes = {id(torre): torre.vida for torre in self.torres}

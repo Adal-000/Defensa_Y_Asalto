@@ -365,9 +365,19 @@ class ServidorPartida:
             return acciones_basicas
 
         if fase_actual == FASE_COMBATE:
-            if cliente is not None and cliente.rol == ROL_ATACANTE:
+            acciones_combate = [
+                ACCION_COMPRAR_TORRE,
+                ACCION_COMPRAR_MURO,
+                ACCION_COMPRAR_UNIDAD,
+                ACCION_PAUSAR_COMBATE,
+            ] + acciones_basicas
+            if cliente is None:
+                return acciones_combate
+            if cliente.rol == ROL_DEFENSOR:
+                return [ACCION_COMPRAR_TORRE, ACCION_COMPRAR_MURO, ACCION_PAUSAR_COMBATE] + acciones_basicas
+            if cliente.rol == ROL_ATACANTE:
                 return [ACCION_COMPRAR_UNIDAD, ACCION_PAUSAR_COMBATE] + acciones_basicas
-            return [ACCION_PAUSAR_COMBATE] + acciones_basicas
+            return acciones_basicas
 
         acciones_preparacion = [
             ACCION_INICIAR_COMBATE,
@@ -863,22 +873,10 @@ class ServidorPartida:
                 return
 
             elif accion == ACCION_INICIAR_COMBATE:
-                ronda_solicitada = mensaje.get("numero_ronda", None)
-                if ronda_solicitada is not None:
-                    try:
-                        ronda_solicitada = int(ronda_solicitada)
-                    except (TypeError, ValueError):
-                        ronda_solicitada = None
-
-                if ronda_solicitada is not None and ronda_solicitada != self.partida.numero_ronda:
-                    exito = True
-                    texto = "Solicitud de combate vieja ignorada."
-                elif len(self.partida.unidades) == 0:
-                    exito, texto = self.partida.resolver_preparacion_agotada()
-                    self.combate_activo = False
-                else:
-                    exito, texto = self.partida.iniciar_fase_combate()
-                    self.combate_activo = bool(exito)
+                exito, texto = self.partida.iniciar_fase_combate()
+                self.combate_activo = exito
+                if exito:
+                    texto = "Combate en tiempo real iniciado."
 
             elif accion == ACCION_PAUSAR_COMBATE:
                 self.combate_activo = False
@@ -952,7 +950,11 @@ class ServidorPartida:
                 resultado = self.partida.ejecutar_combate()
                 estado = self.partida.obtener_estado_partida()
 
-                if resultado.get("ronda_finalizada") or estado.get("partida_finalizada"):
+                if (
+                    resultado.get("ronda_finalizada")
+                    or resultado.get("fase_ronda") == "construccion_defensor"
+                    or estado.get("partida_finalizada")
+                ):
                     self.combate_activo = False
 
             self._enviar_a_todos(

@@ -2,7 +2,6 @@
 # Archivo para mostrar el mapa del juego
 #=======================================#
 
-import math
 import os
 import tkinter as tk
 from tkinter import messagebox
@@ -131,6 +130,16 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         cliente_red = getattr(adaptador_red, "cliente", None)
 
     modo_red = cliente_red is not None and getattr(cliente_red, "conectado", False)
+    faccion_jugador = datos_partida.get("faccion") or ""
+    catalogo_facciones = app.obtener_catalogo_facciones()
+    facciones_por_nombre = {faccion["nombre"]: faccion for faccion in catalogo_facciones}
+    faccion_defensor = faccion_jugador if rol_jugador == "defensor" else "España"
+    faccion_atacante = faccion_jugador if rol_jugador == "atacante" else "EE.UU"
+    imagenes_mapa = {}
+    seleccion_actual = {"tipo": None, "clave": None, "nombre": None}
+    ultimo_estado = {"datos": {}}
+    botones_compra = []
+    control_combate = {"activo": False, "after_id": None, "cuenta_id": None, "cerrando": False, "red_iniciado": False}
 
     nombre_defensor = nombre_usuario if rol_jugador == "defensor" else "Defensor"
     nombre_atacante = nombre_usuario if rol_jugador == "atacante" else "Atacante"
@@ -648,7 +657,110 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         fila = evento.y // ALTO_CELDA
         if fila < 0 or fila >= FILAS_TABLERO or columna < 0 or columna >= COLUMNAS_TABLERO:
             return None, None
-        return int(fila), int(columna)
+        return fila, columna
+
+    def datos_faccion_por_rol(rol):
+        nombre_faccion = faccion_defensor if rol == "defensor" else faccion_atacante
+        return facciones_por_nombre.get(nombre_faccion, {})
+
+    def color_proyectil(nombre_torre, rol="defensor"):
+        datos_faccion = datos_faccion_por_rol(rol)
+        color_base = datos_faccion.get("color_proyectil")
+        if color_base:
+            return color_base
+        nombre = nombre_torre.lower()
+        if "cañon" in nombre or "canon" in nombre:
+            return "#ff7a00"
+        if "hielo" in nombre:
+            return "#00bcd4"
+        if "soporte" in nombre:
+            return "#9c27b0"
+        return "#f2c200"
+
+    def cargar_imagen_mapa(ruta, ancho_max=58, alto_max=34):
+        if not ruta or not os.path.exists(ruta):
+            return None
+        clave = (ruta, ancho_max, alto_max)
+        if clave in imagenes_mapa:
+            return imagenes_mapa[clave]
+        imagen = tk.PhotoImage(master=window_mapa, file=ruta)
+        factor = max(1, int(max(imagen.width() / ancho_max, imagen.height() / alto_max)))
+        if factor > 1:
+            imagen = imagen.subsample(factor, factor)
+        imagenes_mapa[clave] = imagen
+        return imagen
+
+    def ruta_torre_faccion(nombre_torre):
+        nombre = nombre_torre.lower()
+        datos_faccion = datos_faccion_por_rol("defensor")
+        if "pesada" in nombre or "cañon" in nombre or "canon" in nombre:
+            return datos_faccion.get("torre_pesada")
+        if "especial" in nombre or "hielo" in nombre or "soporte" in nombre:
+            return datos_faccion.get("torre_especial")
+        return datos_faccion.get("torre_normal")
+
+    def ruta_unidad_faccion(nombre_unidad):
+        nombre = nombre_unidad.lower()
+        datos_faccion = datos_faccion_por_rol("atacante")
+        if "tanque" in nombre or "pesad" in nombre or "escudero" in nombre or "demoledor" in nombre:
+            return datos_faccion.get("soldado_tanque")
+        if "rap" in nombre or "ráp" in nombre or "explorador" in nombre:
+            return datos_faccion.get("soldado_rapido")
+        return datos_faccion.get("soldado_base")
+
+    def centro_casilla(fila, columna):
+        return (
+            columna * ANCHO_CELDA + ANCHO_CELDA // 2,
+            fila * ALTO_CELDA + ALTO_CELDA // 2,
+        )
+
+    def distancia(fila_a, columna_a, fila_b, columna_b):
+        return abs(fila_a - fila_b) + abs(columna_a - columna_b)
+
+    def animar_proyectiles(estado):
+        if not mostrar_proyectiles or not ventana_activa():
+            return
+        proyectiles = []
+        for torre in estado.get("torres", []):
+            objetivo = None
+            for unidad in estado.get("unidades", []):
+                if distancia(torre["fila"], torre["columna"], unidad["fila"], unidad["columna"]) <= torre.get("alcance", 0):
+                    objetivo = unidad
+                    break
+            if objetivo is not None:
+                x1, y1 = centro_casilla(torre["fila"], torre["columna"])
+                x2, y2 = centro_casilla(objetivo["fila"], objetivo["columna"])
+                color = color_proyectil(torre["nombre"], "defensor")
+                proyectiles.append(cuadro_mapa.create_line(x1, y1, x2, y2, fill="#111111", width=12, arrow=tk.LAST))
+                proyectiles.append(cuadro_mapa.create_line(x1, y1, x2, y2, fill="#ffffff", width=8, arrow=tk.LAST))
+                proyectiles.append(cuadro_mapa.create_line(x1, y1, x2, y2, fill=color, width=5, arrow=tk.LAST))
+                proyectiles.append(cuadro_mapa.create_oval(x2 - 11, y2 - 11, x2 + 11, y2 + 11, fill=color, outline="#111111", width=3))
+                proyectiles.append(cuadro_mapa.create_oval(x2 - 5, y2 - 5, x2 + 5, y2 + 5, fill="#ffffff", outline=color, width=2))
+
+        for unidad in estado.get("unidades", []):
+            objetivo = next(
+                (torre for torre in estado.get("torres", []) if torre["fila"] == unidad["fila"] - 1 and torre["columna"] == unidad["columna"]),
+                None,
+            )
+            if objetivo is not None:
+                x1, y1 = centro_casilla(unidad["fila"], unidad["columna"])
+                x2, y2 = centro_casilla(objetivo["fila"], objetivo["columna"])
+                color = color_proyectil("unidad", "atacante")
+                proyectiles.append(cuadro_mapa.create_line(x1, y1, x2, y2, fill="#111111", width=10, dash=(8, 4)))
+                proyectiles.append(cuadro_mapa.create_line(x1, y1, x2, y2, fill="#ffffff", width=7, dash=(8, 4)))
+                proyectiles.append(cuadro_mapa.create_line(x1, y1, x2, y2, fill=color, width=4, dash=(8, 4)))
+
+        if proyectiles:
+            def borrar_proyectiles():
+                if not ventana_activa():
+                    return
+                try:
+                    for item in proyectiles:
+                        cuadro_mapa.delete(item)
+                except tk.TclError:
+                    control_combate["cerrando"] = True
+
+            window_mapa.after(650, borrar_proyectiles)
 
     def comprar_en_casilla(evento):
         if estado_ui["partida_finalizada"]:
@@ -677,18 +789,73 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         else:
             exito, mensaje = _accion_comprar_unidad(seleccion_actual["clave"], fila, columna)
 
-        escribir_evento(mensaje)
-        if not modo_red:
+    def nombre_fase_preparacion(estado):
+        fase = estado.get("fase_ronda", "")
+        if fase == "ataque_atacante":
+            return "Preparación atacante: coloca tropas"
+        if fase == "construccion_defensor":
+            return "Preparación defensor: coloca defensas"
+        if fase == "combate":
+            return "Combate en tiempo real"
+        return "Preparación"
+
+    def ejecutar_pulso_combate():
+        if not ventana_activa():
+            return False
+        estado_antes = obtener_estado_visible()
+        animar_proyectiles(estado_antes)
+        if modo_red:
+            if not control_combate["red_iniciado"]:
+                _exito, mensaje = cliente_red.iniciar_combate()
+                escribir_evento(mensaje)
+                control_combate["red_iniciado"] = True
+            cliente_red.obtener_estado()
             actualizar_vista()
+            estado_actual = obtener_estado_visible()
+            return not estado_actual.get("partida_finalizada", False)
+        else:
+            resultado = app.ejecutar_combate()
+        for evento in resultado.get("eventos", []):
+            escribir_evento(evento)
+        actualizar_vista()
+        if resultado.get("fase_ronda") == "construccion_defensor":
+            control_combate["activo"] = False
+            etiqueta_cuenta.config(text="Preparación defensor: 45s", fg="#173a59")
+            actualizar_cuenta_regresiva(45)
+            return False
+        return not resultado.get("ronda_finalizada", False)
+
+    def ejecutar_combate_en_tiempo_real():
+        if not control_combate["activo"] or not ventana_activa():
+            return
+        continua = ejecutar_pulso_combate()
+        if continua and control_combate["activo"]:
+            control_combate["after_id"] = window_mapa.after(900, ejecutar_combate_en_tiempo_real)
+        else:
+            control_combate["activo"] = False
+            control_combate["after_id"] = None
+            if ventana_activa():
+                if etiqueta_cuenta.cget("text") != "Preparación defensor: 45s":
+                    etiqueta_cuenta.config(text="Combate finalizado", fg="#1b5e20")
 
     # -----------------------------------------------------------------
     # Dibujo del mapa
     # -----------------------------------------------------------------
 
-    def centro_casilla(fila, columna):
-        return (
-            columna * ANCHO_CELDA + ANCHO_CELDA // 2,
-            fila * ALTO_CELDA + ALTO_CELDA // 2,
+    def actualizar_cuenta_regresiva(segundos_restantes):
+        if not ventana_activa() or control_combate["activo"]:
+            return
+        if segundos_restantes <= 0:
+            control_combate["cuenta_id"] = None
+            iniciar_combate_automatico()
+            return
+        estado_actual = obtener_estado_visible()
+        etiqueta_cuenta.config(
+            text=f"{nombre_fase_preparacion(estado_actual)}: {segundos_restantes}s",
+            fg="#b05a00" if segundos_restantes <= 10 else "#173a59",
+        )
+        control_combate["cuenta_id"] = window_mapa.after(
+            1000, lambda: actualizar_cuenta_regresiva(segundos_restantes - 1)
         )
 
     def distancia(fila_a, columna_a, fila_b, columna_b):
@@ -733,6 +900,10 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         else:
             cuadro_mapa.create_text(x_base, y_base, text="BASE", font=("Arial", 13, "bold"), fill="#9a0000")
 
+        imagen_base = cargar_imagen_mapa(datos_faccion_por_rol("defensor").get("estructura_base"), 110, 38)
+        if imagen_base is not None:
+            cuadro_mapa.create_image(ANCHO_TABLERO // 2, ALTO_CELDA // 2 + 3, image=imagen_base)
+        cuadro_mapa.create_text(ANCHO_TABLERO // 2, ALTO_CELDA // 2, text="BASE DEFENSOR", font=("Arial", 12, "bold"), fill="#9a0000")
         cuadro_mapa.create_text(10, ALTO_CELDA * 4, text="Zona defensor", angle=90, anchor="w", fill="#005b96", font=("Arial", 10, "bold"))
         cuadro_mapa.create_text(10, ALTO_CELDA * 9, text="Zona atacante", angle=90, anchor="w", fill="#b05a00", font=("Arial", 10, "bold"))
 
@@ -763,63 +934,24 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
         for torre in estado.get("torres", []):
             x, y = centro_casilla(torre["fila"], torre["columna"])
-            img = imagen_torre(torre)
-            if img is not None:
-                cuadro_mapa.create_image(x, y, image=img)
+            imagen_torre = cargar_imagen_mapa(ruta_torre_faccion(torre["nombre"]))
+            if imagen_torre is not None:
+                cuadro_mapa.create_image(x, y, image=imagen_torre)
             else:
-                color = color_proyectil(torre.get("nombre", ""))
+                color = color_proyectil(torre["nombre"], "defensor")
                 cuadro_mapa.create_rectangle(x - 20, y - 18, x + 20, y + 18, fill=color, outline="black", width=2)
-                cuadro_mapa.create_text(x, y, text="T", font=("Arial", 14, "bold"), fill="black")
-            dibujar_barra_vida(x, y + 15, torre.get("vida", 0), torre.get("vida_maxima", 1))
+                cuadro_mapa.create_text(x, y - 3, text="T", font=("Arial", 14, "bold"), fill="black")
+            cuadro_mapa.create_text(x, y + 15, text=str(torre["vida"]), font=("Arial", 8, "bold"), fill="black")
 
         for unidad in estado.get("unidades", []):
             x, y = centro_casilla(unidad["fila"], unidad["columna"])
-            img = imagen_unidad(unidad)
-            if img is not None:
-                cuadro_mapa.create_image(x, y, image=img)
+            imagen_unidad = cargar_imagen_mapa(ruta_unidad_faccion(unidad["nombre"]))
+            if imagen_unidad is not None:
+                cuadro_mapa.create_image(x, y, image=imagen_unidad)
             else:
                 cuadro_mapa.create_oval(x - 20, y - 17, x + 20, y + 17, fill="#ff7043", outline="black", width=2)
-                cuadro_mapa.create_text(x, y, text="U", font=("Arial", 14, "bold"), fill="white")
-            dibujar_barra_vida(x, y + 15, unidad.get("vida", 0), unidad.get("vida_maxima", 1))
-
-    def animar_proyectiles(estado):
-        proyectiles = []
-        if estado.get("fase_ronda") != "combate":
-            return
-
-        for torre in estado.get("torres", []):
-            objetivo = None
-            for unidad in estado.get("unidades", []):
-                if distancia(torre["fila"], torre["columna"], unidad["fila"], unidad["columna"]) <= torre.get("alcance", 0):
-                    objetivo = unidad
-                    break
-
-            if objetivo:
-                x1, y1 = centro_casilla(torre["fila"], torre["columna"])
-                x2, y2 = centro_casilla(objetivo["fila"], objetivo["columna"])
-                color = color_proyectil(torre.get("nombre", ""))
-                proyectiles.append(
-                    cuadro_mapa.create_line(
-                        x1, y1 - 6, x2, y2 - 6,
-                        fill=color, width=4, arrow=tk.LAST, tags="proyectil",
-                    )
-                )
-                proyectiles.append(
-                    cuadro_mapa.create_oval(
-                        x2 - 9, y2 - 15, x2 + 9, y2 + 3,
-                        outline=color, width=3, tags="proyectil",
-                    )
-                )
-
-        if proyectiles:
-            def borrar():
-                if not ventana_activa():
-                    return
-                try:
-                    cuadro_mapa.delete("proyectil")
-                except tk.TclError:
-                    pass
-            window_mapa.after(520, borrar)
+                cuadro_mapa.create_text(x, y - 3, text="U", font=("Arial", 14, "bold"), fill="white")
+            cuadro_mapa.create_text(x, y + 15, text=str(unidad["vida"]), font=("Arial", 8, "bold"), fill="white")
 
     def actualizar_panel_estado(estado):
         datos_red = obtener_ultimos_datos_red()
@@ -828,9 +960,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         modo_txt = "🌐 Red" if modo_red else "💻 Local"
         caja_informacion_superior.config(
             text=(
-                f"{modo_txt} | Rol: {rol_jugador.upper()} | Fase: {fase} | "
-                f"Defensor ${estado.get('dinero_defensor', 0)} | "
-                f"Atacante ${estado.get('dinero_atacante', 0)} | "
+                f"Rol: {rol_jugador.upper()} | Fase: {estado.get('fase_ronda', 'preparación')} | Ronda {estado.get('numero_ronda', 1)} | "
                 f"Base {estado.get('vida_base', 0)}/{estado.get('vida_maxima_base', 0)}"
             )
         )
@@ -840,10 +970,8 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             "Si sus unidades caen, tiene 5 segundos para colocar otra tropa si aún tiene dinero. "
             "El atacante gana la ronda si destruye la base. "
         )
-        if segundos_refuerzo is not None:
-            texto += f"Refuerzo atacante: {segundos_refuerzo}s. "
-        if usuarios:
-            texto += f"Jugadores: defensor={usuarios.get('defensor', 'pendiente')} | atacante={usuarios.get('atacante', 'pendiente')}"
+        etiqueta_dinero_defensor.config(text=f"🪙 Defensor\n${estado.get('dinero_defensor', 0)}")
+        etiqueta_dinero_atacante.config(text=f"🪙 Atacante\n${estado.get('dinero_atacante', 0)}")
         caja_informacion_contrincante.config(state="normal")
         caja_informacion_contrincante.delete("1.0", tk.END)
         caja_informacion_contrincante.insert(tk.END, texto)
@@ -937,23 +1065,11 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     etiqueta_marcador = tk.Label(window_mapa, text="", font=("Arial", 11, "bold"), fg="#333333", bg=COLOR_PANEL, width=78, anchor="center")
     etiqueta_marcador.place(relx=0.5, y=128, anchor="center")
 
-    etiqueta_temporizador = tk.Label(window_mapa, text="", font=("Arial", 11, "bold"), fg="#e65100", bg=COLOR_PANEL, width=32, anchor="center")
-    etiqueta_temporizador.place(relx=0.75, y=155, anchor="center")
+    etiqueta_dinero_defensor = tk.Label(window_mapa, text="🪙 Defensor\n$0", font=("Arial", 17, "bold"), width=14, height=2, bg="#d7ebff", fg="#0d47a1", relief="solid", bd=3)
+    etiqueta_dinero_defensor.place(x=820, y=72)
 
-    etiqueta_resultado = tk.Label(
-        window_mapa,
-        text="",
-        font=("Arial", 18, "bold"),
-        bg=COLOR_PANEL,
-        fg=COLOR_PANEL,
-        width=30,
-        height=2,
-        relief="solid",
-        bd=2,
-    )
-    # Se mantiene oculta mientras no haya resultado. Antes quedaba
-    # un cuadro blanco encima del mapa.
-    etiqueta_resultado.place_forget()
+    etiqueta_dinero_atacante = tk.Label(window_mapa, text="🪙 Atacante\n$0", font=("Arial", 17, "bold"), width=14, height=2, bg="#ffe3c2", fg="#bf4e00", relief="solid", bd=3)
+    etiqueta_dinero_atacante.place(x=1010, y=72)
 
     etiqueta_eventos = tk.Label(window_mapa, text="Eventos", font=("Arial", 13, "bold"), bg=COLOR_PANEL)
     etiqueta_eventos.place(x=35, y=175)
