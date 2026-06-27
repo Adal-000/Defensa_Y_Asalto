@@ -2,10 +2,7 @@
 # Archivo para mostrar el mapa del juego
 #=======================================#
 
-<<<<<<< ours
 import math
-=======
->>>>>>> theirs
 import os
 import tkinter as tk
 from tkinter import messagebox
@@ -112,34 +109,31 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     window_mapa.configure(bg=COLOR_PANEL)
 
     datos_partida = obtener_datos_partida() if obtener_datos_partida is not None else {}
+
     rol_jugador = (datos_partida.get("rol") or "defensor").strip().lower()
     nombre_usuario = datos_partida.get("usuario") or datos_partida.get("jugador") or "Jugador"
+
     faccion_jugador = datos_partida.get("faccion") or "Alemania"
+    faccion_defensor = datos_partida.get("faccion_defensor")
+    faccion_atacante = datos_partida.get("faccion_atacante")
+
+    if not faccion_defensor:
+        faccion_defensor = faccion_jugador if rol_jugador == "defensor" else "España"
+
+    if not faccion_atacante:
+        faccion_atacante = faccion_jugador if rol_jugador == "atacante" else "EE.UU"
+
     adaptador_red = datos_partida.get("adaptador")
+    cliente_red = datos_partida.get("cliente_red")
     servidor_local = datos_partida.get("servidor_local")
 
-    modo_red = adaptador_red is not None and getattr(adaptador_red.cliente, "conectado", False)
+    if cliente_red is None and adaptador_red is not None:
+        cliente_red = getattr(adaptador_red, "cliente", None)
+
+    modo_red = cliente_red is not None and getattr(cliente_red, "conectado", False)
+
     nombre_defensor = nombre_usuario if rol_jugador == "defensor" else "Defensor"
     nombre_atacante = nombre_usuario if rol_jugador == "atacante" else "Atacante"
-<<<<<<< ours
-=======
-    cliente_red = datos_partida.get("cliente_red")
-    modo_red = cliente_red is not None and getattr(cliente_red, "conectado", False)
-    faccion_jugador = datos_partida.get("faccion") or ""
-    catalogo_facciones = app.obtener_catalogo_facciones()
-    facciones_por_nombre = {faccion["nombre"]: faccion for faccion in catalogo_facciones}
-    faccion_defensor = faccion_jugador if rol_jugador == "defensor" else "España"
-    faccion_atacante = faccion_jugador if rol_jugador == "atacante" else "EE.UU"
-    imagenes_mapa = {}
-    seleccion_actual = {"tipo": None, "clave": None, "nombre": None}
-    ultimo_estado = {"datos": {}}
-    botones_compra = []
-    control_combate = {"activo": False, "after_id": None, "cuenta_id": None, "cerrando": False, "red_iniciado": False}
-
-    preferencias = app.obtener_configuracion()
-    mostrar_cuadricula = bool(preferencias.get("mostrar_cuadricula", True))
-    mostrar_proyectiles = bool(preferencias.get("mostrar_proyectiles", True))
->>>>>>> theirs
 
     if not modo_red:
         app.crear_partida(nombre_defensor, nombre_atacante)
@@ -205,9 +199,20 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
                 adaptador_red.cerrar()
             except Exception:
                 pass
+        elif cliente_red is not None:
+            try:
+                cliente_red.cerrar()
+            except Exception:
+                pass
+
         if servidor_local is not None:
             try:
-                servidor_local.detener()
+                if isinstance(servidor_local, dict):
+                    instancia_servidor = servidor_local.get("instancia")
+                    if instancia_servidor is not None:
+                        instancia_servidor.detener()
+                else:
+                    servidor_local.detener()
             except Exception:
                 pass
         try:
@@ -312,10 +317,16 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     def obtener_faccion_por_rol(rol):
         datos_red = obtener_ultimos_datos_red()
         facciones = datos_red.get("facciones_lobby", {}) if isinstance(datos_red, dict) else {}
+
         if rol in facciones:
             return facciones[rol]
-        if rol == rol_jugador:
-            return faccion_jugador
+
+        if rol == "defensor":
+            return faccion_defensor
+
+        if rol == "atacante":
+            return faccion_atacante
+
         return faccion_jugador
 
     def clave_unidad(unidad):
@@ -416,7 +427,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         if not modo_red:
             return {}
         try:
-            mensajes = list(adaptador_red.cliente.ultimos_mensajes)
+            mensajes = list(cliente_red.ultimos_mensajes)
         except Exception:
             return {}
         for mensaje in reversed(mensajes):
@@ -427,28 +438,28 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
     def _obtener_estado():
         if modo_red:
-            estado = adaptador_red.cliente.obtener_ultimo_estado_local()
+            estado = cliente_red.obtener_ultimo_estado_local()
             return estado if estado else {}
         return app.obtener_estado_partida()
 
     def _accion_comprar_torre(clave, fila, columna):
         if modo_red:
-            return adaptador_red.cliente.comprar_torre(clave, fila, columna)
+            return cliente_red.comprar_torre(clave, fila, columna)
         return app.comprar_torre(clave, fila, columna)
 
     def _accion_comprar_muro(fila, columna):
         if modo_red:
-            return adaptador_red.cliente.comprar_muro(fila, columna)
+            return cliente_red.comprar_muro(fila, columna)
         return app.comprar_muro(fila, columna)
 
     def _accion_comprar_unidad(clave, fila, columna):
         if modo_red:
-            return adaptador_red.cliente.comprar_unidad(clave, fila, columna)
+            return cliente_red.comprar_unidad(clave, fila, columna)
         return app.comprar_unidad(clave, fila, columna)
 
     def _accion_iniciar_combate(numero_ronda):
         if modo_red:
-            return adaptador_red.cliente.iniciar_combate(numero_ronda=numero_ronda)
+            return cliente_red.iniciar_combate()
         return app.resolver_preparacion_agotada()
 
     # -----------------------------------------------------------------
@@ -637,111 +648,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         fila = evento.y // ALTO_CELDA
         if fila < 0 or fila >= FILAS_TABLERO or columna < 0 or columna >= COLUMNAS_TABLERO:
             return None, None
-<<<<<<< ours
         return int(fila), int(columna)
-=======
-        return fila, columna
-
-    def datos_faccion_por_rol(rol):
-        nombre_faccion = faccion_defensor if rol == "defensor" else faccion_atacante
-        return facciones_por_nombre.get(nombre_faccion, {})
-
-    def color_proyectil(nombre_torre, rol="defensor"):
-        datos_faccion = datos_faccion_por_rol(rol)
-        color_base = datos_faccion.get("color_proyectil")
-        if color_base:
-            return color_base
-        nombre = nombre_torre.lower()
-        if "cañon" in nombre or "canon" in nombre:
-            return "#ff7a00"
-        if "hielo" in nombre:
-            return "#00bcd4"
-        if "soporte" in nombre:
-            return "#9c27b0"
-        return "#f2c200"
-
-    def cargar_imagen_mapa(ruta, ancho_max=58, alto_max=34):
-        if not ruta or not os.path.exists(ruta):
-            return None
-        clave = (ruta, ancho_max, alto_max)
-        if clave in imagenes_mapa:
-            return imagenes_mapa[clave]
-        imagen = tk.PhotoImage(master=window_mapa, file=ruta)
-        factor = max(1, int(max(imagen.width() / ancho_max, imagen.height() / alto_max)))
-        if factor > 1:
-            imagen = imagen.subsample(factor, factor)
-        imagenes_mapa[clave] = imagen
-        return imagen
-
-    def ruta_torre_faccion(nombre_torre):
-        nombre = nombre_torre.lower()
-        datos_faccion = datos_faccion_por_rol("defensor")
-        if "pesada" in nombre or "cañon" in nombre or "canon" in nombre:
-            return datos_faccion.get("torre_pesada")
-        if "especial" in nombre or "hielo" in nombre or "soporte" in nombre:
-            return datos_faccion.get("torre_especial")
-        return datos_faccion.get("torre_normal")
-
-    def ruta_unidad_faccion(nombre_unidad):
-        nombre = nombre_unidad.lower()
-        datos_faccion = datos_faccion_por_rol("atacante")
-        if "tanque" in nombre or "pesad" in nombre:
-            return datos_faccion.get("soldado_tanque")
-        if "rap" in nombre or "ráp" in nombre:
-            return datos_faccion.get("soldado_rapido")
-        return datos_faccion.get("soldado_base")
-
-    def centro_casilla(fila, columna):
-        return (
-            columna * ANCHO_CELDA + ANCHO_CELDA // 2,
-            fila * ALTO_CELDA + ALTO_CELDA // 2,
-        )
-
-    def distancia(fila_a, columna_a, fila_b, columna_b):
-        return abs(fila_a - fila_b) + abs(columna_a - columna_b)
-
-    def animar_proyectiles(estado):
-        if not mostrar_proyectiles or not ventana_activa():
-            return
-        proyectiles = []
-        for torre in estado.get("torres", []):
-            objetivo = None
-            for unidad in estado.get("unidades", []):
-                if distancia(torre["fila"], torre["columna"], unidad["fila"], unidad["columna"]) <= torre.get("alcance", 0):
-                    objetivo = unidad
-                    break
-            if objetivo is not None:
-                x1, y1 = centro_casilla(torre["fila"], torre["columna"])
-                x2, y2 = centro_casilla(objetivo["fila"], objetivo["columna"])
-                color = color_proyectil(torre["nombre"], "defensor")
-                proyectiles.append(cuadro_mapa.create_line(x1, y1, x2, y2, fill="#ffffff", width=8, arrow=tk.LAST))
-                proyectiles.append(cuadro_mapa.create_line(x1, y1, x2, y2, fill=color, width=4, arrow=tk.LAST))
-                proyectiles.append(cuadro_mapa.create_oval(x2 - 8, y2 - 8, x2 + 8, y2 + 8, fill=color, outline="#ffffff", width=2))
-
-        for unidad in estado.get("unidades", []):
-            objetivo = next(
-                (torre for torre in estado.get("torres", []) if torre["fila"] == unidad["fila"] - 1 and torre["columna"] == unidad["columna"]),
-                None,
-            )
-            if objetivo is not None:
-                x1, y1 = centro_casilla(unidad["fila"], unidad["columna"])
-                x2, y2 = centro_casilla(objetivo["fila"], objetivo["columna"])
-                color = color_proyectil("unidad", "atacante")
-                proyectiles.append(cuadro_mapa.create_line(x1, y1, x2, y2, fill="#ffffff", width=7, dash=(6, 3)))
-                proyectiles.append(cuadro_mapa.create_line(x1, y1, x2, y2, fill=color, width=3, dash=(6, 3)))
-
-        if proyectiles:
-            def borrar_proyectiles():
-                if not ventana_activa():
-                    return
-                try:
-                    for item in proyectiles:
-                        cuadro_mapa.delete(item)
-                except tk.TclError:
-                    control_combate["cerrando"] = True
-
-            window_mapa.after(450, borrar_proyectiles)
->>>>>>> theirs
 
     def comprar_en_casilla(evento):
         if estado_ui["partida_finalizada"]:
@@ -826,13 +733,6 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         else:
             cuadro_mapa.create_text(x_base, y_base, text="BASE", font=("Arial", 13, "bold"), fill="#9a0000")
 
-<<<<<<< ours
-=======
-        imagen_base = cargar_imagen_mapa(datos_faccion_por_rol("defensor").get("estructura_base"), 90, 34)
-        if imagen_base is not None:
-            cuadro_mapa.create_image(ANCHO_TABLERO // 2, ALTO_CELDA // 2 + 2, image=imagen_base)
-        cuadro_mapa.create_text(ANCHO_TABLERO // 2, ALTO_CELDA // 2, text="BASE", font=("Arial", 13, "bold"), fill="#9a0000")
->>>>>>> theirs
         cuadro_mapa.create_text(10, ALTO_CELDA * 4, text="Zona defensor", angle=90, anchor="w", fill="#005b96", font=("Arial", 10, "bold"))
         cuadro_mapa.create_text(10, ALTO_CELDA * 9, text="Zona atacante", angle=90, anchor="w", fill="#b05a00", font=("Arial", 10, "bold"))
 
@@ -863,7 +763,6 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
         for torre in estado.get("torres", []):
             x, y = centro_casilla(torre["fila"], torre["columna"])
-<<<<<<< ours
             img = imagen_torre(torre)
             if img is not None:
                 cuadro_mapa.create_image(x, y, image=img)
@@ -921,26 +820,6 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
                 except tk.TclError:
                     pass
             window_mapa.after(520, borrar)
-=======
-            imagen_torre = cargar_imagen_mapa(ruta_torre_faccion(torre["nombre"]))
-            if imagen_torre is not None:
-                cuadro_mapa.create_image(x, y, image=imagen_torre)
-            else:
-                color = color_proyectil(torre["nombre"], "defensor")
-                cuadro_mapa.create_rectangle(x - 20, y - 18, x + 20, y + 18, fill=color, outline="black", width=2)
-                cuadro_mapa.create_text(x, y - 3, text="T", font=("Arial", 14, "bold"), fill="black")
-            cuadro_mapa.create_text(x, y + 15, text=str(torre["vida"]), font=("Arial", 8, "bold"), fill="black")
-
-        for unidad in estado.get("unidades", []):
-            x, y = centro_casilla(unidad["fila"], unidad["columna"])
-            imagen_unidad = cargar_imagen_mapa(ruta_unidad_faccion(unidad["nombre"]))
-            if imagen_unidad is not None:
-                cuadro_mapa.create_image(x, y, image=imagen_unidad)
-            else:
-                cuadro_mapa.create_oval(x - 20, y - 17, x + 20, y + 17, fill="#ff7043", outline="black", width=2)
-                cuadro_mapa.create_text(x, y - 3, text="U", font=("Arial", 14, "bold"), fill="white")
-            cuadro_mapa.create_text(x, y + 15, text=str(unidad["vida"]), font=("Arial", 8, "bold"), fill="white")
->>>>>>> theirs
 
     def actualizar_panel_estado(estado):
         datos_red = obtener_ultimos_datos_red()
@@ -1020,7 +899,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         if not ventana_activa() or not modo_red:
             return
         try:
-            estado = adaptador_red.cliente.obtener_ultimo_estado_local()
+            estado = cliente_red.obtener_ultimo_estado_local()
             if estado:
                 actualizar_vista()
         except Exception:
