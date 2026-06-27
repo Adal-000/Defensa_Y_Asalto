@@ -148,22 +148,27 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     control_combate = {"activo": False, "after_id": None, "cuenta_id": None, "cerrando": False, "red_iniciado": False}
 
     preferencias = app.obtener_configuracion()
+
+    def obtener_estado_visible():
+        if modo_red:
+            estado_red = cliente_red.obtener_ultimo_estado_local()
+            if estado_red is not None:
+                return estado_red
+            return ultimo_estado["datos"]
+        return app.obtener_estado_partida()
+
+    def refrescar_estado_red():
+        return
+
     def mostrar_cuadricula_activa():
         return bool(app.obtener_configuracion().get("mostrar_cuadricula", True))
 
     def mostrar_proyectiles_activos():
         return bool(app.obtener_configuracion().get("mostrar_proyectiles", True))
 
-    def mostrar_proyectiles_activos():
-        return bool(app.obtener_configuracion().get("mostrar_proyectiles", True))
-
-    def mostrar_proyectiles_activos():
-        return bool(app.obtener_configuracion().get("mostrar_proyectiles", True))
-
-    def mostrar_proyectiles_activos():
-        return bool(app.obtener_configuracion().get("mostrar_proyectiles", True))
-
-    if not modo_red:
+    if modo_red:
+        cliente_red.obtener_estado()
+    else:
         app.crear_partida(nombre_defensor, nombre_atacante)
 
     seleccion_actual = {"tipo": None, "clave": None, "nombre": None}
@@ -807,6 +812,16 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             exito, mensaje = _accion_comprar_muro(fila, columna)
         else:
             exito, mensaje = _accion_comprar_unidad(seleccion_actual["clave"], fila, columna)
+
+    def nombre_fase_preparacion(estado):
+        fase = estado.get("fase_ronda", "")
+        if fase == "ataque_atacante":
+            return "Preparación atacante: coloca tropas"
+        if fase == "construccion_defensor":
+            return "Preparación defensor: coloca defensas"
+        if fase == "combate":
+            return "Combate en tiempo real"
+        return "Preparación"
 
     def nombre_fase_preparacion(estado):
         fase = estado.get("fase_ronda", "")
