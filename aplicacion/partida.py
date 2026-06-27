@@ -21,6 +21,8 @@ INCREMENTO_DINERO_POR_RONDA = 200
 RONDAS_PARA_GANAR_PARTIDA = 3
 SEGUNDOS_ESPERA_REFUERZO_ATACANTE = 5
 FILA_BASE = 0
+FILAS_DEFENSOR_VALIDAS = range(1, 8)
+FILAS_ATACANTE_VALIDAS = range(8, 11)
 MAXIMO_TURNOS_POR_RONDA = 30
 CANTIDAD_FILAS_TABLERO = 11
 CANTIDAD_COLUMNAS_TABLERO = 6
@@ -669,8 +671,6 @@ class Partida:
             )
             self._finalizar_ronda("defensor")
             return True
-
-            return False
 
         if self.turnos_en_ronda_actual >= MAXIMO_TURNOS_POR_RONDA:
             self._finalizar_ronda("defensor")
