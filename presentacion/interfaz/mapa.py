@@ -136,13 +136,23 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     faccion_defensor = faccion_jugador if rol_jugador == "defensor" else "España"
     faccion_atacante = faccion_jugador if rol_jugador == "atacante" else "EE.UU"
     imagenes_mapa = {}
+    cuadro_mapa = None
+    etiqueta_marcador = None
+    etiqueta_temporizador = None
+    etiqueta_dinero_defensor = None
+    etiqueta_dinero_atacante = None
+    caja_informacion_contrincante = None
     seleccion_actual = {"tipo": None, "clave": None, "nombre": None}
     ultimo_estado = {"datos": {}}
     botones_compra = []
     control_combate = {"activo": False, "after_id": None, "cuenta_id": None, "cerrando": False, "red_iniciado": False}
 
-    nombre_defensor = nombre_usuario if rol_jugador == "defensor" else "Defensor"
-    nombre_atacante = nombre_usuario if rol_jugador == "atacante" else "Atacante"
+    preferencias = app.obtener_configuracion()
+    def mostrar_cuadricula_activa():
+        return bool(app.obtener_configuracion().get("mostrar_cuadricula", True))
+
+    def mostrar_proyectiles_activos():
+        return bool(app.obtener_configuracion().get("mostrar_proyectiles", True))
 
     if not modo_red:
         app.crear_partida(nombre_defensor, nombre_atacante)
@@ -718,7 +728,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return abs(fila_a - fila_b) + abs(columna_a - columna_b)
 
     def animar_proyectiles(estado):
-        if not mostrar_proyectiles or not ventana_activa():
+        if not mostrar_proyectiles_activos() or not ventana_activa():
             return
         proyectiles = []
         for torre in estado.get("torres", []):
@@ -788,6 +798,16 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             exito, mensaje = _accion_comprar_muro(fila, columna)
         else:
             exito, mensaje = _accion_comprar_unidad(seleccion_actual["clave"], fila, columna)
+
+    def nombre_fase_preparacion(estado):
+        fase = estado.get("fase_ronda", "")
+        if fase == "ataque_atacante":
+            return "Preparación atacante: coloca tropas"
+        if fase == "construccion_defensor":
+            return "Preparación defensor: coloca defensas"
+        if fase == "combate":
+            return "Combate en tiempo real"
+        return "Preparación"
 
     def nombre_fase_preparacion(estado):
         fase = estado.get("fase_ronda", "")
@@ -930,17 +950,11 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
                 color = COLOR_ATAQUE
             cuadro_mapa.create_rectangle(0, y1, ANCHO_TABLERO, y2, fill=color, outline="", stipple="gray25")
 
-        for x in range(0, ANCHO_TABLERO + 1, ANCHO_CELDA):
-            cuadro_mapa.create_line(x, 0, x, ALTO_TABLERO, fill="#a9a9a9")
-        for y in range(0, ALTO_TABLERO + 1, ALTO_CELDA):
-            cuadro_mapa.create_line(0, y, ANCHO_TABLERO, y, fill="#a9a9a9")
-
-        base = imagen_base()
-        x_base, y_base = centro_casilla(0, COLUMNAS_TABLERO // 2)
-        if base is not None:
-            cuadro_mapa.create_image(x_base, y_base + 2, image=base)
-        else:
-            cuadro_mapa.create_text(x_base, y_base, text="BASE", font=("Arial", 13, "bold"), fill="#9a0000")
+        if mostrar_cuadricula_activa():
+            for x in range(0, ANCHO_TABLERO + 1, ANCHO_CELDA):
+                cuadro_mapa.create_line(x, 0, x, ALTO_TABLERO, fill="#cccccc")
+            for y in range(0, ALTO_TABLERO + 1, ALTO_CELDA):
+                cuadro_mapa.create_line(0, y, ANCHO_TABLERO, y, fill="#cccccc")
 
         sprite_base_defensor = cargar_imagen_mapa(datos_faccion_por_rol("defensor").get("estructura_base"), 110, 38)
         if sprite_base_defensor is not None:
