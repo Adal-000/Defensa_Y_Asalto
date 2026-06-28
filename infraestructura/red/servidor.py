@@ -20,6 +20,7 @@ from infraestructura.red.protocolo import (
     ACCION_COMPRAR_MURO,
     ACCION_COMPRAR_TORRE,
     ACCION_COMPRAR_UNIDAD,
+    ACCION_USAR_HABILIDAD_ESPECIAL,
     ACCION_EJECUTAR_COMBATE,
     ACCION_INICIAR_COMBATE,
     ACCION_OBTENER_ESTADO,
@@ -369,14 +370,15 @@ class ServidorPartida:
                 ACCION_COMPRAR_TORRE,
                 ACCION_COMPRAR_MURO,
                 ACCION_COMPRAR_UNIDAD,
+                ACCION_USAR_HABILIDAD_ESPECIAL,
                 ACCION_PAUSAR_COMBATE,
             ] + acciones_basicas
             if cliente is None:
                 return acciones_combate
             if cliente.rol == ROL_DEFENSOR:
-                return [ACCION_COMPRAR_TORRE, ACCION_COMPRAR_MURO, ACCION_PAUSAR_COMBATE] + acciones_basicas
+                return [ACCION_COMPRAR_TORRE, ACCION_COMPRAR_MURO, ACCION_USAR_HABILIDAD_ESPECIAL, ACCION_PAUSAR_COMBATE] + acciones_basicas
             if cliente.rol == ROL_ATACANTE:
-                return [ACCION_COMPRAR_UNIDAD, ACCION_PAUSAR_COMBATE] + acciones_basicas
+                return [ACCION_COMPRAR_UNIDAD, ACCION_USAR_HABILIDAD_ESPECIAL, ACCION_PAUSAR_COMBATE] + acciones_basicas
             return acciones_basicas
 
         acciones_preparacion = [
@@ -391,6 +393,7 @@ class ServidorPartida:
                 ACCION_COMPRAR_TORRE,
                 ACCION_COMPRAR_MURO,
                 ACCION_COMPRAR_UNIDAD,
+                ACCION_USAR_HABILIDAD_ESPECIAL,
             ] + acciones_preparacion
 
         if cliente.rol == ROL_DEFENSOR:
@@ -398,14 +401,14 @@ class ServidorPartida:
                 # El defensor todavia no puede construir: el atacante
                 # tiene sus 15 segundos de preparacion primero.
                 return acciones_preparacion
-            return [ACCION_COMPRAR_TORRE, ACCION_COMPRAR_MURO] + acciones_preparacion
+            return [ACCION_COMPRAR_TORRE, ACCION_COMPRAR_MURO, ACCION_USAR_HABILIDAD_ESPECIAL] + acciones_preparacion
 
         if cliente.rol == ROL_ATACANTE:
             if fase_ronda == "construccion_defensor":
                 # El atacante ya agoto sus 15 segundos y queda
                 # bloqueado mientras el defensor construye.
                 return acciones_preparacion
-            return [ACCION_COMPRAR_UNIDAD] + acciones_preparacion
+            return [ACCION_COMPRAR_UNIDAD, ACCION_USAR_HABILIDAD_ESPECIAL] + acciones_preparacion
 
         return acciones_basicas
 
@@ -723,6 +726,10 @@ class ServidorPartida:
                     atacante.usuario,
                     guardar_victorias=False,
                 )
+                if ROL_DEFENSOR in self.facciones_lobby:
+                    self.partida.establecer_faccion(ROL_DEFENSOR, self.facciones_lobby[ROL_DEFENSOR])
+                if ROL_ATACANTE in self.facciones_lobby:
+                    self.partida.establecer_faccion(ROL_ATACANTE, self.facciones_lobby[ROL_ATACANTE])
                 print("Partida creada correctamente.")
 
     def _escuchar_cliente(self, cliente):
@@ -801,6 +808,8 @@ class ServidorPartida:
                         return
                 self.facciones_lobby[cliente.rol] = faccion
                 self.listos_lobby.discard(cliente.rol)
+                if self.partida is not None:
+                    self.partida.establecer_faccion(cliente.rol, faccion)
             self._enviar_estado_a_todos("Facción elegida.")
             return
 
@@ -874,6 +883,9 @@ class ServidorPartida:
                 fila = obtener_entero(mensaje, "fila")
                 columna = obtener_entero(mensaje, "columna")
                 exito, texto = self.partida.comprar_unidad(tipo_unidad, fila, columna)
+
+            elif accion == ACCION_USAR_HABILIDAD_ESPECIAL:
+                exito, texto = self.partida.usar_habilidad_especial(cliente.rol)
 
             elif accion == ACCION_EJECUTAR_COMBATE:
                 resultado = self.partida.ejecutar_combate()

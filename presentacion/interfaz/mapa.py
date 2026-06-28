@@ -164,6 +164,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     etiqueta_dinero_atacante = None
     etiqueta_resultado = None
     boton_turno = None
+    boton_habilidad = None
     caja_informacion_contrincante = None
     seleccion_actual = {"tipo": None, "clave": None, "nombre": None}
     ultimo_estado = {"datos": {}}
@@ -188,8 +189,11 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
     if modo_red:
         cliente_red.obtener_estado()
+        cliente_red.enviar_accion("elegir_faccion", faccion=faccion_jugador)
     else:
         app.crear_partida(nombre_defensor, nombre_atacante)
+        app.establecer_faccion("defensor", faccion_defensor)
+        app.establecer_faccion("atacante", faccion_atacante)
 
     control = {
         "cerrando": False,
@@ -509,6 +513,11 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         if modo_red:
             return cliente_red.iniciar_combate()
         return app.resolver_preparacion_agotada()
+
+    def _accion_usar_habilidad_especial():
+        if modo_red:
+            return cliente_red.usar_habilidad_especial()
+        return app.usar_habilidad_especial(rol_jugador)
 
     # -----------------------------------------------------------------
     # Marcador, temporizador y resultados
@@ -836,6 +845,103 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
             window_mapa.after(650, borrar_proyectiles)
 
+    def animar_habilidad_especial(rol_que_dispara, info_habilidad):
+        """
+        Descripcion:
+            Dibuja el efecto visual de la habilidad especial de
+            faccion sobre el tablero. El origen del efecto depende de
+            quien la dispara:
+
+            - El defensor la dispara desde su base (fila 0) hacia las
+              primeras filas de la zona del atacante.
+            - El atacante la dispara desde el lado contrario a la
+              base (fila 10) hacia las ultimas filas de la zona del
+              defensor.
+
+            La forma del efecto cambia segun el tipo (gas, granadas,
+            flechas, artilleria, mortero o fuego) para que cada
+            faccion se sienta distinta, pero todas comparten el mismo
+            mecanismo de animacion temporal con after().
+        """
+        if not ventana_activa() or cuadro_mapa is None:
+            return
+
+        color = info_habilidad.get("color", "#999999")
+        tipo_efecto = info_habilidad.get("tipo_efecto", "generico")
+        filas_de_alcance = info_habilidad.get("filas_de_alcance", 3)
+
+        if rol_que_dispara == "defensor":
+            fila_origen = 0
+            filas_objetivo = list(range(8, min(8 + filas_de_alcance, 11)))
+        else:
+            fila_origen = 10
+            filas_objetivo = list(range(max(1, 7 - filas_de_alcance + 1), 8))
+
+        columna_origen = COLUMNAS_TABLERO // 2
+        x_origen, y_origen = centro_casilla(fila_origen, columna_origen)
+
+        elementos = []
+
+        for fila_objetivo in filas_objetivo:
+            for columna in range(COLUMNAS_TABLERO):
+                x_destino, y_destino = centro_casilla(fila_objetivo, columna)
+
+                if tipo_efecto == "gas":
+                    radio = 22
+                    elementos.append(cuadro_mapa.create_oval(
+                        x_destino - radio, y_destino - radio // 2,
+                        x_destino + radio, y_destino + radio // 2,
+                        fill=color, outline="", stipple="gray50",
+                    ))
+                elif tipo_efecto == "flechas":
+                    elementos.append(cuadro_mapa.create_line(
+                        x_origen, y_origen, x_destino, y_destino,
+                        fill=color, width=2, arrow=tk.LAST,
+                    ))
+                elif tipo_efecto == "granadas":
+                    medio_x = (x_origen + x_destino) / 2
+                    medio_y = min(y_origen, y_destino) - 30
+                    elementos.append(cuadro_mapa.create_line(
+                        x_origen, y_origen, medio_x, medio_y, x_destino, y_destino,
+                        fill=color, width=2, smooth=True,
+                    ))
+                    elementos.append(cuadro_mapa.create_oval(
+                        x_destino - 10, y_destino - 10, x_destino + 10, y_destino + 10,
+                        fill="#ff7a00", outline=color, width=2,
+                    ))
+                else:
+                    # artilleria, mortero, fuego y cualquier tipo generico:
+                    # explosion circular sobre la casilla objetivo.
+                    radio = 14
+                    elementos.append(cuadro_mapa.create_oval(
+                        x_destino - radio, y_destino - radio,
+                        x_destino + radio, y_destino + radio,
+                        fill=color, outline="#111111", width=2,
+                    ))
+                    elementos.append(cuadro_mapa.create_oval(
+                        x_destino - radio // 2, y_destino - radio // 2,
+                        x_destino + radio // 2, y_destino + radio // 2,
+                        fill="#ffffff", outline="",
+                    ))
+
+        etiqueta_aviso = cuadro_mapa.create_text(
+            x_origen, max(10, y_origen),
+            text=f"¡{info_habilidad.get('nombre', 'Habilidad especial')}!",
+            fill=color, font=("Arial", 12, "bold"),
+        )
+        elementos.append(etiqueta_aviso)
+
+        def borrar_efecto():
+            if not ventana_activa():
+                return
+            try:
+                for item in elementos:
+                    cuadro_mapa.delete(item)
+            except tk.TclError:
+                control["cerrando"] = True
+
+        window_mapa.after(900, borrar_efecto)
+
     def comprar_en_casilla(evento):
         if estado_ui["partida_finalizada"]:
             return
@@ -910,6 +1016,70 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         else:
             cliente_red.iniciar_combate()
             window_mapa.after(150, lambda: (cliente_red.obtener_estado(), actualizar_vista()))
+
+    def usar_habilidad_click():
+        """
+        Descripcion:
+            Maneja el clic del boton de habilidad especial. Cada
+            jugador solo tiene un boton, correspondiente a su propio
+            rol; la facción (y por lo tanto el efecto, costo y daño)
+            la determina la clase Partida según lo elegido en el
+            lobby, nunca la interfaz.
+        """
+        if estado_ui["partida_finalizada"]:
+            return
+
+        estado_actual = _obtener_estado()
+        info_habilidad = estado_actual.get(
+            "habilidad_defensor" if rol_jugador == "defensor" else "habilidad_atacante",
+            {},
+        )
+
+        exito, mensaje = _accion_usar_habilidad_especial()
+        escribir_evento(mensaje)
+
+        if exito:
+            animar_habilidad_especial(rol_jugador, info_habilidad)
+            actualizar_vista()
+            if modo_red:
+                window_mapa.after(150, lambda: (cliente_red.obtener_estado(), actualizar_vista()))
+
+    def actualizar_boton_habilidad():
+        """
+        Descripcion:
+            Refresca el texto y el estado (habilitado/deshabilitado)
+            del boton de habilidad especial con la informacion mas
+            reciente del estado de la partida: nombre real de la
+            habilidad de la facción del jugador, costo y segundos de
+            enfriamiento restantes.
+        """
+        if boton_habilidad is None:
+            return
+
+        estado_actual = _obtener_estado()
+        info_habilidad = estado_actual.get(
+            "habilidad_defensor" if rol_jugador == "defensor" else "habilidad_atacante",
+            {},
+        )
+        if not info_habilidad:
+            return
+
+        nombre = info_habilidad.get("nombre", "Habilidad especial")
+        nombre_corto = nombre if len(nombre) <= 16 else nombre[:14] + "…"
+        costo = info_habilidad.get("costo", 0)
+        cooldown = info_habilidad.get("segundos_restantes_cooldown", 0)
+        disponible = info_habilidad.get("disponible", False)
+
+        if cooldown > 0:
+            texto = f"💥 {nombre_corto}\n⏳{cooldown}s"
+        else:
+            texto = f"💥 {nombre_corto}\n${costo}"
+
+        boton_habilidad.config(
+            text=texto,
+            state="normal" if disponible else "disabled",
+            bg="#ff8a65" if disponible else "#cccccc",
+        )
 
     def dibujar_zonas():
         cuadro_mapa.delete("all")
@@ -1019,6 +1189,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         detectar_resultado(estado)
         sincronizar_fase_y_temporizador(estado)
         animar_proyectiles(estado)
+        actualizar_boton_habilidad()
 
     # -----------------------------------------------------------------
     # Combate local y polling red
@@ -1116,12 +1287,24 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         boton_compra.place(x=35, y=y_base)
         botones_compra.append((boton_compra, compra))
 
-    etiqueta_temporizador = tk.Label(window_mapa, text=f"Preparación: {SEGUNDOS_PREPARACION_ROL}s", font=("Arial", 13, "bold"), width=26, bg="#fff3bf", fg="#173a59", relief="solid", bd=2)
-    etiqueta_temporizador.place(x=70, y=650)
+    etiqueta_temporizador = tk.Label(window_mapa, text=f"Preparación: {SEGUNDOS_PREPARACION_ROL}s", font=("Arial", 12, "bold"), width=26, bg="#fff3bf", fg="#173a59", relief="solid", bd=2)
+    etiqueta_temporizador.place(x=70, y=634)
     etiqueta_cuenta = etiqueta_temporizador
 
-    boton_turno = tk.Button(window_mapa, text="Forzar combate", font=("Arial", 11, "bold"), width=20, bg="#ffb74d", command=alternar_combate_click)
-    boton_turno.place(x=70, y=695)
+    boton_turno = tk.Button(window_mapa, text="Forzar combate", font=("Arial", 9, "bold"), width=15, bg="#ffb74d", command=alternar_combate_click)
+    boton_turno.place(x=35, y=664)
+
+    boton_habilidad = tk.Button(
+        window_mapa,
+        text="💥 Habilidad",
+        font=("Arial", 9, "bold"),
+        width=15,
+        height=2,
+        bg="#cccccc",
+        state="disabled",
+        command=usar_habilidad_click,
+    )
+    boton_habilidad.place(x=185, y=664)
 
     etiqueta_tablero = tk.Label(window_mapa, text="Área del mapa", font=("Arial", 13, "bold"), bg=COLOR_PANEL)
     etiqueta_tablero.place(x=405, y=175)

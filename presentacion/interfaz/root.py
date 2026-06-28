@@ -9,6 +9,7 @@ Descripcion:
 
 import tkinter as tk
 
+from aplicacion import app
 from presentacion.interfaz.config import config
 from presentacion.interfaz.login import login
 from presentacion.interfaz.main import main as ventana_main
@@ -60,6 +61,13 @@ def main():
     root = tk.Tk()
     root.withdraw()
 
+    # La música de fondo es global a todo el programa: se inicia una
+    # sola vez aquí y sigue sonando sin importar qué ventana esté
+    # abierta (login, menú, perfil, configuración, juego, etc.). Solo
+    # se detiene si el jugador lo pide explícitamente desde la
+    # ventana de Configuración, o al cerrar el programa.
+    app.iniciar_musica_de_fondo()
+
     estado_sesion = {"usuario_actual": None}
 
     def establecer_usuario_actual(nombre_usuario):
@@ -69,6 +77,7 @@ def main():
         return estado_sesion["usuario_actual"]
 
     def cerrar_todo():
+        app.detener_musica()
         root.destroy()
 
     def GoLogin():

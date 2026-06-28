@@ -25,6 +25,20 @@ del ritmo del combate:
   del mismo costo ahora se intercambian 6 a 10 golpes en vez de
   eliminarse casi de inmediato.
 - El panel de compra ahora muestra vida y daño además del costo.
+- La música de fondo ahora es global a todo el programa (usa
+  `pygame.mixer` desde `aplicacion/musica.py`): empieza a sonar al
+  abrir el programa con la canción predeterminada de `Musica/` y
+  sigue sonando sin importar qué ventana esté abierta. Solo se
+  detiene si el jugador entra a Configuración y presiona "Detener",
+  o al cerrar el programa por completo.
+- Cada facción tiene una habilidad especial propia, usable tanto por
+  el defensor como por el atacante si juegan esa facción (botón
+  "💥 Habilidad" en el mapa). Es un ataque de área independiente de
+  las compras normales, con su propio costo y tiempo de enfriamiento:
+  el defensor la dispara desde su base hacia el campo del atacante,
+  y el atacante la dispara desde el lado contrario a la base hacia
+  el campo del defensor. Ver la sección "Habilidades especiales por
+  facción" más abajo.
 
 ## Estructura del repositorio
 
@@ -72,6 +86,13 @@ python Interfaz/root.py
 
 `root.py` agrega automáticamente la carpeta `Logica/` a `sys.path`,
 así que no es necesario instalar nada adicional.
+
+Al arrancar, el programa intenta reproducir música de fondo con
+`pygame.mixer` (instalar con `pip install pygame` si no está
+disponible). Si pygame no está instalado, el juego sigue funcionando
+normalmente, solo sin sonido. La música suena de forma continua sin
+importar qué ventana esté abierta; solo se detiene desde el botón
+"Detener" en la ventana de Configuración o al cerrar el programa.
 
 ## Funciones principales para la interfaz
 
@@ -193,6 +214,41 @@ ejemplo Soldado base vs Torre normal, ambas a $90) se golpeen entre
 golpes. El ritmo de combate sigue siendo de un turno por segundo,
 pero con vida alta y daño moderado el avance se aprecia mas lento y
 parejo.
+
+## Habilidades especiales por facción
+
+Ademas de torres, muros y soldados, cada facción tiene una habilidad
+especial unica que cualquiera de los dos roles puede usar si esta
+jugando con esa facción (el defensor con su propio botón, el
+atacante con el suyo). Es un ataque de área independiente de las
+compras normales: tiene su propio costo, su propio daño y su propio
+tiempo de enfriamiento (cooldown), definidos en
+`dominio/entidades/habilidad_especial.py`.
+
+| Facción | Habilidad | Costo | Daño | Enfriamiento |
+|---|---|---|---|---|
+| Alemania | Gas tóxico | $170 | 30 | 20s |
+| EE.UU | Lluvia de granadas | $175 | 40 | 18s |
+| España | Bombardeo de artillería | $180 | 45 | 18s |
+| Inglaterra | Lluvia de flechas | $150 | 35 | 15s |
+| Rusia | Ataque de mortero | $190 | 55 | 20s |
+| Italia | Cortina de humo y fuego | $160 | 32 | 16s |
+
+Dirección del ataque (de dónde "salen" los proyectiles):
+
+- El **defensor** la dispara desde su base (fila 0) hacia las
+  primeras filas de la zona del atacante, dañando a las unidades que
+  estén ahí.
+- El **atacante** la dispara desde el lado contrario a la base (el
+  extremo opuesto del tablero) hacia las últimas filas de la zona
+  del defensor, dañando a las torres y muros que estén ahí.
+
+La facción de cada rol se fija al elegirla en el lobby de `play.py`
+(mensaje `elegir_faccion`) y queda guardada en la partida mediante
+`Partida.establecer_faccion(rol, faccion)`; el servidor sincroniza
+esto automáticamente. Para usarla se llama
+`Partida.usar_habilidad_especial(rol)`, que valida fase, dinero y
+enfriamiento antes de aplicar el daño.
 
 
 ## Modo multijugador en dos computadoras

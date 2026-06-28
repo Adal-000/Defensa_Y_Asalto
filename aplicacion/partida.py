@@ -12,6 +12,10 @@ from dominio.entidades.base import Base
 from dominio.entidades.torre import crear_torre_por_tipo
 from dominio.entidades.unidad import crear_unidad_por_tipo
 from dominio.entidades.muro import crear_muro
+from dominio.entidades.habilidad_especial import (
+    obtener_habilidad_de_faccion,
+    calcular_filas_objetivo,
+)
 from dominio.servicios.combate import ejecutar_turno_de_combate
 from infraestructura.persistencia.archivos import actualizar_victoria
 
@@ -92,9 +96,41 @@ class Partida:
         self.ganador_partida = None
         self.rol_ganador_partida = None
 
+        self.faccion_defensor = None
+        self.faccion_atacante = None
+        self.ultimo_uso_habilidad_defensor = None
+        self.ultimo_uso_habilidad_atacante = None
+
         self.historial_eventos = []
 
         self.iniciar_nueva_ronda()
+
+    def establecer_faccion(self, rol, faccion):
+        """
+        Descripcion:
+            Registra que faccion esta usando el defensor o el
+            atacante. Esto determina cual es su habilidad especial
+            (cada faccion tiene una distinta) y no afecta dinero,
+            vida, daño ni ninguna otra regla del juego.
+
+        Entradas:
+            rol (str): "defensor" o "atacante".
+            faccion (str): Nombre de la faccion elegida.
+
+        Salidas:
+            tuple[bool, str]: Exito de la accion y mensaje
+            descriptivo.
+
+        Restricciones:
+            - rol debe ser "defensor" o "atacante".
+        """
+        if rol == "defensor":
+            self.faccion_defensor = faccion
+            return True, f"Facción del defensor establecida en {faccion}."
+        if rol == "atacante":
+            self.faccion_atacante = faccion
+            return True, f"Facción del atacante establecida en {faccion}."
+        return False, "Rol invalido para establecer facción."
 
     def iniciar_nueva_ronda(self):
         """
@@ -513,6 +549,123 @@ class Partida:
         )
 
         return True, f"{nueva_unidad.nombre} comprada correctamente."
+
+    def _segundos_restantes_cooldown_habilidad(self, rol):
+        """
+        Descripcion:
+            Calcula cuantos segundos faltan para que el rol indicado
+            pueda volver a usar su habilidad especial de facción.
+
+        Entradas:
+            rol (str): "defensor" o "atacante".
+
+        Salidas:
+            int: Segundos restantes de enfriamiento (0 si ya esta
+            disponible).
+
+        Restricciones:
+            Ninguna.
+        """
+        faccion = self.faccion_defensor if rol == "defensor" else self.faccion_atacante
+        habilidad = obtener_habilidad_de_faccion(faccion)
+        ultimo_uso = (
+            self.ultimo_uso_habilidad_defensor
+            if rol == "defensor"
+            else self.ultimo_uso_habilidad_atacante
+        )
+        if ultimo_uso is None:
+            return 0
+        transcurrido = time.time() - ultimo_uso
+        restante = habilidad["cooldown_segundos"] - int(transcurrido)
+        return max(0, restante)
+
+    def usar_habilidad_especial(self, rol):
+        """
+        Descripcion:
+            Activa la habilidad especial de la facción del rol que la
+            solicita. Es un ataque de area instantaneo independiente
+            de las compras normales: tiene su propio costo en dinero
+            y su propio tiempo de enfriamiento.
+
+            - Si la usa el defensor, dispara desde su base (fila 0)
+              hacia las primeras filas de la zona del atacante y daña
+              a las unidades que esten ahi.
+            - Si la usa el atacante, dispara desde el lado contrario
+              a la base (fila 10) hacia las ultimas filas de la zona
+              del defensor y daña a las torres y muros que esten ahi.
+
+        Entradas:
+            rol (str): "defensor" o "atacante".
+
+        Salidas:
+            tuple[bool, str]: Exito de la accion y mensaje
+            descriptivo. El mensaje de exito incluye cuantos objetivos
+            fueron alcanzados.
+
+        Restricciones:
+            - rol debe ser "defensor" o "atacante".
+            - El rol debe tener dinero suficiente para el costo de su
+              habilidad.
+            - La habilidad debe estar fuera de su tiempo de
+              enfriamiento.
+            - No se puede usar si la partida ya finalizó.
+        """
+        if self.partida_finalizada:
+            return False, "La partida ya finalizó."
+
+        if rol not in ("defensor", "atacante"):
+            return False, "Rol invalido."
+
+        if rol == "defensor" and self.fase_ronda == FASE_ATAQUE_ATACANTE:
+            return False, "Espera a tu turno de preparación para usar la habilidad."
+
+        if rol == "atacante" and self.fase_ronda == FASE_CONSTRUCCION_DEFENSOR:
+            return False, "Estás bloqueado mientras el defensor prepara sus defensas."
+
+        faccion = self.faccion_defensor if rol == "defensor" else self.faccion_atacante
+        habilidad = obtener_habilidad_de_faccion(faccion)
+
+        segundos_cooldown = self._segundos_restantes_cooldown_habilidad(rol)
+        if segundos_cooldown > 0:
+            return False, f"Habilidad en enfriamiento: espera {segundos_cooldown}s más."
+
+        dinero_disponible = self.dinero_defensor if rol == "defensor" else self.dinero_atacante
+        if dinero_disponible < habilidad["costo"]:
+            return False, f"Necesitas ${habilidad['costo']} para usar {habilidad['nombre']}."
+
+        filas_objetivo = calcular_filas_objetivo(rol, habilidad["filas_de_alcance"])
+        dano = habilidad["dano"]
+        objetivos_alcanzados = 0
+
+        if rol == "defensor":
+            self.dinero_defensor -= habilidad["costo"]
+            self.ultimo_uso_habilidad_defensor = time.time()
+            for unidad in self.unidades:
+                if unidad.fila in filas_objetivo and unidad.vida > 0:
+                    unidad.vida = max(0, unidad.vida - dano)
+                    objetivos_alcanzados += 1
+            self.unidades = [u for u in self.unidades if u.vida > 0]
+        else:
+            self.dinero_atacante -= habilidad["costo"]
+            self.ultimo_uso_habilidad_atacante = time.time()
+            for torre in self.torres:
+                if torre.fila in filas_objetivo and torre.vida > 0:
+                    torre.vida = max(0, torre.vida - dano)
+                    objetivos_alcanzados += 1
+            for muro in self.muros:
+                if muro.fila in filas_objetivo and muro.vida > 0:
+                    muro.vida = max(0, muro.vida - dano)
+                    objetivos_alcanzados += 1
+            self.torres = [t for t in self.torres if t.vida > 0]
+            self.muros = [m for m in self.muros if m.vida > 0]
+
+        mensaje = (
+            f"{habilidad['nombre']} alcanzó {objetivos_alcanzados} objetivo(s)."
+            if objetivos_alcanzados > 0
+            else f"{habilidad['nombre']} no alcanzó ningún objetivo."
+        )
+        self.historial_eventos.append(f"[{rol}] usa {habilidad['nombre']}: {mensaje}")
+        return True, mensaje
 
     def _otorgar_dinero_por_combate(self, vida_torres_antes,
                                      vida_unidades_antes, vida_muros_antes,
@@ -966,7 +1119,58 @@ class Partida:
             "partida_finalizada": self.partida_finalizada,
             "ganador_partida": self.ganador_partida,
             "rol_ganador_partida": self.rol_ganador_partida,
+            "faccion_defensor": self.faccion_defensor,
+            "faccion_atacante": self.faccion_atacante,
+            "habilidad_defensor": self._info_habilidad_publica("defensor"),
+            "habilidad_atacante": self._info_habilidad_publica("atacante"),
             "ultimos_eventos": self.historial_eventos[-10:],
+        }
+
+    def _info_habilidad_publica(self, rol):
+        """
+        Descripcion:
+            Empaqueta la informacion de la habilidad especial de un
+            rol para exponerla en el estado: nombre, descripcion,
+            costo, daño, segundos de enfriamiento restantes y si esta
+            disponible para usarse ahora mismo. Sirve para que la
+            interfaz dibuje el boton de habilidad con su estado real
+            sin duplicar las reglas de negocio.
+
+        Entradas:
+            rol (str): "defensor" o "atacante".
+
+        Salidas:
+            dict: Datos listos para mostrar en la interfaz.
+
+        Restricciones:
+            Ninguna.
+        """
+        faccion = self.faccion_defensor if rol == "defensor" else self.faccion_atacante
+        habilidad = obtener_habilidad_de_faccion(faccion)
+        dinero_disponible = self.dinero_defensor if rol == "defensor" else self.dinero_atacante
+        segundos_cooldown = self._segundos_restantes_cooldown_habilidad(rol)
+
+        bloqueada_por_fase = (
+            (rol == "defensor" and self.fase_ronda == FASE_ATAQUE_ATACANTE)
+            or (rol == "atacante" and self.fase_ronda == FASE_CONSTRUCCION_DEFENSOR)
+        )
+
+        return {
+            "faccion": faccion,
+            "nombre": habilidad["nombre"],
+            "descripcion": habilidad["descripcion"],
+            "costo": habilidad["costo"],
+            "dano": habilidad["dano"],
+            "color": habilidad["color"],
+            "tipo_efecto": habilidad["tipo_efecto"],
+            "cooldown_segundos": habilidad["cooldown_segundos"],
+            "segundos_restantes_cooldown": segundos_cooldown,
+            "disponible": (
+                not self.partida_finalizada
+                and not bloqueada_por_fase
+                and segundos_cooldown == 0
+                and dinero_disponible >= habilidad["costo"]
+            ),
         }
 
 
