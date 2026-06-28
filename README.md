@@ -3,6 +3,43 @@
 Proyecto de Introducción a la Programación. Juego de estrategia para
 dos jugadores en Python con interfaz gráfica en Tkinter.
 
+## Cambios recientes (corrección de jugabilidad)
+
+Esta versión corrige varios problemas del flujo cliente-servidor y
+del ritmo del combate:
+
+- El reloj de preparación (15s atacante + 15s defensor) ahora lo
+  controla siempre el servidor/clase `Partida`, no la interfaz. Esto
+  evita que cada dispositivo muestre un tiempo distinto.
+- Se eliminaron funciones duplicadas y dos sistemas de temporizador
+  que competían entre sí en `presentacion/interfaz/mapa.py`.
+- Las piezas compradas ahora se ven de inmediato en el tablero (antes
+  la compra no refrescaba la vista).
+- El catálogo de torres se redujo a los 3 tipos reales que existen en
+  `Imagenes/estructuras/<faccion>/`: `normal`, `pesada`, `especial`.
+- Se corrigieron los nombres de los soldados (`soldado`, `rapido`,
+  `tanque`) para que coincidan con las carpetas de
+  `Imagenes/Soldados/<faccion>/`.
+- Se subió la vida y se bajó el daño de torres, muros, soldados y
+  base para que el combate sea más lento y equilibrado: dos piezas
+  del mismo costo ahora se intercambian 6 a 10 golpes en vez de
+  eliminarse casi de inmediato.
+- El panel de compra ahora muestra vida y daño además del costo.
+- La música de fondo ahora es global a todo el programa (usa
+  `pygame.mixer` desde `aplicacion/musica.py`): empieza a sonar al
+  abrir el programa con la canción predeterminada de `Musica/` y
+  sigue sonando sin importar qué ventana esté abierta. Solo se
+  detiene si el jugador entra a Configuración y presiona "Detener",
+  o al cerrar el programa por completo.
+- Cada facción tiene una habilidad especial propia, usable tanto por
+  el defensor como por el atacante si juegan esa facción (botón
+  "💥 Habilidad" en el mapa). Es un ataque de área independiente de
+  las compras normales, con su propio costo y tiempo de enfriamiento:
+  el defensor la dispara desde su base hacia el campo del atacante,
+  y el atacante la dispara desde el lado contrario a la base hacia
+  el campo del defensor. Ver la sección "Habilidades especiales por
+  facción" más abajo.
+
 ## Estructura del repositorio
 
 ```text
@@ -50,6 +87,13 @@ python Interfaz/root.py
 `root.py` agrega automáticamente la carpeta `Logica/` a `sys.path`,
 así que no es necesario instalar nada adicional.
 
+Al arrancar, el programa intenta reproducir música de fondo con
+`pygame.mixer` (instalar con `pip install pygame` si no está
+disponible). Si pygame no está instalado, el juego sigue funcionando
+normalmente, solo sin sonido. La música suena de forma continua sin
+importar qué ventana esté abierta; solo se detiene desde el botón
+"Detener" en la ventana de Configuración o al cerrar el programa.
+
 ## Funciones principales para la interfaz
 
 El Desarrollador 1 debe conectarse principalmente con `Logica/app.py`.
@@ -84,8 +128,10 @@ La parte del Desarrollador 2 incluye:
 - Actualización de victorias por rol al finalizar la partida.
 - Ranking top 5 de defensores y atacantes.
 - Clase `Jugador`.
-- Clase `Torre` con tipos: `arquera`, `cañon`, `hielo`, `soporte`.
-- Clase `Unidad` con tipos: `soldado`, `escudero`, `explorador`, `demoledor`.
+- Clase `Torre` con tipos: `normal`, `pesada`, `especial` (alineados a las
+  imagenes de `Imagenes/estructuras/<faccion>/`).
+- Clase `Unidad` con tipos: `soldado` (Soldado base), `rapido` (Soldado
+  rápido), `tanque` (Soldado tanque), alineados a `Imagenes/Soldados/<faccion>/`.
 - Clase `Muro` para bloquear unidades.
 - Clase `Base` con vida y destrucción.
 - Clase `Partida` para rondas, dinero, compras, marcador y victoria.
@@ -98,20 +144,40 @@ La parte del Desarrollador 2 incluye:
 Cada partida se juega por rondas y gana la partida completa el primer
 jugador que llegue a 3 rondas ganadas. Cada ronda sigue este orden:
 
-1. El defensor recibe dinero inicial.
-2. El defensor coloca muros y torres.
-3. El atacante recibe dinero inicial.
-4. El atacante compra y coloca unidades.
-5. Se ejecuta la fase de combate.
-6. Se determina el ganador de la ronda.
-7. Se actualiza el marcador.
-8. Si nadie ha ganado 3 rondas, inicia una nueva ronda.
+1. El atacante recibe dinero y tiene **15 segundos** para comprar y
+   colocar sus unidades en su zona del tablero.
+2. Al agotarse esos 15 segundos, el atacante queda **bloqueado** (no
+   puede comprar mas tropas) y el defensor recibe dinero para construir.
+3. El defensor tiene otros **15 segundos** para comprar y colocar
+   torres y muros en su zona del tablero.
+4. Al agotarse el tiempo del defensor, si el atacante coloco al menos
+   una unidad, inicia el **combate en tiempo real**; si no coloco
+   ninguna, el defensor gana la ronda de inmediato sin combate.
+5. Durante el combate ambos jugadores pueden seguir comprando: el
+   defensor más torres/muros y el atacante más unidades, mientras les
+   alcance el dinero.
+6. Si el atacante tiene dinero suficiente para otra unidad pero no
+   tiene ninguna unidad viva en el tablero, se le dan 7 segundos de
+   gracia; si no coloca nada en ese tiempo, termina la ronda.
+7. Si el dinero del atacante ya no alcanza para la unidad mas barata y
+   no tiene unidades vivas, la ronda termina de inmediato.
+8. Si la base del defensor es destruida, la ronda termina de inmediato
+   a favor del atacante.
+9. Se determina el ganador de la ronda y se actualiza el marcador.
+10. Si nadie ha ganado 3 rondas, inicia una nueva ronda (vuelve al
+    paso 1, con mas dinero disponible para ambos).
 
 El defensor gana la ronda si la base central sigue en pie y el atacante
 se queda sin dinero o todas sus unidades son eliminadas. El atacante gana
 la ronda si destruye la base central del defensor. Al terminar la partida
 se actualiza el registro de victorias del jugador ganador segun el rol
 utilizado.
+
+Tanto en modo local como en red, el reloj de los 15 segundos de cada
+fase lo calcula siempre la clase `Partida` (campo
+`segundos_restantes_preparacion` del estado), nunca un contador propio
+de la interfaz grafica. Esto evita que el defensor y el atacante vean
+temporizadores distintos cuando juegan desde dos dispositivos.
 
 ## Sistema de dinero
 
@@ -124,19 +190,65 @@ utilizado.
 
 ## Habilidades implementadas
 
-Torres:
+Torres (defensor, costo - vida - daño - alcance):
 
-- `arquera`: disparo doble.
-- `cañon`: daño en área.
-- `hielo`: congela unidades.
-- `soporte`: repara torres dañadas.
+- `normal` ($90, vida 220, daño 28, alcance 4): disparo doble cada
+  4 turnos de combate.
+- `pesada` ($130, vida 320, daño 38, alcance 3): daño en área cada
+  4 turnos (golpea a todas las unidades dentro de su alcance).
+- `especial` ($110, vida 260, daño 24, alcance 4): congela una unidad
+  enemiga cada 4 turnos para retrasar su avance.
 
-Unidades:
+Unidades (atacante, costo - vida - daño - velocidad):
 
-- `soldado`: ataque doble.
-- `escudero`: escudo temporal.
-- `explorador`: aumento de velocidad.
-- `demoledor`: daño extra contra torres.
+- `soldado` / Soldado base ($90, vida 220, daño 28, velocidad 1):
+  ataque doble cada 4 turnos.
+- `rapido` / Soldado rápido ($70, vida 150, daño 20, velocidad 2):
+  avanza 2 casillas por turno.
+- `tanque` / Soldado tanque ($130, vida 320, daño 38, velocidad 1):
+  daño extra contra torres.
+
+El balance esta pensado para que dos piezas del mismo costo (por
+ejemplo Soldado base vs Torre normal, ambas a $90) se golpeen entre
+6 y 10 veces antes de que una caiga, en vez de eliminarse en 1-3
+golpes. El ritmo de combate sigue siendo de un turno por segundo,
+pero con vida alta y daño moderado el avance se aprecia mas lento y
+parejo.
+
+## Habilidades especiales por facción
+
+Ademas de torres, muros y soldados, cada facción tiene una habilidad
+especial unica que cualquiera de los dos roles puede usar si esta
+jugando con esa facción (el defensor con su propio botón, el
+atacante con el suyo). Es un ataque de área independiente de las
+compras normales: tiene su propio costo, su propio daño y su propio
+tiempo de enfriamiento (cooldown), definidos en
+`dominio/entidades/habilidad_especial.py`.
+
+| Facción | Habilidad | Costo | Daño | Enfriamiento |
+|---|---|---|---|---|
+| Alemania | Gas tóxico | $170 | 30 | 20s |
+| EE.UU | Lluvia de granadas | $175 | 40 | 18s |
+| España | Bombardeo de artillería | $180 | 45 | 18s |
+| Inglaterra | Lluvia de flechas | $150 | 35 | 15s |
+| Rusia | Ataque de mortero | $190 | 55 | 20s |
+| Italia | Cortina de humo y fuego | $160 | 32 | 16s |
+
+Dirección del ataque (de dónde "salen" los proyectiles):
+
+- El **defensor** la dispara desde su base (fila 0) hacia las
+  primeras filas de la zona del atacante, dañando a las unidades que
+  estén ahí.
+- El **atacante** la dispara desde el lado contrario a la base (el
+  extremo opuesto del tablero) hacia las últimas filas de la zona
+  del defensor, dañando a las torres y muros que estén ahí.
+
+La facción de cada rol se fija al elegirla en el lobby de `play.py`
+(mensaje `elegir_faccion`) y queda guardada en la partida mediante
+`Partida.establecer_faccion(rol, faccion)`; el servidor sincroniza
+esto automáticamente. Para usarla se llama
+`Partida.usar_habilidad_especial(rol)`, que valida fase, dinero y
+enfriamiento antes de aplicar el daño.
 
 
 ## Modo multijugador en dos computadoras
@@ -192,7 +304,7 @@ computadoras deben estar en la misma red o tener permiso de firewall.
 ### Comandos disponibles en el cliente de consola
 
 ```text
-torre arquera 2 2
+torre normal 2 2
 muro 5 1
 unidad soldado 10 2
 iniciar
@@ -217,7 +329,7 @@ principales son:
 
 ```python
 cliente.conectar(ip_servidor, usuario, rol="defensor")
-cliente.comprar_torre("arquera", fila, columna)
+cliente.comprar_torre("normal", fila, columna)
 cliente.comprar_muro(fila, columna)
 cliente.comprar_unidad("soldado", fila, columna)
 cliente.iniciar_combate()

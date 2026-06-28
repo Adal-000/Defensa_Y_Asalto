@@ -12,6 +12,10 @@ from dominio.entidades.base import Base
 from dominio.entidades.torre import crear_torre_por_tipo
 from dominio.entidades.unidad import crear_unidad_por_tipo
 from dominio.entidades.muro import crear_muro
+from dominio.entidades.habilidad_especial import (
+    obtener_habilidad_de_faccion,
+    calcular_filas_objetivo,
+)
 from dominio.servicios.combate import ejecutar_turno_de_combate
 from infraestructura.persistencia.archivos import actualizar_victoria
 
@@ -19,11 +23,13 @@ DINERO_BASE_RONDA = 500
 BONO_GANADOR_RONDA = 200
 INCREMENTO_DINERO_POR_RONDA = 200
 RONDAS_PARA_GANAR_PARTIDA = 3
-SEGUNDOS_ESPERA_REFUERZO_ATACANTE = 5
+SEGUNDOS_PREPARACION_ATACANTE = 15
+SEGUNDOS_PREPARACION_DEFENSOR = 15
+SEGUNDOS_ESPERA_REFUERZO_ATACANTE = 7
 FILA_BASE = 0
 FILAS_DEFENSOR_VALIDAS = range(1, 8)
 FILAS_ATACANTE_VALIDAS = range(8, 11)
-MAXIMO_TURNOS_POR_RONDA = 30
+MAXIMO_TURNOS_POR_RONDA = 45
 TURNOS_ESPERA_ATACANTE_SIN_UNIDADES = 7
 CANTIDAD_FILAS_TABLERO = 11
 CANTIDAD_COLUMNAS_TABLERO = 6
@@ -81,6 +87,7 @@ class Partida:
         self.turnos_en_ronda_actual = 0
         self.turnos_sin_unidades_atacantes = 0
         self.fase_ronda = FASE_CONSTRUCCION_DEFENSOR
+        self.tiempo_inicio_fase = None
         self.rol_ganador_ultima_ronda = None
         self.esperando_refuerzo_atacante = False
         self.tiempo_inicio_espera_refuerzo = None
@@ -89,9 +96,41 @@ class Partida:
         self.ganador_partida = None
         self.rol_ganador_partida = None
 
+        self.faccion_defensor = None
+        self.faccion_atacante = None
+        self.ultimo_uso_habilidad_defensor = None
+        self.ultimo_uso_habilidad_atacante = None
+
         self.historial_eventos = []
 
         self.iniciar_nueva_ronda()
+
+    def establecer_faccion(self, rol, faccion):
+        """
+        Descripcion:
+            Registra que faccion esta usando el defensor o el
+            atacante. Esto determina cual es su habilidad especial
+            (cada faccion tiene una distinta) y no afecta dinero,
+            vida, daño ni ninguna otra regla del juego.
+
+        Entradas:
+            rol (str): "defensor" o "atacante".
+            faccion (str): Nombre de la faccion elegida.
+
+        Salidas:
+            tuple[bool, str]: Exito de la accion y mensaje
+            descriptivo.
+
+        Restricciones:
+            - rol debe ser "defensor" o "atacante".
+        """
+        if rol == "defensor":
+            self.faccion_defensor = faccion
+            return True, f"Facción del defensor establecida en {faccion}."
+        if rol == "atacante":
+            self.faccion_atacante = faccion
+            return True, f"Facción del atacante establecida en {faccion}."
+        return False, "Rol invalido para establecer facción."
 
     def iniciar_nueva_ronda(self):
         """
@@ -119,7 +158,11 @@ class Partida:
         self.muros = []
         self.unidades = []
         self.base.reiniciar()
+        # Orden de cada ronda: primero el atacante coloca tropas (15s),
+        # despues el atacante queda bloqueado y el defensor coloca sus
+        # defensas (15s) y por ultimo inicia el combate.
         self.fase_ronda = FASE_ATAQUE_ATACANTE
+        self.tiempo_inicio_fase = time.time()
 
         dinero_base = DINERO_BASE_RONDA + (
             INCREMENTO_DINERO_POR_RONDA * (self.numero_ronda - 1)
@@ -159,6 +202,7 @@ class Partida:
             return False, "No se puede volver a comprar unidades durante el combate."
 
         self.fase_ronda = FASE_ATAQUE_ATACANTE
+        self.tiempo_inicio_fase = time.time()
         mensaje = (
             f"Fase de ataque activa. Atacante disponible: ${self.dinero_atacante}."
         )
@@ -167,7 +211,12 @@ class Partida:
 
 
     def iniciar_fase_defensa(self):
-        """Activa la preparacion del defensor despues del ataque inicial."""
+        """
+        Descripcion:
+            Cierra la preparacion del atacante (queda bloqueado para
+            colocar mas tropas hasta el combate) y abre los 15
+            segundos de preparacion del defensor.
+        """
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
 
@@ -178,6 +227,7 @@ class Partida:
             return False, "La defensa inicial ya terminó; durante el combate ambos pueden comprar."
 
         self.fase_ronda = FASE_CONSTRUCCION_DEFENSOR
+        self.tiempo_inicio_fase = time.time()
         mensaje = "Fase de defensa activa: el defensor planea sus estructuras."
         self.historial_eventos.append(mensaje)
         return True, mensaje
@@ -187,6 +237,9 @@ class Partida:
         Descripcion:
             Inicia la fase de combate luego de la construccion del
             defensor y la compra/colocacion de unidades del atacante.
+            Si el atacante no colocó ninguna unidad durante su tiempo
+            de preparacion, el defensor gana la ronda directamente en
+            lugar de iniciar un combate vacio.
         """
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
@@ -198,9 +251,15 @@ class Partida:
             return False, self.iniciar_fase_defensa()[1]
 
         if len(self.unidades) == 0:
-            return False, "No se puede iniciar combate sin unidades atacantes."
+            self.historial_eventos.append(
+                "El atacante no colocó unidades durante la preparación. "
+                "El defensor gana la ronda."
+            )
+            self._finalizar_ronda("defensor")
+            return True, "Sin unidades atacantes: el defensor gana la ronda."
 
         self.fase_ronda = FASE_COMBATE
+        self.tiempo_inicio_fase = time.time()
         self.esperando_refuerzo_atacante = False
         self.tiempo_inicio_espera_refuerzo = None
         mensaje = "Inicia la fase de combate."
@@ -373,9 +432,6 @@ class Partida:
         if self.fase_ronda == FASE_ATAQUE_ATACANTE:
             return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
 
-        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
-            return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
-
         posicion_valida, mensaje_posicion = self._validar_compra_defensiva(
             fila, columna
         )
@@ -420,9 +476,6 @@ class Partida:
         """
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
-
-        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
-            return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
 
         if self.fase_ronda == FASE_ATAQUE_ATACANTE:
             return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
@@ -496,6 +549,123 @@ class Partida:
         )
 
         return True, f"{nueva_unidad.nombre} comprada correctamente."
+
+    def _segundos_restantes_cooldown_habilidad(self, rol):
+        """
+        Descripcion:
+            Calcula cuantos segundos faltan para que el rol indicado
+            pueda volver a usar su habilidad especial de facción.
+
+        Entradas:
+            rol (str): "defensor" o "atacante".
+
+        Salidas:
+            int: Segundos restantes de enfriamiento (0 si ya esta
+            disponible).
+
+        Restricciones:
+            Ninguna.
+        """
+        faccion = self.faccion_defensor if rol == "defensor" else self.faccion_atacante
+        habilidad = obtener_habilidad_de_faccion(faccion)
+        ultimo_uso = (
+            self.ultimo_uso_habilidad_defensor
+            if rol == "defensor"
+            else self.ultimo_uso_habilidad_atacante
+        )
+        if ultimo_uso is None:
+            return 0
+        transcurrido = time.time() - ultimo_uso
+        restante = habilidad["cooldown_segundos"] - int(transcurrido)
+        return max(0, restante)
+
+    def usar_habilidad_especial(self, rol):
+        """
+        Descripcion:
+            Activa la habilidad especial de la facción del rol que la
+            solicita. Es un ataque de area instantaneo independiente
+            de las compras normales: tiene su propio costo en dinero
+            y su propio tiempo de enfriamiento.
+
+            - Si la usa el defensor, dispara desde su base (fila 0)
+              hacia las primeras filas de la zona del atacante y daña
+              a las unidades que esten ahi.
+            - Si la usa el atacante, dispara desde el lado contrario
+              a la base (fila 10) hacia las ultimas filas de la zona
+              del defensor y daña a las torres y muros que esten ahi.
+
+        Entradas:
+            rol (str): "defensor" o "atacante".
+
+        Salidas:
+            tuple[bool, str]: Exito de la accion y mensaje
+            descriptivo. El mensaje de exito incluye cuantos objetivos
+            fueron alcanzados.
+
+        Restricciones:
+            - rol debe ser "defensor" o "atacante".
+            - El rol debe tener dinero suficiente para el costo de su
+              habilidad.
+            - La habilidad debe estar fuera de su tiempo de
+              enfriamiento.
+            - No se puede usar si la partida ya finalizó.
+        """
+        if self.partida_finalizada:
+            return False, "La partida ya finalizó."
+
+        if rol not in ("defensor", "atacante"):
+            return False, "Rol invalido."
+
+        if rol == "defensor" and self.fase_ronda == FASE_ATAQUE_ATACANTE:
+            return False, "Espera a tu turno de preparación para usar la habilidad."
+
+        if rol == "atacante" and self.fase_ronda == FASE_CONSTRUCCION_DEFENSOR:
+            return False, "Estás bloqueado mientras el defensor prepara sus defensas."
+
+        faccion = self.faccion_defensor if rol == "defensor" else self.faccion_atacante
+        habilidad = obtener_habilidad_de_faccion(faccion)
+
+        segundos_cooldown = self._segundos_restantes_cooldown_habilidad(rol)
+        if segundos_cooldown > 0:
+            return False, f"Habilidad en enfriamiento: espera {segundos_cooldown}s más."
+
+        dinero_disponible = self.dinero_defensor if rol == "defensor" else self.dinero_atacante
+        if dinero_disponible < habilidad["costo"]:
+            return False, f"Necesitas ${habilidad['costo']} para usar {habilidad['nombre']}."
+
+        filas_objetivo = calcular_filas_objetivo(rol, habilidad["filas_de_alcance"])
+        dano = habilidad["dano"]
+        objetivos_alcanzados = 0
+
+        if rol == "defensor":
+            self.dinero_defensor -= habilidad["costo"]
+            self.ultimo_uso_habilidad_defensor = time.time()
+            for unidad in self.unidades:
+                if unidad.fila in filas_objetivo and unidad.vida > 0:
+                    unidad.vida = max(0, unidad.vida - dano)
+                    objetivos_alcanzados += 1
+            self.unidades = [u for u in self.unidades if u.vida > 0]
+        else:
+            self.dinero_atacante -= habilidad["costo"]
+            self.ultimo_uso_habilidad_atacante = time.time()
+            for torre in self.torres:
+                if torre.fila in filas_objetivo and torre.vida > 0:
+                    torre.vida = max(0, torre.vida - dano)
+                    objetivos_alcanzados += 1
+            for muro in self.muros:
+                if muro.fila in filas_objetivo and muro.vida > 0:
+                    muro.vida = max(0, muro.vida - dano)
+                    objetivos_alcanzados += 1
+            self.torres = [t for t in self.torres if t.vida > 0]
+            self.muros = [m for m in self.muros if m.vida > 0]
+
+        mensaje = (
+            f"{habilidad['nombre']} alcanzó {objetivos_alcanzados} objetivo(s)."
+            if objetivos_alcanzados > 0
+            else f"{habilidad['nombre']} no alcanzó ningún objetivo."
+        )
+        self.historial_eventos.append(f"[{rol}] usa {habilidad['nombre']}: {mensaje}")
+        return True, mensaje
 
     def _otorgar_dinero_por_combate(self, vida_torres_antes,
                                      vida_unidades_antes, vida_muros_antes,
@@ -647,12 +817,69 @@ class Partida:
             "dinero_atacante": self.dinero_atacante,
         }
 
+    def segundos_restantes_preparacion(self):
+        """
+        Descripcion:
+            Calcula cuantos segundos le quedan a la fase de
+            preparacion actual (ataque del atacante o construccion
+            del defensor). Sirve para que la interfaz y el servidor
+            usen el mismo reloj en lugar de temporizadores locales
+            independientes que se desincronizan entre dispositivos.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            int: Segundos restantes (nunca negativo). Devuelve 0 si
+            la fase actual es combate, si la partida finalizo o si
+            todavia no se registro un inicio de fase.
+        """
+        if self.partida_finalizada or self.fase_ronda == FASE_COMBATE:
+            return 0
+
+        if self.tiempo_inicio_fase is None:
+            return SEGUNDOS_PREPARACION_ATACANTE
+
+        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
+            limite = SEGUNDOS_PREPARACION_ATACANTE
+        else:
+            limite = SEGUNDOS_PREPARACION_DEFENSOR
+
+        transcurrido = time.time() - self.tiempo_inicio_fase
+        restante = limite - int(transcurrido)
+        return max(0, restante)
+
+    def tiempo_de_fase_agotado(self):
+        """
+        Descripcion:
+            Indica si el tiempo de la fase de preparacion actual ya
+            se agoto segun el reloj del servidor.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            bool: True si ya no quedan segundos en la fase actual de
+            preparacion, False en caso contrario o si la fase actual
+            es combate.
+        """
+        if self.fase_ronda == FASE_COMBATE or self.partida_finalizada:
+            return False
+        return self.segundos_restantes_preparacion() <= 0
+
     def resolver_preparacion_agotada(self):
         """
         Descripcion:
-            Resuelve el final de los 15 segundos de preparación. Si el
-            atacante no colocó ninguna unidad, pierde la ronda por
-            inactividad. Si ya hay unidades, inicia el combate.
+            Resuelve el final del tiempo de preparacion actual segun
+            la fase en la que se encuentre la ronda:
+
+            - Si el atacante agoto sus 15 segundos: queda bloqueado
+              (ya no puede comprar mas unidades en esta fase) y se
+              abren los 15 segundos de preparacion del defensor,
+              tenga o no unidades colocadas todavia.
+            - Si el defensor agoto sus 15 segundos: si el atacante no
+              colocó ninguna unidad, el defensor gana la ronda de
+              inmediato; si ya hay unidades, inicia el combate.
 
         Entradas:
             Ninguna.
@@ -666,12 +893,12 @@ class Partida:
         if self.fase_ronda == FASE_COMBATE:
             return True, "El combate ya estaba en curso."
 
-        if len(self.unidades) == 0:
+        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
             self.historial_eventos.append(
-                "El atacante no colocó unidades en 15 segundos. El defensor gana la ronda."
+                "Tiempo de preparación del atacante agotado. El atacante "
+                "queda bloqueado y ahora el defensor coloca sus defensas."
             )
-            self._finalizar_ronda("defensor")
-            return True, "Tiempo agotado sin unidades: el defensor gana la ronda."
+            return self.iniciar_fase_defensa()
 
         return self.iniciar_fase_combate()
 
@@ -843,6 +1070,7 @@ class Partida:
             "rondas_ganadas_atacante": self.rondas_ganadas_atacante,
             "rondas_para_ganar_partida": RONDAS_PARA_GANAR_PARTIDA,
             "rol_ganador_ultima_ronda": self.rol_ganador_ultima_ronda,
+            "segundos_restantes_preparacion": self.segundos_restantes_preparacion(),
             "esperando_refuerzo_atacante": self.esperando_refuerzo_atacante,
             "segundos_refuerzo_atacante": self._segundos_restantes_refuerzo(),
             "vida_base": self.base.vida,
@@ -891,7 +1119,58 @@ class Partida:
             "partida_finalizada": self.partida_finalizada,
             "ganador_partida": self.ganador_partida,
             "rol_ganador_partida": self.rol_ganador_partida,
+            "faccion_defensor": self.faccion_defensor,
+            "faccion_atacante": self.faccion_atacante,
+            "habilidad_defensor": self._info_habilidad_publica("defensor"),
+            "habilidad_atacante": self._info_habilidad_publica("atacante"),
             "ultimos_eventos": self.historial_eventos[-10:],
+        }
+
+    def _info_habilidad_publica(self, rol):
+        """
+        Descripcion:
+            Empaqueta la informacion de la habilidad especial de un
+            rol para exponerla en el estado: nombre, descripcion,
+            costo, daño, segundos de enfriamiento restantes y si esta
+            disponible para usarse ahora mismo. Sirve para que la
+            interfaz dibuje el boton de habilidad con su estado real
+            sin duplicar las reglas de negocio.
+
+        Entradas:
+            rol (str): "defensor" o "atacante".
+
+        Salidas:
+            dict: Datos listos para mostrar en la interfaz.
+
+        Restricciones:
+            Ninguna.
+        """
+        faccion = self.faccion_defensor if rol == "defensor" else self.faccion_atacante
+        habilidad = obtener_habilidad_de_faccion(faccion)
+        dinero_disponible = self.dinero_defensor if rol == "defensor" else self.dinero_atacante
+        segundos_cooldown = self._segundos_restantes_cooldown_habilidad(rol)
+
+        bloqueada_por_fase = (
+            (rol == "defensor" and self.fase_ronda == FASE_ATAQUE_ATACANTE)
+            or (rol == "atacante" and self.fase_ronda == FASE_CONSTRUCCION_DEFENSOR)
+        )
+
+        return {
+            "faccion": faccion,
+            "nombre": habilidad["nombre"],
+            "descripcion": habilidad["descripcion"],
+            "costo": habilidad["costo"],
+            "dano": habilidad["dano"],
+            "color": habilidad["color"],
+            "tipo_efecto": habilidad["tipo_efecto"],
+            "cooldown_segundos": habilidad["cooldown_segundos"],
+            "segundos_restantes_cooldown": segundos_cooldown,
+            "disponible": (
+                not self.partida_finalizada
+                and not bloqueada_por_fase
+                and segundos_cooldown == 0
+                and dinero_disponible >= habilidad["costo"]
+            ),
         }
 
 

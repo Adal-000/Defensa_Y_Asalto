@@ -30,7 +30,7 @@ class Muro:
           dentro del tablero de la partida.
     """
 
-    def __init__(self, costo=60, vida=100, fila=0, columna=0):
+    def __init__(self, costo=60, vida=220, fila=0, columna=0):
         self.nombre = "Muro"
         self.costo = costo
         self.vida = vida

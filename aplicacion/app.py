@@ -24,6 +24,7 @@ from aplicacion.facciones import obtener_catalogo_facciones as _obtener_catalogo
 from aplicacion.configuracion import obtener_configuracion as _obtener_configuracion
 from aplicacion.configuracion import actualizar_configuracion as _actualizar_configuracion
 from aplicacion.configuracion import restablecer_configuracion as _restablecer_configuracion
+from aplicacion import musica as _musica
 
 _partida_actual = None
 
@@ -190,6 +191,49 @@ def comprar_unidad(tipo_unidad, fila, columna):
     return _partida_actual.comprar_unidad(tipo_unidad, fila, columna)
 
 
+def establecer_faccion(rol, faccion):
+    """
+    Descripcion:
+        Registra la facción elegida por un rol en la partida activa,
+        para que su habilidad especial corresponda a esa facción.
+
+    Entradas:
+        rol (str): "defensor" o "atacante".
+        faccion (str): Nombre de la facción elegida.
+
+    Salidas:
+        tuple[bool, str]: Exito de la operacion y mensaje
+        descriptivo.
+
+    Restricciones:
+        - Debe existir una partida activa creada con crear_partida.
+    """
+    if _partida_actual is None:
+        return False, "No hay una partida activa."
+    return _partida_actual.establecer_faccion(rol, faccion)
+
+
+def usar_habilidad_especial(rol):
+    """
+    Descripcion:
+        Activa la habilidad especial de facción del rol indicado en
+        la partida activa.
+
+    Entradas:
+        rol (str): "defensor" o "atacante".
+
+    Salidas:
+        tuple[bool, str]: Exito de la operacion y mensaje
+        descriptivo.
+
+    Restricciones:
+        - Debe existir una partida activa creada con crear_partida.
+    """
+    if _partida_actual is None:
+        return False, "No hay una partida activa."
+    return _partida_actual.usar_habilidad_especial(rol)
+
+
 def iniciar_fase_ataque():
     """
     Descripcion:
@@ -269,9 +313,11 @@ def obtener_estado_partida():
 def obtener_catalogo_torres():
     """
     Descripcion:
-        Devuelve informacion basica de los tipos de torres que puede
-        comprar el defensor. Es util para llenar menus o etiquetas de
-        ayuda en la interfaz grafica.
+        Devuelve informacion basica de los tres tipos de torres que
+        puede comprar el defensor (normal, pesada y especial). Es
+        util para llenar menus o etiquetas de ayuda en la interfaz
+        grafica. Solo se exponen las tres claves oficiales, aunque el
+        dominio reconozca alias adicionales por compatibilidad.
 
     Entradas:
         Ninguna.
@@ -283,11 +329,11 @@ def obtener_catalogo_torres():
     Restricciones:
         Ninguna.
     """
-    from dominio.entidades.torre import FABRICANTES_TORRES
+    from dominio.entidades.torre import FABRICANTES_TORRES, CLAVES_CATALOGO_TORRES
 
     catalogo = []
-    for clave, fabricante in FABRICANTES_TORRES.items():
-        torre = fabricante()
+    for clave in CLAVES_CATALOGO_TORRES:
+        torre = FABRICANTES_TORRES[clave]()
         catalogo.append({
             "clave": clave,
             "nombre": torre.nombre,
@@ -439,3 +485,49 @@ def actualizar_configuracion(**opciones):
 def restablecer_configuracion():
     """Restaura las preferencias predeterminadas."""
     return _restablecer_configuracion()
+
+
+def iniciar_musica_de_fondo():
+    """
+    Descripcion:
+        Arranca la música de fondo global del programa usando la
+        ruta guardada en la configuración del jugador, o la canción
+        predeterminada de la carpeta Musica/ si no hay ninguna
+        configurada todavía. Pensada para llamarse una sola vez al
+        iniciar el programa (en root.py), para que la música siga
+        sonando sin importar qué ventana esté abierta.
+
+    Entradas:
+        Ninguna.
+
+    Salidas:
+        tuple[bool, str]: Exito de la operación y mensaje descriptivo.
+
+    Restricciones:
+        - Requiere pygame instalado para producir sonido real; si no
+          está disponible, el juego sigue funcionando en silencio.
+    """
+    ruta_configurada = _obtener_configuracion().get("ruta_musica", "")
+    return _musica.reproducir_predeterminada_si_no_hay_nada(ruta_configurada)
+
+
+def reproducir_musica(ruta=None):
+    """Reproduce música de fondo (la indicada o la última usada)."""
+    return _musica.reproducir(ruta)
+
+
+def detener_musica():
+    """Detiene la música de fondo. Es la única forma de apagarla."""
+    _musica.detener()
+    return True, "Música detenida."
+
+
+def musica_esta_reproduciendo():
+    """Indica si la música de fondo está sonando ahora mismo."""
+    return _musica.esta_reproduciendo()
+
+
+def obtener_ruta_musica_actual():
+    """Devuelve la ruta del archivo de música actual o predeterminada."""
+    return _musica.obtener_ruta_actual() or _musica.RUTA_MUSICA_PREDETERMINADA
+

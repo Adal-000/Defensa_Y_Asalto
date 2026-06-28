@@ -15,6 +15,7 @@ from infraestructura.red.protocolo import (
     ACCION_COMPRAR_MURO,
     ACCION_COMPRAR_TORRE,
     ACCION_COMPRAR_UNIDAD,
+    ACCION_USAR_HABILIDAD_ESPECIAL,
     ACCION_INICIAR_COMBATE,
     ACCION_OBTENER_ESTADO,
     ACCION_PAUSAR_COMBATE,
@@ -310,6 +311,28 @@ class ClientePartida:
             columna=columna,
         )
 
+    def usar_habilidad_especial(self):
+        """
+        Descripcion:
+            Envia al servidor la solicitud para activar la habilidad
+            especial de la facción de este cliente. El servidor
+            determina cual habilidad corresponde según la facción que
+            este rol eligió en el lobby; el costo y el daño los
+            calcula siempre la clase Partida, nunca la interfaz.
+
+        Entradas:
+            Ninguna.
+
+        Salidas:
+            tuple[bool, str]: Exito del envio y mensaje descriptivo.
+
+        Restricciones:
+            - Debe existir una partida creada en el servidor.
+            - El rol debe tener dinero suficiente y la habilidad debe
+              estar fuera de su tiempo de enfriamiento.
+        """
+        return self.enviar_accion(ACCION_USAR_HABILIDAD_ESPECIAL)
+
 
     def ejecutar_combate(self):
         """
@@ -458,6 +481,11 @@ class ClientePartida:
                 "roles_faltantes": list(self.roles_faltantes),
                 "sala_lista": self.sala_lista,
                 "mensaje_sala": self.mensaje_sala,
+                "segundos_restantes_preparacion": (
+                    self.ultimo_estado.get("segundos_restantes_preparacion")
+                    if isinstance(self.ultimo_estado, dict)
+                    else None
+                ),
             }
 
 

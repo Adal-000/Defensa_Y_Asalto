@@ -2,7 +2,6 @@
 # Archivo para manejo de configuracion
 #=======================================#
 
-import importlib.util
 import os
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -31,11 +30,11 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
     configuracion_actual = app.obtener_configuracion()
     ip_var = tk.StringVar(value=configuracion_actual["ip_servidor_predeterminada"])
     puerto_var = tk.StringVar(value=str(configuracion_actual["puerto_predeterminado"]))
-    musica_var = tk.StringVar(value=configuracion_actual.get("ruta_musica", ""))
-    reproductor_musica = {"pygame": None, "reproduciendo": False}
+    musica_var = tk.StringVar(value=configuracion_actual.get("ruta_musica", "") or app.obtener_ruta_musica_actual())
 
     def GoMainR():
-        detener_musica()
+        # Salir de Configuración ya NO detiene la música: solo el
+        # botón "Detener" de esta misma ventana la apaga.
         window3.destroy()
         GoMain()
 
@@ -58,16 +57,6 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
             musica_var.set(ruta)
             etiqueta_estado.config(text="Música seleccionada. Pulsa Reproducir para escucharla.", fg=COLOR_BORDE)
 
-    def obtener_pygame_mixer():
-        if reproductor_musica["pygame"] is not None:
-            return reproductor_musica["pygame"]
-        if importlib.util.find_spec("pygame") is None:
-            return None
-        import pygame
-        pygame.mixer.init()
-        reproductor_musica["pygame"] = pygame
-        return pygame
-
     def reproducir_musica():
         ruta = musica_var.get().strip()
         if not ruta:
@@ -76,20 +65,16 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
         if not os.path.exists(ruta):
             messagebox.showwarning("Música", "El archivo seleccionado no existe.")
             return
-        pygame = obtener_pygame_mixer()
-        if pygame is None:
-            messagebox.showwarning("Música", "Para reproducir audio instala pygame en el entorno de Python.")
+        exito, mensaje = app.reproducir_musica(ruta)
+        if not exito:
+            messagebox.showwarning("Música", mensaje)
+            etiqueta_estado.config(text=mensaje, fg="#ef9a9a")
             return
-        pygame.mixer.music.load(ruta)
-        pygame.mixer.music.play(-1)
-        reproductor_musica["reproduciendo"] = True
-        etiqueta_estado.config(text="Reproduciendo música seleccionada.", fg="#8ee08e")
+        etiqueta_estado.config(text="Reproduciendo música. Sigue sonando en todas las ventanas.", fg="#8ee08e")
 
     def detener_musica():
-        pygame = reproductor_musica.get("pygame")
-        if pygame is not None and reproductor_musica.get("reproduciendo"):
-            pygame.mixer.music.stop()
-        reproductor_musica["reproduciendo"] = False
+        app.detener_musica()
+        etiqueta_estado.config(text="Música detenida.", fg=COLOR_SUAVE)
 
     def aplicar_configuracion():
         try:
@@ -113,9 +98,8 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
         valores = app.restablecer_configuracion()
         ip_var.set(valores["ip_servidor_predeterminada"])
         puerto_var.set(str(valores["puerto_predeterminado"]))
-        musica_var.set(valores.get("ruta_musica", ""))
-        detener_musica()
-        etiqueta_estado.config(text="Configuración restablecida.", fg=COLOR_BORDE)
+        musica_var.set(valores.get("ruta_musica", "") or app.obtener_ruta_musica_actual())
+        etiqueta_estado.config(text="Configuración restablecida. La música sigue sonando.", fg=COLOR_BORDE)
 
     boton_volver = tk.Button(
         window3,
@@ -187,8 +171,4 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
     etiqueta_estado = tk.Label(window3, text="Los cambios aplican durante la sesión actual.", font=("Arial", 11, "bold"), bg=COLOR_FONDO, fg=COLOR_SUAVE)
     etiqueta_estado.place(relx=0.5, y=575, anchor="center")
 
-    def cerrar_configuracion():
-        detener_musica()
-        cerrar_todo()
-
-    window3.protocol("WM_DELETE_WINDOW", cerrar_configuracion)
+    window3.protocol("WM_DELETE_WINDOW", cerrar_todo)

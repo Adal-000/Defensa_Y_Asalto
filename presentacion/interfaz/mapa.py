@@ -2,6 +2,7 @@
 # Archivo para mostrar el mapa del juego
 #=======================================#
 
+import math
 import os
 import tkinter as tk
 from tkinter import messagebox
@@ -35,8 +36,13 @@ SEGUNDOS_PREPARACION_ROL = 15
 
 TIEMPO_PREPARACION_SEGUNDOS = 15
 INTERVALO_POLLING_MS = 250
-INTERVALO_COMBATE_LOCAL_MS = 750
+INTERVALO_POLLING_RAPIDO_MS = 120
+INTERVALO_COMBATE_LOCAL_MS = 1000
 RONDAS_PARA_GANAR = 3
+
+FASE_ATAQUE_ATACANTE = "ataque_atacante"
+FASE_CONSTRUCCION_DEFENSOR = "construccion_defensor"
+FASE_COMBATE = "combate"
 
 
 RUTA_PROYECTO = os.path.abspath(
@@ -78,12 +84,18 @@ CLAVE_UNIDAD_POR_NOMBRE = {
 }
 
 CLAVE_TORRE_POR_NOMBRE = {
+    "torre normal": "normal",
+    "normal": "normal",
     "torre arquera": "normal",
     "arquera": "normal",
+    "torre pesada": "pesada",
+    "pesada": "pesada",
     "torre cañon": "pesada",
     "torre canon": "pesada",
     "cañon": "pesada",
     "canon": "pesada",
+    "torre especial": "especial",
+    "especial": "especial",
     "torre de hielo": "especial",
     "hielo": "especial",
     "torre de soporte": "especial",
@@ -130,11 +142,20 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         cliente_red = getattr(adaptador_red, "cliente", None)
 
     modo_red = cliente_red is not None and getattr(cliente_red, "conectado", False)
-    faccion_jugador = datos_partida.get("faccion") or ""
+
     catalogo_facciones = app.obtener_catalogo_facciones()
     facciones_por_nombre = {faccion["nombre"]: faccion for faccion in catalogo_facciones}
-    faccion_defensor = faccion_jugador if rol_jugador == "defensor" else "España"
-    faccion_atacante = faccion_jugador if rol_jugador == "atacante" else "EE.UU"
+
+    # Nombres de los jugadores para crear la partida local (sin red).
+    # En modo red estos nombres los define el servidor segun quien se
+    # conecto como defensor y quien como atacante.
+    nombre_defensor = datos_partida.get("nombre_defensor") or (
+        nombre_usuario if rol_jugador == "defensor" else "Defensor"
+    )
+    nombre_atacante = datos_partida.get("nombre_atacante") or (
+        nombre_usuario if rol_jugador == "atacante" else "Atacante"
+    )
+
     imagenes_mapa = {}
     cuadro_mapa = None
     etiqueta_marcador = None
@@ -143,11 +164,12 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     etiqueta_dinero_atacante = None
     etiqueta_resultado = None
     boton_turno = None
+    boton_habilidad = None
     caja_informacion_contrincante = None
     seleccion_actual = {"tipo": None, "clave": None, "nombre": None}
     ultimo_estado = {"datos": {}}
     botones_compra = []
-    control_combate = {"activo": False, "after_id": None, "cuenta_id": None, "cerrando": False, "red_iniciado": False}
+    imagenes = {}
 
     preferencias = app.obtener_configuracion()
 
@@ -159,9 +181,6 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             return ultimo_estado["datos"]
         return app.obtener_estado_partida()
 
-    def refrescar_estado_red():
-        return
-
     def mostrar_cuadricula_activa():
         return bool(app.obtener_configuracion().get("mostrar_cuadricula", True))
 
@@ -170,13 +189,12 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
     if modo_red:
         cliente_red.obtener_estado()
+        cliente_red.enviar_accion("elegir_faccion", faccion=faccion_jugador)
     else:
         app.crear_partida(nombre_defensor, nombre_atacante)
+        app.establecer_faccion("defensor", faccion_defensor)
+        app.establecer_faccion("atacante", faccion_atacante)
 
-    seleccion_actual = {"tipo": None, "clave": None, "nombre": None}
-    botones_compra = []
-    imagenes = {}
-    ultimo_estado = {"datos": {}}
     control = {
         "cerrando": False,
         "after_polling": None,
@@ -187,13 +205,12 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         "combate_local_activo": False,
     }
     estado_ui = {
-        "fase": "preparacion",
+        "fase": FASE_ATAQUE_ATACANTE,
         "segundos": TIEMPO_PREPARACION_SEGUNDOS,
         "ronda": 1,
         "victorias_defensor": 0,
         "victorias_atacante": 0,
         "partida_finalizada": False,
-        "temporizador_enviado": set(),
         "resultados_mostrados": set(),
         "puntuacion_anterior": (0, 0),
     }
@@ -497,6 +514,11 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             return cliente_red.iniciar_combate()
         return app.resolver_preparacion_agotada()
 
+    def _accion_usar_habilidad_especial():
+        if modo_red:
+            return cliente_red.usar_habilidad_especial()
+        return app.usar_habilidad_especial(rol_jugador)
+
     # -----------------------------------------------------------------
     # Marcador, temporizador y resultados
     # -----------------------------------------------------------------
@@ -511,18 +533,26 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             text=f"Ronda {ronda} | Defensor {vic_def} - {vic_ata} Atacante | gana el primero en {para_ganar}"
         )
 
-    def actualizar_temporizador_label(texto_extra=""):
+    def actualizar_temporizador_label():
         fase = estado_ui["fase"]
         if estado_ui["partida_finalizada"]:
             etiqueta_temporizador.config(text="Partida finalizada", fg="#444444")
-        elif fase == "combate":
+        elif fase == FASE_COMBATE:
             etiqueta_temporizador.config(text="⚔ Combate en tiempo real", fg="#1565c0")
-        else:
+        elif fase == FASE_ATAQUE_ATACANTE:
             seg = estado_ui["segundos"]
             etiqueta_temporizador.config(
-                text=texto_extra or f"⏱ Preparación: {seg}s",
-                fg="#c45100" if seg <= 5 else "#333333",
+                text=f"⏱ Preparación atacante: {seg}s",
+                fg="#c45100" if seg <= 5 else "#b05a00",
             )
+        elif fase == FASE_CONSTRUCCION_DEFENSOR:
+            seg = estado_ui["segundos"]
+            etiqueta_temporizador.config(
+                text=f"⏱ Preparación defensor: {seg}s",
+                fg="#c45100" if seg <= 5 else "#173a59",
+            )
+        else:
+            etiqueta_temporizador.config(text="Preparación", fg="#333333")
 
     def mostrar_caja_resultado(ganador_ronda, partida_finalizada=False, ganador_partida=None):
         if not ventana_activa():
@@ -580,14 +610,20 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
         estado_ui["puntuacion_anterior"] = puntuacion
 
-    def reiniciar_temporizador_si_cambio_ronda(estado):
+    def sincronizar_fase_y_temporizador(estado):
+        """
+        Descripcion:
+            Unico punto que decide en que fase visual esta la partida
+            y cuantos segundos de preparación quedan. Usa siempre el
+            campo "segundos_restantes_preparacion" que calcula el
+            backend (la clase Partida, ya sea local o a traves del
+            servidor), nunca un contador propio de la interfaz. Esto
+            evita que el reloj del defensor y el del atacante se vean
+            distintos entre los dos dispositivos.
+        """
         ronda = int(estado.get("numero_ronda", 1))
-        fase_logica = estado.get("fase_ronda", "")
+        fase_logica = estado.get("fase_ronda", FASE_ATAQUE_ATACANTE)
         partida_finalizada = bool(estado.get("partida_finalizada", False))
-        combate_red = False
-        datos_red = obtener_ultimos_datos_red()
-        if isinstance(datos_red, dict):
-            combate_red = bool(datos_red.get("combate_activo", False))
 
         estado_ui["partida_finalizada"] = partida_finalizada
         estado_ui["ronda"] = ronda
@@ -596,50 +632,67 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
         if partida_finalizada:
             estado_ui["fase"] = "finalizada"
-            cancelar_after("after_timer")
             actualizar_temporizador_label()
             return
 
-        if fase_logica == "combate" or combate_red:
-            estado_ui["fase"] = "combate"
-            cancelar_after("after_timer")
+        if fase_logica == FASE_COMBATE:
+            if estado_ui["fase"] != FASE_COMBATE:
+                escribir_evento("Inicia el combate. Ambos jugadores pueden seguir comprando.")
+            estado_ui["fase"] = FASE_COMBATE
             actualizar_temporizador_label()
+            if not modo_red and not control["combate_local_activo"]:
+                iniciar_combate_local()
             return
 
-        if estado_ui["fase"] != "preparacion" or estado_ui.get("ronda_timer") != ronda:
-            estado_ui["fase"] = "preparacion"
-            estado_ui["ronda_timer"] = ronda
-            estado_ui["segundos"] = TIEMPO_PREPARACION_SEGUNDOS
-            iniciar_temporizador_preparacion()
+        cambio_de_fase = estado_ui["fase"] != fase_logica
+        estado_ui["fase"] = fase_logica
+        segundos = estado.get("segundos_restantes_preparacion")
+        if segundos is None:
+            segundos = TIEMPO_PREPARACION_SEGUNDOS
+        estado_ui["segundos"] = int(segundos)
 
-    def iniciar_temporizador_preparacion():
-        cancelar_after("after_timer")
+        if cambio_de_fase and fase_logica == FASE_CONSTRUCCION_DEFENSOR:
+            escribir_evento("El atacante quedó bloqueado. Ahora el defensor coloca sus defensas.")
+
         actualizar_temporizador_label()
-        control["after_timer"] = window_mapa.after(1000, tick_temporizador_preparacion)
 
-    def tick_temporizador_preparacion():
+        if rol_jugador == "atacante" and fase_logica == FASE_CONSTRUCCION_DEFENSOR:
+            etiqueta_seleccion.config(text="Bloqueado: espera a que el defensor termine.")
+        elif rol_jugador == "defensor" and fase_logica == FASE_ATAQUE_ATACANTE:
+            etiqueta_seleccion.config(text="Espera: el atacante está colocando tropas.")
+
+        iniciar_reloj_preparacion()
+
+    def iniciar_reloj_preparacion():
+        cancelar_after("after_timer")
+        control["after_timer"] = window_mapa.after(1000, tick_reloj_preparacion)
+
+    def tick_reloj_preparacion():
         if not ventana_activa() or estado_ui["partida_finalizada"]:
             return
-        if estado_ui["fase"] != "preparacion":
+        if estado_ui["fase"] not in (FASE_ATAQUE_ATACANTE, FASE_CONSTRUCCION_DEFENSOR):
             return
 
-        estado_ui["segundos"] -= 1
+        if estado_ui["segundos"] > 0:
+            estado_ui["segundos"] -= 1
         actualizar_temporizador_label()
 
         if estado_ui["segundos"] <= 0:
-            numero_ronda = estado_ui["ronda"]
-            if numero_ronda not in estado_ui["temporizador_enviado"]:
-                estado_ui["temporizador_enviado"].add(numero_ronda)
-                escribir_evento("Tiempo de preparación terminado. El combate inicia si hay tropas; si no, gana el defensor.")
-                _accion_iniciar_combate(numero_ronda)
-                if not modo_red:
-                    actualizar_vista()
-                    estado = _obtener_estado()
-                    if estado.get("fase_ronda") == "combate":
-                        iniciar_combate_local()
+            if not modo_red:
+                # En modo local no hay servidor avanzando fases solo: lo
+                # hace esta misma interfaz al llegar a 0.
+                _, mensaje = app.resolver_preparacion_agotada()
+                escribir_evento(mensaje)
+                actualizar_vista()
+            else:
+                # En red el servidor avanza la fase con su propio reloj
+                # (ver _bucle_combate en servidor.py); aqui solo se pide
+                # el estado mas reciente para no quedar atrasado.
+                cliente_red.obtener_estado()
+            control["after_timer"] = window_mapa.after(400, tick_reloj_preparacion)
             return
 
-        control["after_timer"] = window_mapa.after(1000, tick_temporizador_preparacion)
+        control["after_timer"] = window_mapa.after(1000, tick_reloj_preparacion)
 
     # -----------------------------------------------------------------
     # Catálogo y compra
@@ -654,7 +707,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             "clave": "muro",
             "nombre": "Muro",
             "costo": 60,
-            "vida": 100,
+            "vida": 220,
             "dano": 0,
             "alcance": 0,
             "habilidad": "bloqueo",
@@ -665,7 +718,11 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         seleccion_actual["tipo"] = compra["tipo"]
         seleccion_actual["clave"] = compra["clave"]
         seleccion_actual["nombre"] = compra["nombre"]
-        etiqueta_seleccion.config(text=f"Seleccionado: {compra['nombre']}")
+        if compra["tipo"] == "muro":
+            detalle = f"❤{compra['vida']}"
+        else:
+            detalle = f"❤{compra['vida']}  ⚔{compra['dano']}"
+        etiqueta_seleccion.config(text=f"Seleccionado: {compra['nombre']} ({detalle}) — ${compra['costo']}")
         for boton, compra_boton in botones_compra:
             boton.config(relief="sunken" if compra_boton is compra else "raised")
 
@@ -784,9 +841,106 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
                     for item in proyectiles:
                         cuadro_mapa.delete(item)
                 except tk.TclError:
-                    control_combate["cerrando"] = True
+                    control["cerrando"] = True
 
             window_mapa.after(650, borrar_proyectiles)
+
+    def animar_habilidad_especial(rol_que_dispara, info_habilidad):
+        """
+        Descripcion:
+            Dibuja el efecto visual de la habilidad especial de
+            faccion sobre el tablero. El origen del efecto depende de
+            quien la dispara:
+
+            - El defensor la dispara desde su base (fila 0) hacia las
+              primeras filas de la zona del atacante.
+            - El atacante la dispara desde el lado contrario a la
+              base (fila 10) hacia las ultimas filas de la zona del
+              defensor.
+
+            La forma del efecto cambia segun el tipo (gas, granadas,
+            flechas, artilleria, mortero o fuego) para que cada
+            faccion se sienta distinta, pero todas comparten el mismo
+            mecanismo de animacion temporal con after().
+        """
+        if not ventana_activa() or cuadro_mapa is None:
+            return
+
+        color = info_habilidad.get("color", "#999999")
+        tipo_efecto = info_habilidad.get("tipo_efecto", "generico")
+        filas_de_alcance = info_habilidad.get("filas_de_alcance", 3)
+
+        if rol_que_dispara == "defensor":
+            fila_origen = 0
+            filas_objetivo = list(range(8, min(8 + filas_de_alcance, 11)))
+        else:
+            fila_origen = 10
+            filas_objetivo = list(range(max(1, 7 - filas_de_alcance + 1), 8))
+
+        columna_origen = COLUMNAS_TABLERO // 2
+        x_origen, y_origen = centro_casilla(fila_origen, columna_origen)
+
+        elementos = []
+
+        for fila_objetivo in filas_objetivo:
+            for columna in range(COLUMNAS_TABLERO):
+                x_destino, y_destino = centro_casilla(fila_objetivo, columna)
+
+                if tipo_efecto == "gas":
+                    radio = 22
+                    elementos.append(cuadro_mapa.create_oval(
+                        x_destino - radio, y_destino - radio // 2,
+                        x_destino + radio, y_destino + radio // 2,
+                        fill=color, outline="", stipple="gray50",
+                    ))
+                elif tipo_efecto == "flechas":
+                    elementos.append(cuadro_mapa.create_line(
+                        x_origen, y_origen, x_destino, y_destino,
+                        fill=color, width=2, arrow=tk.LAST,
+                    ))
+                elif tipo_efecto == "granadas":
+                    medio_x = (x_origen + x_destino) / 2
+                    medio_y = min(y_origen, y_destino) - 30
+                    elementos.append(cuadro_mapa.create_line(
+                        x_origen, y_origen, medio_x, medio_y, x_destino, y_destino,
+                        fill=color, width=2, smooth=True,
+                    ))
+                    elementos.append(cuadro_mapa.create_oval(
+                        x_destino - 10, y_destino - 10, x_destino + 10, y_destino + 10,
+                        fill="#ff7a00", outline=color, width=2,
+                    ))
+                else:
+                    # artilleria, mortero, fuego y cualquier tipo generico:
+                    # explosion circular sobre la casilla objetivo.
+                    radio = 14
+                    elementos.append(cuadro_mapa.create_oval(
+                        x_destino - radio, y_destino - radio,
+                        x_destino + radio, y_destino + radio,
+                        fill=color, outline="#111111", width=2,
+                    ))
+                    elementos.append(cuadro_mapa.create_oval(
+                        x_destino - radio // 2, y_destino - radio // 2,
+                        x_destino + radio // 2, y_destino + radio // 2,
+                        fill="#ffffff", outline="",
+                    ))
+
+        etiqueta_aviso = cuadro_mapa.create_text(
+            x_origen, max(10, y_origen),
+            text=f"¡{info_habilidad.get('nombre', 'Habilidad especial')}!",
+            fill=color, font=("Arial", 12, "bold"),
+        )
+        elementos.append(etiqueta_aviso)
+
+        def borrar_efecto():
+            if not ventana_activa():
+                return
+            try:
+                for item in elementos:
+                    cuadro_mapa.delete(item)
+            except tk.TclError:
+                control["cerrando"] = True
+
+        window_mapa.after(900, borrar_efecto)
 
     def comprar_en_casilla(evento):
         if estado_ui["partida_finalizada"]:
@@ -794,8 +948,15 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         if seleccion_actual["clave"] is None:
             escribir_evento("Primero selecciona una compra del panel izquierdo.")
             return
-        if rol_jugador == "defensor" and estado_ui["fase"] == "combate":
-            escribir_evento("El defensor no coloca defensas durante el combate.")
+
+        estado_actual = _obtener_estado()
+        fase_actual = estado_actual.get("fase_ronda", estado_ui.get("fase"))
+
+        if rol_jugador == "defensor" and fase_actual == FASE_ATAQUE_ATACANTE:
+            escribir_evento("Espera: el atacante todavía está colocando sus tropas.")
+            return
+        if rol_jugador == "atacante" and fase_actual == FASE_CONSTRUCCION_DEFENSOR:
+            escribir_evento("El atacante quedó bloqueado mientras el defensor prepara sus defensas.")
             return
 
         fila, columna = convertir_click_a_casilla(evento)
@@ -815,227 +976,110 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         else:
             exito, mensaje = _accion_comprar_unidad(seleccion_actual["clave"], fila, columna)
 
-    def nombre_fase_preparacion(estado):
-        fase = estado.get("fase_ronda", "")
-        if fase == "ataque_atacante":
-            return "Preparación atacante: coloca tropas"
-        if fase == "construccion_defensor":
-            return "Preparación defensor: coloca defensas"
-        if fase == "combate":
-            return "Combate en tiempo real"
-        return "Preparación"
+        escribir_evento(mensaje)
 
-    def nombre_fase_preparacion(estado):
-        fase = estado.get("fase_ronda", "")
-        if fase == "ataque_atacante":
-            return "Preparación atacante: coloca tropas"
-        if fase == "construccion_defensor":
-            return "Preparación defensor: coloca defensas"
-        if fase == "combate":
-            return "Combate en tiempo real"
-        return "Preparación"
-
-    def nombre_fase_preparacion(estado):
-        fase = estado.get("fase_ronda", "")
-        if fase == "ataque_atacante":
-            return "Preparación atacante: coloca tropas"
-        if fase == "construccion_defensor":
-            return "Preparación defensor: coloca defensas"
-        if fase == "combate":
-            return "Combate en tiempo real"
-        return "Preparación"
-
-    def nombre_fase_preparacion(estado):
-        fase = estado.get("fase_ronda", "")
-        if fase == "ataque_atacante":
-            return "Preparación atacante: coloca tropas"
-        if fase == "construccion_defensor":
-            return "Preparación defensor: coloca defensas"
-        if fase == "combate":
-            return "Combate en tiempo real"
-        return "Preparación"
-
-    def nombre_fase_preparacion(estado):
-        fase = estado.get("fase_ronda", "")
-        if fase == "ataque_atacante":
-            return "Preparación atacante: coloca tropas"
-        if fase == "construccion_defensor":
-            return "Preparación defensor: coloca defensas"
-        if fase == "combate":
-            return "Combate en tiempo real"
-        return "Preparación"
-
-    def nombre_fase_preparacion(estado):
-        fase = estado.get("fase_ronda", "")
-        if fase == "ataque_atacante":
-            return "Preparación atacante: coloca tropas"
-        if fase == "construccion_defensor":
-            return "Preparación defensor: coloca defensas"
-        if fase == "combate":
-            return "Combate en tiempo real"
-        return "Preparación"
-
-    def nombre_fase_preparacion(estado):
-        fase = estado.get("fase_ronda", "")
-        if fase == "ataque_atacante":
-            return "Preparación atacante: coloca tropas"
-        if fase == "construccion_defensor":
-            return "Preparación defensor: coloca defensas"
-        if fase == "combate":
-            return "Combate en tiempo real"
-        return "Preparación"
-
-    def nombre_fase_preparacion(estado):
-        fase = estado.get("fase_ronda", "")
-        if fase == "ataque_atacante":
-            return "Preparación atacante: coloca tropas"
-        if fase == "construccion_defensor":
-            return "Preparación defensor: coloca defensas"
-        if fase == "combate":
-            return "Combate en tiempo real"
-        return "Preparación"
-
-    def nombre_fase_preparacion(estado):
-        fase = estado.get("fase_ronda", "")
-        if fase == "ataque_atacante":
-            return "Preparación atacante: coloca tropas"
-        if fase == "construccion_defensor":
-            return "Preparación defensor: coloca defensas"
-        if fase == "combate":
-            return "Combate en tiempo real"
-        return "Preparación"
-
-    def nombre_fase_preparacion(estado):
-        fase = estado.get("fase_ronda", "")
-        if fase == "ataque_atacante":
-            return "Preparación atacante: coloca tropas"
-        if fase == "construccion_defensor":
-            return "Preparación defensor: coloca defensas"
-        if fase == "combate":
-            return "Combate en tiempo real"
-        return "Preparación"
-
-    def nombre_fase_preparacion(estado):
-        fase = estado.get("fase_ronda", "")
-        if fase == "ataque_atacante":
-            return "Preparación atacante: coloca tropas"
-        if fase == "construccion_defensor":
-            return "Preparación defensor: coloca defensas"
-        if fase == "combate":
-            return "Combate en tiempo real"
-        return "Preparación"
-
-    def nombre_fase_preparacion(estado):
-        fase = estado.get("fase_ronda", "")
-        if fase == "ataque_atacante":
-            return "Preparación atacante: coloca tropas"
-        if fase == "construccion_defensor":
-            return "Preparación defensor: coloca defensas"
-        if fase == "combate":
-            return "Combate en tiempo real"
-        return "Preparación"
-
-    def ejecutar_pulso_combate():
-        if not ventana_activa():
-            return False
-        estado_antes = obtener_estado_visible()
-        animar_proyectiles(estado_antes)
-        if modo_red:
-            if not control_combate["red_iniciado"]:
-                _exito, mensaje = cliente_red.iniciar_combate()
-                escribir_evento(mensaje)
-                control_combate["red_iniciado"] = True
-            cliente_red.obtener_estado()
+        if exito:
+            # Refresco inmediato y optimista: en modo red la confirmacion
+            # oficial llega por polling, pero el jugador debe ver su
+            # pieza en el tablero apenas hace clic, no segundos despues.
             actualizar_vista()
-            estado_actual = obtener_estado_visible()
-            if estado_actual.get("fase_ronda") == "construccion_defensor" and control_combate.get("red_iniciado"):
-                control_combate["activo"] = False
-                control_combate["red_iniciado"] = False
-                etiqueta_temporizador.config(text=f"Preparación defensor: {SEGUNDOS_PREPARACION_ROL}s", fg="#173a59")
-                actualizar_cuenta_regresiva(SEGUNDOS_PREPARACION_ROL)
-                return False
-            return not estado_actual.get("partida_finalizada", False)
-        else:
-            resultado = app.ejecutar_combate()
-        for evento in resultado.get("eventos", []):
-            escribir_evento(evento)
-        actualizar_vista()
-        if resultado.get("fase_ronda") == "construccion_defensor":
-            control_combate["activo"] = False
-            etiqueta_temporizador.config(text=f"Preparación defensor: {SEGUNDOS_PREPARACION_ROL}s", fg="#173a59")
-            control_combate["red_iniciado"] = False
-            actualizar_cuenta_regresiva(SEGUNDOS_PREPARACION_ROL)
-            return False
-        return not resultado.get("ronda_finalizada", False)
-
-    def mostrar_resultado_combate(estado):
-        if etiqueta_resultado is None or not ventana_activa():
-            return
-        ganador_partida = estado.get("rol_ganador_partida")
-        if estado.get("partida_finalizada") and ganador_partida:
-            texto = "¡GANASTE LA PARTIDA!" if ganador_partida == rol_jugador else "PERDISTE LA PARTIDA"
-            color = "#1b5e20" if ganador_partida == rol_jugador else "#b71c1c"
-        else:
-            ganador_ronda = estado.get("ganador_ronda") or estado.get("rol_ganador_ronda")
-            if not ganador_ronda:
-                return
-            texto = "¡GANASTE LA RONDA!" if ganador_ronda == rol_jugador else "PERDISTE LA RONDA"
-            color = "#2e7d32" if ganador_ronda == rol_jugador else "#c62828"
-        etiqueta_resultado.config(text=texto, bg=color, fg="white")
-        etiqueta_resultado.place(relx=0.5, y=575, anchor="center")
-        etiqueta_resultado.lift()
-        escribir_evento(texto)
-        if estado.get("partida_finalizada") and boton_turno is not None:
-            boton_turno.config(text="Partida terminada", bg="#9e9e9e", state="disabled")
-
-    def ejecutar_combate_en_tiempo_real():
-        if not control_combate["activo"] or not ventana_activa():
-            return
-        continua = ejecutar_pulso_combate()
-        if continua and control_combate["activo"]:
-            control_combate["after_id"] = window_mapa.after(900, ejecutar_combate_en_tiempo_real)
-        else:
-            control_combate["activo"] = False
-            control_combate["after_id"] = None
-            if ventana_activa():
-                if etiqueta_temporizador.cget("text") != f"Preparación defensor: {SEGUNDOS_PREPARACION_ROL}s":
-                    etiqueta_temporizador.config(text="Combate finalizado", fg="#1b5e20")
-                mostrar_resultado_combate(obtener_estado_visible())
-
-    def iniciar_combate_automatico():
-        if control_combate["activo"]:
-            return
-        control_combate["activo"] = True
-        etiqueta_temporizador.config(text="Combate iniciado", fg="#1b5e20")
-        escribir_evento("Tiempo de preparación terminado. Combate iniciado automáticamente.")
-        ejecutar_combate_en_tiempo_real()
-
-    def actualizar_cuenta_regresiva(segundos_restantes):
-        if not ventana_activa() or control_combate["activo"]:
-            return
-        if segundos_restantes <= 0:
-            control_combate["cuenta_id"] = None
-            iniciar_combate_automatico()
-            return
-        estado_actual = obtener_estado_visible()
-        etiqueta_temporizador.config(
-            text=f"{nombre_fase_preparacion(estado_actual)}: {segundos_restantes}s",
-            fg="#b05a00" if segundos_restantes <= 10 else "#173a59",
-        )
-        control_combate["cuenta_id"] = window_mapa.after(
-            1000, lambda: actualizar_cuenta_regresiva(segundos_restantes - 1)
-        )
+            if modo_red:
+                cliente_red.obtener_estado()
+                window_mapa.after(120, actualizar_vista)
+    def nombre_fase_preparacion(estado):
+        fase = estado.get("fase_ronda", "")
+        if fase == FASE_ATAQUE_ATACANTE:
+            return "Preparación atacante: coloca tropas"
+        if fase == FASE_CONSTRUCCION_DEFENSOR:
+            return "Preparación defensor: coloca defensas"
+        if fase == FASE_COMBATE:
+            return "Combate en tiempo real"
+        return "Preparación"
 
     def alternar_combate_click():
-        if control_combate["activo"]:
-            detener_combate_programado()
-            etiqueta_temporizador.config(text="Combate pausado", fg="#b05a00")
-            escribir_evento("Combate pausado.")
+        """
+        Boton manual "Forzar combate": solo tiene efecto util durante
+        las fases de preparacion (salta el tiempo restante). Durante
+        el combate no hace nada porque el combate ya avanza solo,
+        tanto en red (servidor) como en local (after de Tkinter).
+        """
+        if estado_ui["partida_finalizada"]:
             return
-        control_combate["activo"] = True
-        etiqueta_temporizador.config(text="Combate iniciado", fg="#1b5e20")
-        escribir_evento("Combate en tiempo real iniciado.")
-        ejecutar_combate_en_tiempo_real()
+        if estado_ui["fase"] == FASE_COMBATE:
+            escribir_evento("El combate ya está en curso, avanza automáticamente.")
+            return
+        escribir_evento("Forzando fin de la preparación...")
+        if not modo_red:
+            _, mensaje = app.resolver_preparacion_agotada()
+            escribir_evento(mensaje)
+            actualizar_vista()
+        else:
+            cliente_red.iniciar_combate()
+            window_mapa.after(150, lambda: (cliente_red.obtener_estado(), actualizar_vista()))
+
+    def usar_habilidad_click():
+        """
+        Descripcion:
+            Maneja el clic del boton de habilidad especial. Cada
+            jugador solo tiene un boton, correspondiente a su propio
+            rol; la facción (y por lo tanto el efecto, costo y daño)
+            la determina la clase Partida según lo elegido en el
+            lobby, nunca la interfaz.
+        """
+        if estado_ui["partida_finalizada"]:
+            return
+
+        estado_actual = _obtener_estado()
+        info_habilidad = estado_actual.get(
+            "habilidad_defensor" if rol_jugador == "defensor" else "habilidad_atacante",
+            {},
+        )
+
+        exito, mensaje = _accion_usar_habilidad_especial()
+        escribir_evento(mensaje)
+
+        if exito:
+            animar_habilidad_especial(rol_jugador, info_habilidad)
+            actualizar_vista()
+            if modo_red:
+                window_mapa.after(150, lambda: (cliente_red.obtener_estado(), actualizar_vista()))
+
+    def actualizar_boton_habilidad():
+        """
+        Descripcion:
+            Refresca el texto y el estado (habilitado/deshabilitado)
+            del boton de habilidad especial con la informacion mas
+            reciente del estado de la partida: nombre real de la
+            habilidad de la facción del jugador, costo y segundos de
+            enfriamiento restantes.
+        """
+        if boton_habilidad is None:
+            return
+
+        estado_actual = _obtener_estado()
+        info_habilidad = estado_actual.get(
+            "habilidad_defensor" if rol_jugador == "defensor" else "habilidad_atacante",
+            {},
+        )
+        if not info_habilidad:
+            return
+
+        nombre = info_habilidad.get("nombre", "Habilidad especial")
+        nombre_corto = nombre if len(nombre) <= 16 else nombre[:14] + "…"
+        costo = info_habilidad.get("costo", 0)
+        cooldown = info_habilidad.get("segundos_restantes_cooldown", 0)
+        disponible = info_habilidad.get("disponible", False)
+
+        if cooldown > 0:
+            texto = f"💥 {nombre_corto}\n⏳{cooldown}s"
+        else:
+            texto = f"💥 {nombre_corto}\n${costo}"
+
+        boton_habilidad.config(
+            text=texto,
+            state="normal" if disponible else "disabled",
+            bg="#ff8a65" if disponible else "#cccccc",
+        )
 
     def dibujar_zonas():
         cuadro_mapa.delete("all")
@@ -1143,8 +1187,9 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         actualizar_panel_estado(estado)
         actualizar_marcador(estado)
         detectar_resultado(estado)
-        reiniciar_temporizador_si_cambio_ronda(estado)
+        sincronizar_fase_y_temporizador(estado)
         animar_proyectiles(estado)
+        actualizar_boton_habilidad()
 
     # -----------------------------------------------------------------
     # Combate local y polling red
@@ -1190,21 +1235,6 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             pass
         control["after_polling"] = window_mapa.after(INTERVALO_POLLING_MS, tick_polling)
 
-    def alternar_combate_click():
-        if estado_ui["partida_finalizada"]:
-            return
-        estado = _obtener_estado()
-        numero_ronda = int(estado.get("numero_ronda", estado_ui["ronda"]))
-        if estado.get("fase_ronda") == "combate":
-            escribir_evento("El combate ya está en curso.")
-            return
-        exito, mensaje = _accion_iniciar_combate(numero_ronda)
-        escribir_evento(mensaje)
-        if not modo_red:
-            actualizar_vista()
-            if app.obtener_estado_partida().get("fase_ronda") == "combate":
-                iniciar_combate_local()
-
     # -----------------------------------------------------------------
     # WIDGETS
     # -----------------------------------------------------------------
@@ -1240,23 +1270,41 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
     for indice, compra in enumerate(obtener_catalogo_compras()):
         y_base = 500 + (indice * 34)
-        descripcion = f"{compra['nombre']}  ${compra['costo']}"
+        if compra["tipo"] == "muro":
+            descripcion = f"{compra['nombre']}  ${compra['costo']}  ❤{compra['vida']}"
+        else:
+            descripcion = (
+                f"{compra['nombre']}  ${compra['costo']}  "
+                f"❤{compra['vida']}  ⚔{compra['dano']}"
+            )
         boton_compra = tk.Button(
             window_mapa,
             text=descripcion,
             font=("Arial", 9, "bold"),
-            width=28,
+            width=30,
             command=lambda c=compra: seleccionar_compra(c),
         )
         boton_compra.place(x=35, y=y_base)
         botones_compra.append((boton_compra, compra))
 
-    etiqueta_temporizador = tk.Label(window_mapa, text=f"Preparación: {SEGUNDOS_PREPARACION_ROL}s", font=("Arial", 13, "bold"), width=26, bg="#fff3bf", fg="#173a59", relief="solid", bd=2)
-    etiqueta_temporizador.place(x=70, y=650)
+    etiqueta_temporizador = tk.Label(window_mapa, text=f"Preparación: {SEGUNDOS_PREPARACION_ROL}s", font=("Arial", 12, "bold"), width=26, bg="#fff3bf", fg="#173a59", relief="solid", bd=2)
+    etiqueta_temporizador.place(x=70, y=634)
     etiqueta_cuenta = etiqueta_temporizador
 
-    boton_turno = tk.Button(window_mapa, text="Forzar combate", font=("Arial", 11, "bold"), width=20, bg="#ffb74d", command=alternar_combate_click)
-    boton_turno.place(x=70, y=695)
+    boton_turno = tk.Button(window_mapa, text="Forzar combate", font=("Arial", 9, "bold"), width=15, bg="#ffb74d", command=alternar_combate_click)
+    boton_turno.place(x=35, y=664)
+
+    boton_habilidad = tk.Button(
+        window_mapa,
+        text="💥 Habilidad",
+        font=("Arial", 9, "bold"),
+        width=15,
+        height=2,
+        bg="#cccccc",
+        state="disabled",
+        command=usar_habilidad_click,
+    )
+    boton_habilidad.place(x=185, y=664)
 
     etiqueta_tablero = tk.Label(window_mapa, text="Área del mapa", font=("Arial", 13, "bold"), bg=COLOR_PANEL)
     etiqueta_tablero.place(x=405, y=175)
@@ -1277,6 +1325,5 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
     actualizar_vista()
     if modo_red:
-        window_mapa.after(100, lambda: refrescar_estado_red())
-    actualizar_cuenta_regresiva(SEGUNDOS_PREPARACION_ROL)
+        iniciar_polling()
     window_mapa.protocol("WM_DELETE_WINDOW", cerrar_ventana)

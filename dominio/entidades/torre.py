@@ -232,137 +232,126 @@ class Torre:
         return mensaje
 
 
-def crear_torre_arquera(fila=0, columna=0):
+def crear_torre_normal(fila=0, columna=0):
     """
     Descripcion:
-        Crea una torre de tipo "Torre Arquera", especializada en
-        ataques rapidos y dobles.
+        Crea la "Torre normal": la defensa basica y equilibrada.
+        Tiene alcance largo y dispara dos veces seguidas cuando su
+        habilidad esta lista, pero no es la mas resistente ni la que
+        mas dano hace por golpe. Corresponde a las imagenes
+        "torre_xxx_normal1/2.png" de cada faccion.
 
     Entradas:
         fila (int): Fila del tablero donde se coloca la torre.
         columna (int): Columna del tablero donde se coloca la torre.
 
     Salidas:
-        Torre: Instancia de Torre configurada como Torre Arquera.
+        Torre: Instancia de Torre configurada como Torre normal.
 
     Restricciones:
         Ninguna.
     """
     return Torre(
         nombre="Torre normal",
-        costo=100,
-        vida=130,
-        dano=22,
+        costo=90,
+        vida=220,
+        dano=28,
         alcance=4,
         habilidad="disparo_doble",
-        turnos_habilidad=2,
+        turnos_habilidad=4,
         fila=fila,
         columna=columna,
     )
 
 
-def crear_torre_cañon(fila=0, columna=0):
+def crear_torre_pesada(fila=0, columna=0):
     """
     Descripcion:
-        Crea una torre de tipo "Torre Cañon", especializada en
-        infringir dano a varias unidades a la vez.
+        Crea la "Torre pesada": la defensa mas cara y mas resistente.
+        Pega mas fuerte que el resto y ataca a varias unidades a la
+        vez gracias a su habilidad de dano en area, a cambio de tener
+        menos alcance. Corresponde a las imagenes
+        "torre_xxx_pesada1/2.png" de cada faccion.
 
     Entradas:
         fila (int): Fila del tablero donde se coloca la torre.
         columna (int): Columna del tablero donde se coloca la torre.
 
     Salidas:
-        Torre: Instancia de Torre configurada como Torre Cañon.
+        Torre: Instancia de Torre configurada como Torre pesada.
 
     Restricciones:
         Ninguna.
     """
     return Torre(
         nombre="Torre pesada",
-        costo=150,
-        vida=180,
-        dano=34,
+        costo=130,
+        vida=320,
+        dano=38,
         alcance=3,
         habilidad="dano_area",
-        turnos_habilidad=3,
+        turnos_habilidad=4,
         fila=fila,
         columna=columna,
     )
 
 
-def crear_torre_hielo(fila=0, columna=0):
+def crear_torre_especial(fila=0, columna=0):
     """
     Descripcion:
-        Crea una torre de tipo "Torre de Hielo", especializada en
-        congelar unidades enemigas para retrasar su avance.
+        Crea la "Torre especial": la defensa de soporte/control. Su
+        dano por golpe es el mas bajo de las tres, pero compensa
+        congelando unidades enemigas para frenar el avance del
+        atacante. Corresponde a las imagenes
+        "torre_xxx_especial1/2.png" de cada faccion.
 
     Entradas:
         fila (int): Fila del tablero donde se coloca la torre.
         columna (int): Columna del tablero donde se coloca la torre.
 
     Salidas:
-        Torre: Instancia de Torre configurada como Torre de Hielo.
+        Torre: Instancia de Torre configurada como Torre especial.
 
     Restricciones:
         Ninguna.
     """
     return Torre(
         nombre="Torre especial",
-        costo=120,
-        vida=140,
-        dano=16,
+        costo=110,
+        vida=260,
+        dano=24,
         alcance=4,
         habilidad="congelar_unidad",
-        turnos_habilidad=3,
-        fila=fila,
-        columna=columna,
-    )
-
-
-def crear_torre_soporte(fila=0, columna=0):
-    """
-    Descripcion:
-        Crea una torre de tipo "Torre de Soporte", especializada en
-        reparar torres cercanas y aumentar el dano propio de forma
-        temporal.
-
-    Entradas:
-        fila (int): Fila del tablero donde se coloca la torre.
-        columna (int): Columna del tablero donde se coloca la torre.
-
-    Salidas:
-        Torre: Instancia de Torre configurada como Torre de Soporte.
-
-    Restricciones:
-        Ninguna.
-    """
-    return Torre(
-        nombre="Torre soporte",
-        costo=130,
-        vida=155,
-        dano=14,
-        alcance=3,
-        habilidad="reparar_torre_cercana",
-        turnos_habilidad=3,
+        turnos_habilidad=4,
         fila=fila,
         columna=columna,
     )
 
 
 FABRICANTES_TORRES = {
-    "arquera": crear_torre_arquera,
-    "cañon": crear_torre_cañon,
-    "hielo": crear_torre_hielo,
-    "soporte": crear_torre_soporte,
+    "normal": crear_torre_normal,
+    "pesada": crear_torre_pesada,
+    "especial": crear_torre_especial,
+    # Alias en espanol para no romper interfaces, comandos de consola
+    # o pruebas antiguas que todavia usen los nombres originales.
+    "arquera": crear_torre_normal,
+    "cañon": crear_torre_pesada,
+    "canon": crear_torre_pesada,
+    "hielo": crear_torre_especial,
+    "soporte": crear_torre_especial,
 }
+
+
+CLAVES_CATALOGO_TORRES = ("normal", "pesada", "especial")
 
 
 def crear_torre_por_tipo(tipo_torre, fila=0, columna=0):
     """
     Descripcion:
         Funcion de fabrica que crea una torre segun el tipo solicitado
-        por nombre clave (por ejemplo, "arquera", "cañon", "hielo" o
-        "soporte").
+        por nombre clave. El catalogo oficial usa "normal", "pesada" y
+        "especial" porque son las tres familias que existen en las
+        imagenes de Imagenes/estructuras/<faccion>/.
 
     Entradas:
         tipo_torre (str): Clave del tipo de torre a crear.
@@ -377,7 +366,7 @@ def crear_torre_por_tipo(tipo_torre, fila=0, columna=0):
         - tipo_torre debe ser una de las claves definidas en
           FABRICANTES_TORRES.
     """
-    fabricante = FABRICANTES_TORRES.get(tipo_torre)
+    fabricante = FABRICANTES_TORRES.get(str(tipo_torre).strip().lower())
     if fabricante is None:
         return None
     return fabricante(fila, columna)
