@@ -101,6 +101,8 @@ class Partida:
         self.faccion_atacante = None
         self.ultimo_uso_habilidad_defensor = None
         self.ultimo_uso_habilidad_atacante = None
+        self.timestamp_disparo_defensor = None  # Para que el otro cliente detecte el disparo
+        self.timestamp_disparo_atacante = None
 
         self.historial_eventos = []
 
@@ -637,7 +639,9 @@ class Partida:
 
         if rol == "defensor":
             self.dinero_defensor -= habilidad["costo"]
-            self.ultimo_uso_habilidad_defensor = time.time()
+            ts = time.time()
+            self.ultimo_uso_habilidad_defensor = ts
+            self.timestamp_disparo_defensor = ts
             for unidad in self.unidades:
                 if unidad.fila in filas_objetivo and unidad.vida > 0:
                     unidad.vida = max(0, unidad.vida - dano)
@@ -645,7 +649,9 @@ class Partida:
             self.unidades = [u for u in self.unidades if u.vida > 0]
         else:
             self.dinero_atacante -= habilidad["costo"]
-            self.ultimo_uso_habilidad_atacante = time.time()
+            ts = time.time()
+            self.ultimo_uso_habilidad_atacante = ts
+            self.timestamp_disparo_atacante = ts
             for torre in self.torres:
                 if torre.fila in filas_objetivo and torre.vida > 0:
                     torre.vida = max(0, torre.vida - dano)
@@ -1153,6 +1159,14 @@ class Partida:
             or (rol == "atacante" and self.fase_ronda == FASE_CONSTRUCCION_DEFENSOR)
         )
 
+        ts_disparo = (
+            self.timestamp_disparo_defensor if rol == "defensor"
+            else self.timestamp_disparo_atacante
+        )
+        # recien_disparada: True si se usó en los últimos 3 segundos
+        recien_disparada = (
+            ts_disparo is not None and (time.time() - ts_disparo) < 3.0
+        )
         return {
             "faccion": faccion,
             "nombre": habilidad["nombre"],
@@ -1161,8 +1175,11 @@ class Partida:
             "dano": habilidad["dano"],
             "color": habilidad["color"],
             "tipo_efecto": habilidad["tipo_efecto"],
+            "filas_de_alcance": habilidad.get("filas_de_alcance", 3),
             "cooldown_segundos": habilidad["cooldown_segundos"],
             "segundos_restantes_cooldown": segundos_cooldown,
+            "timestamp_disparo": ts_disparo,
+            "recien_disparada": recien_disparada,
             "disponible": (
                 not self.partida_finalizada
                 and not bloqueada_por_fase

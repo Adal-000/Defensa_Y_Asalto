@@ -214,6 +214,8 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         "resultados_mostrados": set(),
         "puntuacion_anterior": (0, 0),
     }
+    # Rastreo de timestamps de habilidades para detectar disparo del rival
+    ultimo_timestamp_habilidad = {"defensor": None, "atacante": None}
 
     # -----------------------------------------------------------------
     # Utilidades generales
@@ -966,7 +968,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             except tk.TclError:
                 control["cerrando"] = True
 
-        window_mapa.after(1000, borrar_efecto)
+        window_mapa.after(2500, borrar_efecto)
 
     def comprar_en_casilla(evento):
         if estado_ui["partida_finalizada"]:
@@ -1197,6 +1199,29 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         caja_informacion_contrincante.insert(tk.END, texto)
         caja_informacion_contrincante.config(state="disabled")
 
+    def _detectar_y_animar_habilidad_rival(estado):
+        """
+        Detecta si el rival usó su habilidad especial comparando el
+        timestamp_disparo del estado con el último conocido. Si cambió,
+        activa la animación en esta pantalla también (sin aplicar daño,
+        ya que el servidor ya lo hizo).
+        """
+        for rol_rival in ("defensor", "atacante"):
+            if rol_rival == rol_jugador:
+                continue  # Solo animamos el disparo del rival, el propio ya se animó al clicar
+            clave = "habilidad_defensor" if rol_rival == "defensor" else "habilidad_atacante"
+            info = estado.get(clave, {})
+            if not info:
+                continue
+            ts = info.get("timestamp_disparo")
+            if ts is None:
+                continue
+            if ultimo_timestamp_habilidad[rol_rival] != ts:
+                ultimo_timestamp_habilidad[rol_rival] = ts
+                # Solo animar si fue reciente (menos de 3 segundos)
+                if info.get("recien_disparada", False):
+                    animar_habilidad_especial(rol_rival, info)
+
     def actualizar_vista():
         estado = _obtener_estado()
         if not estado:
@@ -1210,6 +1235,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         sincronizar_fase_y_temporizador(estado)
         animar_proyectiles(estado)
         actualizar_boton_habilidad()
+        _detectar_y_animar_habilidad_rival(estado)
 
     # -----------------------------------------------------------------
     # Combate local y polling red
