@@ -20,6 +20,7 @@ from dominio.servicios.combate import ejecutar_turno_de_combate
 from infraestructura.persistencia.archivos import actualizar_victoria
 
 DINERO_BASE_RONDA = 500
+DINERO_BASE_ATACANTE_EXTRA = 250   # Bono extra que solo recibe el atacante
 BONO_GANADOR_RONDA = 200
 INCREMENTO_DINERO_POR_RONDA = 200
 RONDAS_PARA_GANAR_PARTIDA = 3
@@ -171,13 +172,13 @@ class Partida:
 
         if self.rol_ganador_ultima_ronda == "defensor":
             self.dinero_defensor = dinero_ganador
-            self.dinero_atacante = dinero_base
+            self.dinero_atacante = dinero_base + DINERO_BASE_ATACANTE_EXTRA
         elif self.rol_ganador_ultima_ronda == "atacante":
             self.dinero_defensor = dinero_base
-            self.dinero_atacante = dinero_ganador
+            self.dinero_atacante = dinero_ganador + DINERO_BASE_ATACANTE_EXTRA
         else:
             self.dinero_defensor = dinero_base
-            self.dinero_atacante = dinero_base
+            self.dinero_atacante = dinero_base + DINERO_BASE_ATACANTE_EXTRA
 
         self.historial_eventos.append(
             f"Inicia la ronda {self.numero_ronda}: el atacante prepara tropas primero; luego el defensor planea la defensa."
@@ -429,8 +430,7 @@ class Partida:
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
 
-        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
-            return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
+        # El defensor puede colocar torres en cualquier fase (incluso durante el combate)
 
         posicion_valida, mensaje_posicion = self._validar_compra_defensiva(
             fila, columna
@@ -477,8 +477,7 @@ class Partida:
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
 
-        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
-            return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
+        # El defensor puede colocar muros en cualquier fase (incluso durante el combate)
 
         posicion_valida, mensaje_posicion = self._validar_compra_defensiva(
             fila, columna
@@ -524,8 +523,7 @@ class Partida:
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
 
-        if self.fase_ronda == FASE_CONSTRUCCION_DEFENSOR:
-            return False, "Ahora el defensor planea la defensa; las tropas vuelven durante el combate."
+        # El atacante puede colocar unidades en cualquier fase excepto cuando la partida terminó
 
         posicion_valida, mensaje_posicion = self._validar_compra_unidad(
             fila, columna
