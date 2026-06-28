@@ -214,6 +214,8 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         "resultados_mostrados": set(),
         "puntuacion_anterior": (0, 0),
     }
+    # Rastreo de timestamps de habilidades para detectar disparo del rival
+    ultimo_timestamp_habilidad = {"defensor": None, "atacante": None}
 
     # -----------------------------------------------------------------
     # Utilidades generales
@@ -649,19 +651,22 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         segundos = estado.get("segundos_restantes_preparacion")
         if segundos is None:
             segundos = TIEMPO_PREPARACION_SEGUNDOS
-        estado_ui["segundos"] = int(segundos)
+        segundos_int = int(segundos)
+
+        # Solo sincronizamos el contador si cambió la fase o hay un desfase grande (>2s)
+        # Así el reloj local puede hacer tick sin que cada polling lo reinicie
+        if cambio_de_fase or abs(estado_ui["segundos"] - segundos_int) > 2:
+            estado_ui["segundos"] = segundos_int
 
         if cambio_de_fase and fase_logica == FASE_CONSTRUCCION_DEFENSOR:
             escribir_evento("El atacante quedó bloqueado. Ahora el defensor coloca sus defensas.")
 
         actualizar_temporizador_label()
 
-        if rol_jugador == "atacante" and fase_logica == FASE_CONSTRUCCION_DEFENSOR:
-            etiqueta_seleccion.config(text="Bloqueado: espera a que el defensor termine.")
-        elif rol_jugador == "defensor" and fase_logica == FASE_ATAQUE_ATACANTE:
-            etiqueta_seleccion.config(text="Espera: el atacante está colocando tropas.")
-
-        iniciar_reloj_preparacion()
+        # Solo iniciamos/reiniciamos el reloj cuando cambia la fase,
+        # no en cada ciclo de polling, para que el tick fluya normalmente
+        if cambio_de_fase or control.get("after_timer") is None:
+            iniciar_reloj_preparacion()
 
     def iniciar_reloj_preparacion():
         cancelar_after("after_timer")
@@ -685,11 +690,11 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
                 escribir_evento(mensaje)
                 actualizar_vista()
             else:
-                # En red el servidor avanza la fase con su propio reloj
-                # (ver _bucle_combate en servidor.py); aqui solo se pide
-                # el estado mas reciente para no quedar atrasado.
+                # En red el servidor avanza la fase con su propio reloj.
+                # Pedimos el estado actualizado para sincronizar.
                 cliente_red.obtener_estado()
-            control["after_timer"] = window_mapa.after(400, tick_reloj_preparacion)
+                actualizar_vista()
+            control["after_timer"] = window_mapa.after(500, tick_reloj_preparacion)
             return
 
         control["after_timer"] = window_mapa.after(1000, tick_reloj_preparacion)
@@ -847,21 +852,11 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
     def animar_habilidad_especial(rol_que_dispara, info_habilidad):
         """
-        Descripcion:
-            Dibuja el efecto visual de la habilidad especial de
-            faccion sobre el tablero. El origen del efecto depende de
-            quien la dispara:
-
-            - El defensor la dispara desde su base (fila 0) hacia las
-              primeras filas de la zona del atacante.
-            - El atacante la dispara desde el lado contrario a la
-              base (fila 10) hacia las ultimas filas de la zona del
-              defensor.
-
-            La forma del efecto cambia segun el tipo (gas, granadas,
-            flechas, artilleria, mortero o fuego) para que cada
-            faccion se sienta distinta, pero todas comparten el mismo
-            mecanismo de animacion temporal con after().
+        Muestra el efecto visual de la habilidad especial sobre el tablero:
+        - Overlay coloreado sobre las filas afectadas (semitransparente)
+        - Explosiones/efectos en cada casilla objetivo
+        - Texto grande con el nombre de la habilidad centrado
+        Dura 1 segundo y luego desaparece y refresca la vista.
         """
         if not ventana_activa() or cuadro_mapa is None:
             return
@@ -869,6 +864,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         color = info_habilidad.get("color", "#999999")
         tipo_efecto = info_habilidad.get("tipo_efecto", "generico")
         filas_de_alcance = info_habilidad.get("filas_de_alcance", 3)
+        nombre_habilidad = info_habilidad.get("nombre", "Habilidad especial")
 
         if rol_que_dispara == "defensor":
             fila_origen = 0
@@ -882,37 +878,52 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
         elementos = []
 
-        for fila_objetivo in filas_objetivo:
+        # Overlay de zona afectada (rectángulo coloreado semitransparente)
+        if filas_objetivo:
+            fila_min = min(filas_objetivo)
+            fila_max = max(filas_objetivo)
+            y_top = fila_min * ALTO_CELDA
+            y_bot = (fila_max + 1) * ALTO_CELDA
+            elementos.append(cuadro_mapa.create_rectangle(
+                0, y_top, ANCHO_TABLERO, y_bot,
+                fill=color, outline=color, width=4, stipple="gray50",
+            ))
+
+        # Efectos por casilla
+        for fila_obj in filas_objetivo:
             for columna in range(COLUMNAS_TABLERO):
-                x_destino, y_destino = centro_casilla(fila_objetivo, columna)
+                x_destino, y_destino = centro_casilla(fila_obj, columna)
 
                 if tipo_efecto == "gas":
-                    radio = 22
+                    radio = 26
                     elementos.append(cuadro_mapa.create_oval(
                         x_destino - radio, y_destino - radio // 2,
                         x_destino + radio, y_destino + radio // 2,
-                        fill=color, outline="", stipple="gray50",
+                        fill=color, outline="#004400", width=2, stipple="gray50",
                     ))
                 elif tipo_efecto == "flechas":
                     elementos.append(cuadro_mapa.create_line(
                         x_origen, y_origen, x_destino, y_destino,
-                        fill=color, width=2, arrow=tk.LAST,
+                        fill=color, width=3, arrow=tk.LAST,
                     ))
                 elif tipo_efecto == "granadas":
                     medio_x = (x_origen + x_destino) / 2
-                    medio_y = min(y_origen, y_destino) - 30
+                    medio_y = min(y_origen, y_destino) - 40
                     elementos.append(cuadro_mapa.create_line(
                         x_origen, y_origen, medio_x, medio_y, x_destino, y_destino,
-                        fill=color, width=2, smooth=True,
+                        fill=color, width=3, smooth=True,
                     ))
                     elementos.append(cuadro_mapa.create_oval(
-                        x_destino - 10, y_destino - 10, x_destino + 10, y_destino + 10,
+                        x_destino - 14, y_destino - 14, x_destino + 14, y_destino + 14,
                         fill="#ff7a00", outline=color, width=2,
                     ))
+                    elementos.append(cuadro_mapa.create_oval(
+                        x_destino - 6, y_destino - 6, x_destino + 6, y_destino + 6,
+                        fill="#ffee00", outline="",
+                    ))
                 else:
-                    # artilleria, mortero, fuego y cualquier tipo generico:
-                    # explosion circular sobre la casilla objetivo.
-                    radio = 14
+                    # artilleria, mortero, fuego y generico
+                    radio = 18
                     elementos.append(cuadro_mapa.create_oval(
                         x_destino - radio, y_destino - radio,
                         x_destino + radio, y_destino + radio,
@@ -924,12 +935,28 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
                         fill="#ffffff", outline="",
                     ))
 
-        etiqueta_aviso = cuadro_mapa.create_text(
-            x_origen, max(10, y_origen),
-            text=f"¡{info_habilidad.get('nombre', 'Habilidad especial')}!",
-            fill=color, font=("Arial", 12, "bold"),
-        )
-        elementos.append(etiqueta_aviso)
+        # Texto central grande con nombre de la habilidad
+        cx = ANCHO_TABLERO // 2
+        cy = ALTO_TABLERO // 2
+        # sombra
+        elementos.append(cuadro_mapa.create_rectangle(
+            cx - 180, cy - 28, cx + 180, cy + 28,
+            fill="#000000", outline="", stipple="gray50",
+        ))
+        elementos.append(cuadro_mapa.create_text(
+            cx + 2, cy + 2, text=f"¡{nombre_habilidad}!",
+            fill="#000000", font=("Arial", 20, "bold"),
+        ))
+        elementos.append(cuadro_mapa.create_text(
+            cx, cy, text=f"¡{nombre_habilidad}!",
+            fill=color, font=("Arial", 20, "bold"),
+        ))
+
+        # Forzar refresco visual inmediato
+        try:
+            window_mapa.update_idletasks()
+        except tk.TclError:
+            pass
 
         def borrar_efecto():
             if not ventana_activa():
@@ -937,10 +964,11 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             try:
                 for item in elementos:
                     cuadro_mapa.delete(item)
+                actualizar_vista()
             except tk.TclError:
                 control["cerrando"] = True
 
-        window_mapa.after(900, borrar_efecto)
+        window_mapa.after(2500, borrar_efecto)
 
     def comprar_en_casilla(evento):
         if estado_ui["partida_finalizada"]:
@@ -952,12 +980,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         estado_actual = _obtener_estado()
         fase_actual = estado_actual.get("fase_ronda", estado_ui.get("fase"))
 
-        if rol_jugador == "defensor" and fase_actual == FASE_ATAQUE_ATACANTE:
-            escribir_evento("Espera: el atacante todavía está colocando sus tropas.")
-            return
-        if rol_jugador == "atacante" and fase_actual == FASE_CONSTRUCCION_DEFENSOR:
-            escribir_evento("El atacante quedó bloqueado mientras el defensor prepara sus defensas.")
-            return
+        # Ambos jugadores pueden colocar sus piezas en cualquier momento
 
         fila, columna = convertir_click_a_casilla(evento)
         if fila is None:
@@ -979,13 +1002,12 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         escribir_evento(mensaje)
 
         if exito:
-            # Refresco inmediato y optimista: en modo red la confirmacion
-            # oficial llega por polling, pero el jugador debe ver su
-            # pieza en el tablero apenas hace clic, no segundos despues.
+            # Refresco inmediato: la pieza aparece en pantalla de inmediato
             actualizar_vista()
+            window_mapa.update_idletasks()   # fuerza el redibujado antes del siguiente evento
             if modo_red:
                 cliente_red.obtener_estado()
-                window_mapa.after(120, actualizar_vista)
+                window_mapa.after(80, actualizar_vista)
     def nombre_fase_preparacion(estado):
         fase = estado.get("fase_ronda", "")
         if fase == FASE_ATAQUE_ATACANTE:
@@ -1177,6 +1199,29 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         caja_informacion_contrincante.insert(tk.END, texto)
         caja_informacion_contrincante.config(state="disabled")
 
+    def _detectar_y_animar_habilidad_rival(estado):
+        """
+        Detecta si el rival usó su habilidad especial comparando el
+        timestamp_disparo del estado con el último conocido. Si cambió,
+        activa la animación en esta pantalla también (sin aplicar daño,
+        ya que el servidor ya lo hizo).
+        """
+        for rol_rival in ("defensor", "atacante"):
+            if rol_rival == rol_jugador:
+                continue  # Solo animamos el disparo del rival, el propio ya se animó al clicar
+            clave = "habilidad_defensor" if rol_rival == "defensor" else "habilidad_atacante"
+            info = estado.get(clave, {})
+            if not info:
+                continue
+            ts = info.get("timestamp_disparo")
+            if ts is None:
+                continue
+            if ultimo_timestamp_habilidad[rol_rival] != ts:
+                ultimo_timestamp_habilidad[rol_rival] = ts
+                # Solo animar si fue reciente (menos de 3 segundos)
+                if info.get("recien_disparada", False):
+                    animar_habilidad_especial(rol_rival, info)
+
     def actualizar_vista():
         estado = _obtener_estado()
         if not estado:
@@ -1190,6 +1235,7 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         sincronizar_fase_y_temporizador(estado)
         animar_proyectiles(estado)
         actualizar_boton_habilidad()
+        _detectar_y_animar_habilidad_rival(estado)
 
     # -----------------------------------------------------------------
     # Combate local y polling red
@@ -1323,6 +1369,24 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     # Inicio
     # -----------------------------------------------------------------
 
+    # Precarga de imágenes para que aparezcan de inmediato al hacer clic
+    # (la primera carga de un PNG puede tomar unos ms; hacerlo aquí
+    #  evita el parpadeo/retraso visible al colocar la primera unidad o torre)
+    def _precargar_imagenes():
+        for faccion in (faccion_defensor, faccion_atacante):
+            imagen_base()
+            imagen_muro()
+            imagen_fondo_mapa()
+            for tipo in ("soldado", "rapido", "tanque"):
+                imagen_unidad({"clave": tipo})
+            for tipo in ("normal", "pesada", "especial"):
+                imagen_torre({"clave": tipo, "nombre": tipo})
+        try:
+            window_mapa.update_idletasks()
+        except tk.TclError:
+            pass
+
+    _precargar_imagenes()
     actualizar_vista()
     if modo_red:
         iniciar_polling()

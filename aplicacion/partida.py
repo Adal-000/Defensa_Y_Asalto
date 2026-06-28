@@ -20,6 +20,7 @@ from dominio.servicios.combate import ejecutar_turno_de_combate
 from infraestructura.persistencia.archivos import actualizar_victoria
 
 DINERO_BASE_RONDA = 500
+DINERO_BASE_ATACANTE_EXTRA = 250   # Bono extra que solo recibe el atacante
 BONO_GANADOR_RONDA = 200
 INCREMENTO_DINERO_POR_RONDA = 200
 RONDAS_PARA_GANAR_PARTIDA = 3
@@ -100,6 +101,8 @@ class Partida:
         self.faccion_atacante = None
         self.ultimo_uso_habilidad_defensor = None
         self.ultimo_uso_habilidad_atacante = None
+        self.timestamp_disparo_defensor = None  # Para que el otro cliente detecte el disparo
+        self.timestamp_disparo_atacante = None
 
         self.historial_eventos = []
 
@@ -171,13 +174,13 @@ class Partida:
 
         if self.rol_ganador_ultima_ronda == "defensor":
             self.dinero_defensor = dinero_ganador
-            self.dinero_atacante = dinero_base
+            self.dinero_atacante = dinero_base + DINERO_BASE_ATACANTE_EXTRA
         elif self.rol_ganador_ultima_ronda == "atacante":
             self.dinero_defensor = dinero_base
-            self.dinero_atacante = dinero_ganador
+            self.dinero_atacante = dinero_ganador + DINERO_BASE_ATACANTE_EXTRA
         else:
             self.dinero_defensor = dinero_base
-            self.dinero_atacante = dinero_base
+            self.dinero_atacante = dinero_base + DINERO_BASE_ATACANTE_EXTRA
 
         self.historial_eventos.append(
             f"Inicia la ronda {self.numero_ronda}: el atacante prepara tropas primero; luego el defensor planea la defensa."
@@ -429,8 +432,7 @@ class Partida:
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
 
-        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
-            return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
+        # El defensor puede colocar torres en cualquier fase (incluso durante el combate)
 
         posicion_valida, mensaje_posicion = self._validar_compra_defensiva(
             fila, columna
@@ -477,8 +479,7 @@ class Partida:
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
 
-        if self.fase_ronda == FASE_ATAQUE_ATACANTE:
-            return False, "Primero el atacante prepara sus tropas; luego el defensor planea defensas."
+        # El defensor puede colocar muros en cualquier fase (incluso durante el combate)
 
         posicion_valida, mensaje_posicion = self._validar_compra_defensiva(
             fila, columna
@@ -524,8 +525,7 @@ class Partida:
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
 
-        if self.fase_ronda == FASE_CONSTRUCCION_DEFENSOR:
-            return False, "Ahora el defensor planea la defensa; las tropas vuelven durante el combate."
+        # El atacante puede colocar unidades en cualquier fase excepto cuando la partida terminó
 
         posicion_valida, mensaje_posicion = self._validar_compra_unidad(
             fila, columna
@@ -639,7 +639,9 @@ class Partida:
 
         if rol == "defensor":
             self.dinero_defensor -= habilidad["costo"]
-            self.ultimo_uso_habilidad_defensor = time.time()
+            ts = time.time()
+            self.ultimo_uso_habilidad_defensor = ts
+            self.timestamp_disparo_defensor = ts
             for unidad in self.unidades:
                 if unidad.fila in filas_objetivo and unidad.vida > 0:
                     unidad.vida = max(0, unidad.vida - dano)
@@ -647,7 +649,9 @@ class Partida:
             self.unidades = [u for u in self.unidades if u.vida > 0]
         else:
             self.dinero_atacante -= habilidad["costo"]
-            self.ultimo_uso_habilidad_atacante = time.time()
+            ts = time.time()
+            self.ultimo_uso_habilidad_atacante = ts
+            self.timestamp_disparo_atacante = ts
             for torre in self.torres:
                 if torre.fila in filas_objetivo and torre.vida > 0:
                     torre.vida = max(0, torre.vida - dano)
@@ -1155,6 +1159,14 @@ class Partida:
             or (rol == "atacante" and self.fase_ronda == FASE_CONSTRUCCION_DEFENSOR)
         )
 
+        ts_disparo = (
+            self.timestamp_disparo_defensor if rol == "defensor"
+            else self.timestamp_disparo_atacante
+        )
+        # recien_disparada: True si se usó en los últimos 3 segundos
+        recien_disparada = (
+            ts_disparo is not None and (time.time() - ts_disparo) < 3.0
+        )
         return {
             "faccion": faccion,
             "nombre": habilidad["nombre"],
@@ -1163,8 +1175,11 @@ class Partida:
             "dano": habilidad["dano"],
             "color": habilidad["color"],
             "tipo_efecto": habilidad["tipo_efecto"],
+            "filas_de_alcance": habilidad.get("filas_de_alcance", 3),
             "cooldown_segundos": habilidad["cooldown_segundos"],
             "segundos_restantes_cooldown": segundos_cooldown,
+            "timestamp_disparo": ts_disparo,
+            "recien_disparada": recien_disparada,
             "disponible": (
                 not self.partida_finalizada
                 and not bloqueada_por_fase
