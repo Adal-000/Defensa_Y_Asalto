@@ -95,6 +95,16 @@ FACCIONES_VISUALES = [
 
 def obtener_catalogo_facciones():
     """
-    Devuelve las facciones visuales disponibles para Tkinter.
+    Descripcion:
+        Devuelve las facciones visuales disponibles para Tkinter.
+    
+    Entradas:
+        Ninguna.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        Ninguna.
     """
     return [faccion.copy() for faccion in FACCIONES_VISUALES]

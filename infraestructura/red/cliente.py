@@ -50,6 +50,26 @@ class ClientePartida:
     """
 
     def __init__(self, callback_mensaje=None):
+        """
+        Descripcion:
+            Inicializa la instancia y asigna los valores necesarios para
+            que el objeto pueda utilizarse correctamente.
+        
+        Entradas:
+            callback_mensaje (object): Valor recibido por la funcion.
+            Valor opcional.
+        
+        Salidas:
+            None: Inicializa los atributos de la instancia.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         self.callback_mensaje = callback_mensaje
         self.conexion = None
         self.archivo_lectura = None
@@ -67,6 +87,9 @@ class ClientePartida:
         self.mensaje_sala = ""
         self.victorias_sincronizadas = set()
         self.bloqueo = threading.Lock()
+        # Callbacks temporales de enviar_accion_y_esperar() esperando
+        # la respuesta del PROXIMO mensaje que llegue del servidor.
+        self._esperas_respuesta = []
 
     def conectar(self, host, usuario, puerto=PUERTO_PREDETERMINADO, rol=""):
         """
@@ -148,8 +171,9 @@ class ClientePartida:
     def _procesar_mensaje_entrante(self, mensaje):
         """
         Descripcion:
-            Guarda un mensaje recibido y llama el callback configurado,
-            si existe.
+            Guarda un mensaje recibido, notifica a quien este esperando
+            la respuesta de una accion (ver enviar_accion_y_esperar) y
+            llama el callback configurado, si existe.
 
         Entradas:
             mensaje (dict): Mensaje recibido del servidor.
@@ -191,15 +215,40 @@ class ClientePartida:
                 if "mensaje_sala" in datos:
                     self.mensaje_sala = str(datos["mensaje_sala"])
 
+            # Notifica al callback de espera mas antiguo (FIFO) que
+            # acepte este mensaje. El servidor responde a los mensajes
+            # de un mismo cliente en el mismo orden en que los recibe,
+            # asi que la primera espera pendiente corresponde a la
+            # primera accion todavia sin confirmar.
+            if self._esperas_respuesta:
+                callback_mas_antiguo = self._esperas_respuesta[0]
+                if callback_mas_antiguo(mensaje):
+                    self._esperas_respuesta.pop(0)
+
         if self.callback_mensaje is not None:
             self.callback_mensaje(mensaje)
 
     def _sincronizar_victoria_si_finalizo(self, estado):
         """
         Descripcion:
-            Cuando el servidor avisa que la partida terminó, guarda
-            esa victoria en el jugadores.json local de esta computadora.
-            Se hace una sola vez por partida para no duplicar contador.
+            Cuando el servidor avisa que la partida terminó, guarda esa
+            victoria en el jugadores.json local de esta computadora. Se
+            hace una sola vez por partida para no duplicar contador.
+        
+        Entradas:
+            estado (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
         """
         if not isinstance(estado, dict):
             return
@@ -225,7 +274,13 @@ class ClientePartida:
     def enviar_accion(self, accion, **datos):
         """
         Descripcion:
-            Envia una accion generica al servidor.
+            Envia una accion generica al servidor sin esperar la
+            respuesta real: devuelve "exito" apenas el mensaje sale
+            por el socket. Sirve para acciones donde no importa
+            confirmar el resultado exacto (por ejemplo pedir el
+            estado). Para compras y otras acciones donde el usuario
+            necesita saber si el servidor la aceptó de verdad, usar
+            enviar_accion_y_esperar en su lugar.
 
         Entradas:
             accion (str): Accion definida en el protocolo.
@@ -248,10 +303,117 @@ class ClientePartida:
         except (OSError, ErrorProtocolo) as error:
             return False, str(error)
 
+    def enviar_accion_y_esperar(self, accion, tiempo_espera=2.0, **datos):
+        """
+        Descripcion:
+            Envia una accion al servidor y espera la respuesta real
+            que el servidor manda para ESA accion, en lugar de asumir
+            que se acepto solo porque el mensaje salio por la red.
+
+            Esto evita el caso en que la interfaz dice "comprada
+            correctamente" y en realidad el servidor la rechazo (por
+            ejemplo porque la partida todavia no se habia creado, o
+            la accion no estaba permitida en la fase exacta de ese
+            instante): sin esto, ese rechazo solo se notaba despues,
+            de forma silenciosa, en el siguiente estado recibido por
+            polling.
+
+            El servidor atiende los mensajes de un mismo cliente uno a
+            la vez y en orden (TCP + un hilo de escucha por cliente),
+            asi que el primer mensaje nuevo que llegue despues de
+            enviar esta accion es, en la practica, su respuesta.
+
+        Entradas:
+            accion (str): Accion definida en el protocolo.
+            tiempo_espera (float): Segundos maximos a esperar la
+                respuesta antes de devolver un resultado optimista.
+            **datos: Datos necesarios para la accion.
+
+        Salidas:
+            tuple[bool, str]: Exito real informado por el servidor
+            (o del envio, si no hubo respuesta a tiempo) y mensaje
+            descriptivo.
+
+        Restricciones:
+            - El cliente debe estar conectado.
+            - accion debe ser valida dentro del protocolo.
+        """
+        if not self.conectado or self.conexion is None:
+            return False, "No hay conexion activa con el servidor."
+
+        evento_respuesta = threading.Event()
+        resultado = {}
+
+        def capturar_respuesta(mensaje):
+            # Solo nos interesan las respuestas directas a una accion
+            # (tipo "resultado", que el servidor usa tanto para exito
+            # como para error). Los mensajes tipo "estado" son
+            # broadcasts que el servidor manda a todos los clientes
+            # (incluyendo los que dispara su propio bucle de combate
+            # en otro hilo) y no son la respuesta a esta accion en
+            # particular; si los acepataramos aqui, podriamos quedarnos
+            # con un mensaje que no tiene relacion con la compra que
+            # se esta esperando confirmar.
+            """
+            Descripcion:
+                Ejecuta la logica correspondiente a capturar respuesta
+                dentro del flujo del juego.
+            
+            Entradas:
+                mensaje (object): Valor recibido por la funcion.
+            
+            Salidas:
+                bool: True si la condicion evaluada se cumple, False en
+                caso contrario.
+            
+            Restricciones:
+                - Los parametros recibidos deben respetar el tipo y el
+                formato esperado por la funcion.
+                - Requiere una conexion, sala o mensaje valido cuando la
+                operacion dependa de la red.
+            """
+            if mensaje.get("tipo") != "resultado":
+                return False
+            if not evento_respuesta.is_set():
+                resultado["exito"] = mensaje.get("exito", True)
+                resultado["mensaje"] = mensaje.get("mensaje", "")
+                evento_respuesta.set()
+            return True
+
+        with self.bloqueo:
+            self._esperas_respuesta.append(capturar_respuesta)
+
+        try:
+            mensaje = crear_mensaje(accion, **datos)
+            enviar_mensaje(self.conexion, mensaje)
+        except (OSError, ErrorProtocolo) as error:
+            with self.bloqueo:
+                if capturar_respuesta in self._esperas_respuesta:
+                    self._esperas_respuesta.remove(capturar_respuesta)
+            return False, str(error)
+
+        llego_a_tiempo = evento_respuesta.wait(timeout=tiempo_espera)
+
+        with self.bloqueo:
+            if capturar_respuesta in self._esperas_respuesta:
+                self._esperas_respuesta.remove(capturar_respuesta)
+
+        if not llego_a_tiempo:
+            # El servidor no respondio a tiempo (lag de red, etc.):
+            # devolvemos un resultado optimista en vez de bloquear la
+            # interfaz indefinidamente, igual que el comportamiento
+            # anterior de enviar_accion.
+            return True, "Accion enviada (sin confirmación del servidor todavía)."
+
+        return bool(resultado.get("exito", True)), resultado.get("mensaje", "")
+
     def comprar_torre(self, tipo_torre, fila, columna):
         """
         Descripcion:
-            Envia al servidor la solicitud para comprar una torre.
+            Envia al servidor la solicitud para comprar una torre y
+            espera la confirmacion real antes de informar el
+            resultado, para que la interfaz nunca diga "comprada"
+            cuando el servidor en realidad la rechazo.
 
         Entradas:
             tipo_torre (str): Tipo de torre a comprar.
@@ -259,12 +421,13 @@ class ClientePartida:
             columna (int): Columna de colocacion.
 
         Salidas:
-            tuple[bool, str]: Exito del envio y mensaje descriptivo.
+            tuple[bool, str]: Exito real informado por el servidor y
+            mensaje descriptivo.
 
         Restricciones:
             - Solo funcionara en el servidor si este cliente es defensor.
         """
-        return self.enviar_accion(
+        return self.enviar_accion_y_esperar(
             ACCION_COMPRAR_TORRE,
             tipo_torre=tipo_torre,
             fila=fila,
@@ -274,24 +437,33 @@ class ClientePartida:
     def comprar_muro(self, fila, columna):
         """
         Descripcion:
-            Envia al servidor la solicitud para comprar un muro.
+            Envia al servidor la solicitud para comprar un muro y
+            espera la confirmacion real antes de informar el
+            resultado.
 
         Entradas:
             fila (int): Fila de colocacion.
             columna (int): Columna de colocacion.
 
         Salidas:
-            tuple[bool, str]: Exito del envio y mensaje descriptivo.
+            tuple[bool, str]: Exito real informado por el servidor y
+            mensaje descriptivo.
 
         Restricciones:
             - Solo funcionara en el servidor si este cliente es defensor.
         """
-        return self.enviar_accion(ACCION_COMPRAR_MURO, fila=fila, columna=columna)
+        return self.enviar_accion_y_esperar(ACCION_COMPRAR_MURO, fila=fila, columna=columna)
 
     def comprar_unidad(self, tipo_unidad, fila, columna):
         """
         Descripcion:
-            Envia al servidor la solicitud para comprar una unidad.
+            Envia al servidor la solicitud para comprar una unidad y
+            espera la confirmacion real antes de informar el
+            resultado. Esto es lo que evita que, justo en el primer
+            turno (cuando el atacante puede hacer clic antes de que
+            el servidor termine de emparejar a ambos jugadores y crear
+            la partida), la interfaz diga "comprada correctamente"
+            mientras el servidor en realidad la rechazo en silencio.
 
         Entradas:
             tipo_unidad (str): Tipo de unidad a comprar.
@@ -299,12 +471,13 @@ class ClientePartida:
             columna (int): Columna de colocacion.
 
         Salidas:
-            tuple[bool, str]: Exito del envio y mensaje descriptivo.
+            tuple[bool, str]: Exito real informado por el servidor y
+            mensaje descriptivo.
 
         Restricciones:
             - Solo funcionara en el servidor si este cliente es atacante.
         """
-        return self.enviar_accion(
+        return self.enviar_accion_y_esperar(
             ACCION_COMPRAR_UNIDAD,
             tipo_unidad=tipo_unidad,
             fila=fila,
@@ -358,6 +531,19 @@ class ClientePartida:
             Solicita al servidor que empiece a ejecutar el combate en
             tiempo real. El numero de ronda evita que dos temporizadores
             atrasados inicien o cierren una ronda nueva por accidente.
+        
+        Entradas:
+            numero_ronda (object): Valor recibido por la funcion. Valor
+            opcional.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
         """
         datos = {}
         if numero_ronda is not None:
@@ -502,6 +688,24 @@ if __name__ == "__main__":
         rol_cli = sys.argv[3]
 
     def imprimir_mensaje(mensaje):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a imprimir mensaje dentro
+            del flujo del juego.
+        
+        Entradas:
+            mensaje (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+        """
         print(mensaje)
 
     cliente = ClientePartida(callback_mensaje=imprimir_mensaje)

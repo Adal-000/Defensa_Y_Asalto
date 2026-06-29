@@ -17,8 +17,25 @@ COLOR_TEXTO_SUAVE = "#b8c7d9"
 def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
              obtener_usuario_actual):
     """
-    Descripción:
+    Descripcion:
         Crea la ventana de puntajes del jugador y puntajes mundiales.
+    
+    Entradas:
+        root (object): Valor recibido por la funcion.
+        GoPerfil (object): Valor recibido por la funcion.
+        cerrar_todo (object): Valor recibido por la funcion.
+        configurar_ventana (object): Valor recibido por la funcion.
+        obtener_usuario_actual (object): Valor recibido por la funcion.
+    
+    Salidas:
+        None: Ejecuta la accion y puede modificar el estado interno, la
+        interfaz o los datos relacionados.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Requiere que los widgets, ventanas o callbacks usados por la
+        interfaz existan antes de ejecutarse.
     """
 
     window_puntajes = tk.Toplevel(root)
@@ -26,10 +43,50 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
     window_puntajes.configure(bg=COLOR_FONDO)
 
     def GoPerfilR():
+        """
+        Descripcion:
+            Maneja la navegacion de la interfaz hacia la pantalla o
+            accion asociada a GoPerfilR.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         window_puntajes.destroy()
         GoPerfil()
 
     def crear_tarjeta(parent, x, y, ancho, alto, titulo, color_titulo=COLOR_PRIMARIO):
+        """
+        Descripcion:
+            Crea y configura el elemento asociado a crear tarjeta para
+            usarlo dentro del juego o la interfaz.
+        
+        Entradas:
+            parent (object): Valor recibido por la funcion.
+            x (object): Valor recibido por la funcion.
+            y (object): Valor recibido por la funcion.
+            ancho (object): Valor recibido por la funcion.
+            alto (object): Valor recibido por la funcion.
+            titulo (object): Valor recibido por la funcion.
+            color_titulo (object): Valor recibido por la funcion. Valor
+            opcional.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         tarjeta = tk.Frame(
             parent,
             bg=COLOR_TARJETA,
@@ -51,6 +108,27 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
         return tarjeta
 
     def crear_metrica(parent, titulo, valor, color, columna):
+        """
+        Descripcion:
+            Crea y configura el elemento asociado a crear metrica para
+            usarlo dentro del juego o la interfaz.
+        
+        Entradas:
+            parent (object): Valor recibido por la funcion.
+            titulo (object): Valor recibido por la funcion.
+            valor (object): Valor recibido por la funcion.
+            color (object): Valor recibido por la funcion.
+            columna (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         cuadro = tk.Frame(parent, bg="#31445c", highlightbackground=color, highlightthickness=2)
         cuadro.grid(row=0, column=columna, padx=10, pady=18, sticky="nsew")
         tk.Label(cuadro, text=titulo, bg="#31445c", fg=COLOR_TEXTO_SUAVE, font=("Arial", 11, "bold")).pack(pady=(10, 2))
@@ -58,6 +136,23 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
         return cuadro
 
     def medalla(posicion):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a medalla dentro del flujo
+            del juego.
+        
+        Entradas:
+            posicion (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if posicion == 1:
             return "🥇"
         if posicion == 2:
@@ -67,6 +162,28 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
         return f"{posicion}."
 
     def crear_tabla_ranking(parent, titulo, ranking, clave_victorias, fila_inicial):
+        """
+        Descripcion:
+            Crea y configura el elemento asociado a crear tabla ranking
+            para usarlo dentro del juego o la interfaz.
+        
+        Entradas:
+            parent (object): Valor recibido por la funcion.
+            titulo (object): Valor recibido por la funcion.
+            ranking (object): Valor recibido por la funcion.
+            clave_victorias (object): Valor recibido por la funcion.
+            fila_inicial (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         tk.Label(parent, text=titulo, bg=COLOR_TARJETA, fg="#f5f7fb", font=("Arial", 15, "bold"), anchor="w").grid(
             row=fila_inicial, column=0, columnspan=3, sticky="ew", padx=24, pady=(14, 6)
         )
@@ -185,6 +302,22 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
     ventana_todos_ref = {"ventana": None}
 
     def abrir_todos_los_puntajes():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a abrir todos los puntajes
+            dentro del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         ventana_abierta = ventana_todos_ref["ventana"]
         try:
             if ventana_abierta is not None and ventana_abierta.winfo_exists():
@@ -202,6 +335,22 @@ def puntajes(root, GoPerfil, cerrar_todo, configurar_ventana,
         ventana_todos.geometry("620x520")
 
         def cerrar_todos_los_puntajes():
+            """
+            Descripcion:
+                Cierra o libera los recursos asociados a cerrar todos
+                los puntajes.
+            
+            Entradas:
+                Ninguna.
+            
+            Salidas:
+                None: Ejecuta la accion y puede modificar el estado
+                interno, la interfaz o los datos relacionados.
+            
+            Restricciones:
+                - Requiere que los widgets, ventanas o callbacks usados
+                por la interfaz existan antes de ejecutarse.
+            """
             ventana_todos_ref["ventana"] = None
             try:
                 boton_ver_todos.config(state="normal")

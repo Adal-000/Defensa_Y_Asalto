@@ -103,9 +103,25 @@ def _muro_en_posicion(lista_muros, fila, columna):
 def _torre_en_posicion(lista_torres, fila, columna):
     """
     Descripcion:
-        Busca una torre viva en una posicion especifica del tablero.
-        Se usa para evitar que una unidad atraviese una estructura
+        Busca una torre viva en una posicion especifica del tablero. Se
+        usa para evitar que una unidad atraviese una estructura
         defensiva y para permitirle atacarla desde la casilla anterior.
+    
+    Entradas:
+        lista_torres (object): Valor recibido por la funcion.
+        fila (object): Valor recibido por la funcion.
+        columna (object): Valor recibido por la funcion.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Debe ejecutarse sobre objetos del dominio creados
+        correctamente.
+        - Funcion de apoyo interno; no se recomienda llamarla
+        directamente desde otros modulos.
     """
     if lista_torres is None:
         return None
@@ -117,6 +133,28 @@ def _torre_en_posicion(lista_torres, fila, columna):
 
 
 def _estructura_en_posicion(lista_torres, lista_muros, fila, columna):
+    """
+    Descripcion:
+        Ejecuta la logica correspondiente a  estructura en posicion
+        dentro del flujo del juego.
+    
+    Entradas:
+        lista_torres (object): Valor recibido por la funcion.
+        lista_muros (object): Valor recibido por la funcion.
+        fila (object): Valor recibido por la funcion.
+        columna (object): Valor recibido por la funcion.
+    
+    Salidas:
+        tuple: Conjunto de valores resultantes de la operacion.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Debe ejecutarse sobre objetos del dominio creados
+        correctamente.
+        - Funcion de apoyo interno; no se recomienda llamarla
+        directamente desde otros modulos.
+    """
     torre = _torre_en_posicion(lista_torres, fila, columna)
     if torre is not None:
         return "torre", torre
@@ -135,6 +173,24 @@ def mover_unidad(unidad, fila_objetivo, lista_muros=None, lista_torres=None):
         por su columna, pero no entra en la casilla de una torre o un
         muro. Si una estructura esta justo al frente, se queda en su
         casilla actual para atacarla durante la fase de ataque.
+    
+    Entradas:
+        unidad (object): Valor recibido por la funcion.
+        fila_objetivo (object): Valor recibido por la funcion.
+        lista_muros (object): Valor recibido por la funcion. Valor
+        opcional.
+        lista_torres (object): Valor recibido por la funcion. Valor
+        opcional.
+    
+    Salidas:
+        None: Ejecuta la accion y puede modificar el estado interno, la
+        interfaz o los datos relacionados.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Debe ejecutarse sobre objetos del dominio creados
+        correctamente.
     """
     velocidad_actual = unidad.calcular_velocidad_actual()
 
@@ -338,11 +394,29 @@ def fase_ataque_torres(lista_torres, lista_unidades, registrador_eventos=None):
 def _buscar_objetivo_unidad(unidad, lista_torres, lista_muros, base, fila_base):
     """
     Descripcion:
-        Determina que objetivo debe atacar una unidad. Primero revisa
-        si ya esta sobre una estructura por compatibilidad con estados
+        Determina que objetivo debe atacar una unidad. Primero revisa si
+        ya esta sobre una estructura por compatibilidad con estados
         anteriores; luego revisa la casilla que tiene al frente. Esto
-        hace que las tropas no atraviesen torres o muros: se detienen
-        y atacan desde la casilla anterior.
+        hace que las tropas no atraviesen torres o muros: se detienen y
+        atacan desde la casilla anterior.
+    
+    Entradas:
+        unidad (object): Valor recibido por la funcion.
+        lista_torres (object): Valor recibido por la funcion.
+        lista_muros (object): Valor recibido por la funcion.
+        base (object): Valor recibido por la funcion.
+        fila_base (object): Valor recibido por la funcion.
+    
+    Salidas:
+        tuple: Conjunto de valores resultantes de la operacion.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Debe ejecutarse sobre objetos del dominio creados
+        correctamente.
+        - Funcion de apoyo interno; no se recomienda llamarla
+        directamente desde otros modulos.
     """
     tipo, objetivo = _estructura_en_posicion(
         lista_torres, lista_muros, unidad.fila, unidad.columna

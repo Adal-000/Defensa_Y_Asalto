@@ -20,8 +20,27 @@ COLOR_NARANJA = "#ef6c00"
 def perfil(root, GoMain, GoPuntajes, cerrar_todo, configurar_ventana,
            obtener_usuario_actual):
     """
-    Descripción:
-        Crea la ventana de perfil del jugador con estilo visual de juego.
+    Descripcion:
+        Crea la ventana de perfil del jugador con estilo visual de
+        juego.
+    
+    Entradas:
+        root (object): Valor recibido por la funcion.
+        GoMain (object): Valor recibido por la funcion.
+        GoPuntajes (object): Valor recibido por la funcion.
+        cerrar_todo (object): Valor recibido por la funcion.
+        configurar_ventana (object): Valor recibido por la funcion.
+        obtener_usuario_actual (object): Valor recibido por la funcion.
+    
+    Salidas:
+        None: Ejecuta la accion y puede modificar el estado interno, la
+        interfaz o los datos relacionados.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Requiere que los widgets, ventanas o callbacks usados por la
+        interfaz existan antes de ejecutarse.
     """
 
     window1 = tk.Toplevel(root)
@@ -29,14 +48,66 @@ def perfil(root, GoMain, GoPuntajes, cerrar_todo, configurar_ventana,
     window1.configure(bg=COLOR_FONDO)
 
     def GoMainR():
+        """
+        Descripcion:
+            Maneja la navegacion de la interfaz hacia la pantalla o
+            accion asociada a GoMainR.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         window1.destroy()
         GoMain()
 
     def GoPuntajesR():
+        """
+        Descripcion:
+            Maneja la navegacion de la interfaz hacia la pantalla o
+            accion asociada a GoPuntajesR.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         window1.destroy()
         GoPuntajes()
 
     def hover(boton, base, hover_color):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a hover dentro del flujo
+            del juego.
+        
+        Entradas:
+            boton (object): Valor recibido por la funcion.
+            base (object): Valor recibido por la funcion.
+            hover_color (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         boton.bind("<Enter>", lambda _evento: boton.config(bg=hover_color, relief="sunken"))
         boton.bind("<Leave>", lambda _evento: boton.config(bg=base, relief="raised"))
 

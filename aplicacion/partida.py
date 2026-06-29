@@ -70,6 +70,26 @@ class Partida:
     """
 
     def __init__(self, nombre_defensor, nombre_atacante, guardar_victorias=True):
+        """
+        Descripcion:
+            Inicializa la instancia y asigna los valores necesarios para
+            que el objeto pueda utilizarse correctamente.
+        
+        Entradas:
+            nombre_defensor (object): Valor recibido por la funcion.
+            nombre_atacante (object): Valor recibido por la funcion.
+            guardar_victorias (object): Valor recibido por la funcion.
+            Valor opcional.
+        
+        Salidas:
+            None: Inicializa los atributos de la instancia.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         self.nombre_defensor = nombre_defensor
         self.nombre_atacante = nombre_atacante
         self.guardar_victorias = guardar_victorias
@@ -194,6 +214,15 @@ class Partida:
         Descripcion:
             Cierra la construccion del defensor y entrega el dinero
             inicial al atacante para comprar y colocar unidades.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            tuple: Conjunto de valores resultantes de la operacion.
+        
+        Restricciones:
+            Ninguna.
         """
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
@@ -217,8 +246,17 @@ class Partida:
         """
         Descripcion:
             Cierra la preparacion del atacante (queda bloqueado para
-            colocar mas tropas hasta el combate) y abre los 15
-            segundos de preparacion del defensor.
+            colocar mas tropas hasta el combate) y abre los 15 segundos
+            de preparacion del defensor.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            tuple: Conjunto de valores resultantes de la operacion.
+        
+        Restricciones:
+            Ninguna.
         """
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
@@ -239,10 +277,19 @@ class Partida:
         """
         Descripcion:
             Inicia la fase de combate luego de la construccion del
-            defensor y la compra/colocacion de unidades del atacante.
-            Si el atacante no colocó ninguna unidad durante su tiempo
-            de preparacion, el defensor gana la ronda directamente en
-            lugar de iniciar un combate vacio.
+            defensor y la compra/colocacion de unidades del atacante. Si
+            el atacante no colocó ninguna unidad durante su tiempo de
+            preparacion, el defensor gana la ronda directamente en lugar
+            de iniciar un combate vacio.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            tuple: Conjunto de valores resultantes de la operacion.
+        
+        Restricciones:
+            Ninguna.
         """
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
@@ -824,19 +871,20 @@ class Partida:
     def segundos_restantes_preparacion(self):
         """
         Descripcion:
-            Calcula cuantos segundos le quedan a la fase de
-            preparacion actual (ataque del atacante o construccion
-            del defensor). Sirve para que la interfaz y el servidor
-            usen el mismo reloj en lugar de temporizadores locales
-            independientes que se desincronizan entre dispositivos.
-
+            Calcula cuantos segundos le quedan a la fase de preparacion
+            actual (ataque del atacante o construccion del defensor).
+            Sirve para que la interfaz y el servidor usen el mismo reloj
+            en lugar de temporizadores locales independientes que se
+            desincronizan entre dispositivos.
+        
         Entradas:
             Ninguna.
-
+        
         Salidas:
-            int: Segundos restantes (nunca negativo). Devuelve 0 si
-            la fase actual es combate, si la partida finalizo o si
-            todavia no se registro un inicio de fase.
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            Ninguna.
         """
         if self.partida_finalizada or self.fase_ronda == FASE_COMBATE:
             return 0
@@ -856,16 +904,18 @@ class Partida:
     def tiempo_de_fase_agotado(self):
         """
         Descripcion:
-            Indica si el tiempo de la fase de preparacion actual ya
-            se agoto segun el reloj del servidor.
-
+            Indica si el tiempo de la fase de preparacion actual ya se
+            agoto segun el reloj del servidor.
+        
         Entradas:
             Ninguna.
-
+        
         Salidas:
-            bool: True si ya no quedan segundos en la fase actual de
-            preparacion, False en caso contrario o si la fase actual
-            es combate.
+            bool: True si la condicion evaluada se cumple, False en caso
+            contrario.
+        
+        Restricciones:
+            Ninguna.
         """
         if self.fase_ronda == FASE_COMBATE or self.partida_finalizada:
             return False
@@ -874,22 +924,23 @@ class Partida:
     def resolver_preparacion_agotada(self):
         """
         Descripcion:
-            Resuelve el final del tiempo de preparacion actual segun
-            la fase en la que se encuentre la ronda:
-
-            - Si el atacante agoto sus 15 segundos: queda bloqueado
-              (ya no puede comprar mas unidades en esta fase) y se
-              abren los 15 segundos de preparacion del defensor,
-              tenga o no unidades colocadas todavia.
-            - Si el defensor agoto sus 15 segundos: si el atacante no
-              colocó ninguna unidad, el defensor gana la ronda de
-              inmediato; si ya hay unidades, inicia el combate.
-
+            Resuelve el final del tiempo de preparacion actual segun la
+            fase en la que se encuentre la ronda: - Si el atacante agoto
+            sus 15 segundos: queda bloqueado (ya no puede comprar mas
+            unidades en esta fase) y se abren los 15 segundos de
+            preparacion del defensor, tenga o no unidades colocadas
+            todavia. - Si el defensor agoto sus 15 segundos: si el
+            atacante no colocó ninguna unidad, el defensor gana la ronda
+            de inmediato; si ya hay unidades, inicia el combate.
+        
         Entradas:
             Ninguna.
-
+        
         Salidas:
-            tuple[bool, str]: Exito de la acción y mensaje descriptivo.
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            Ninguna.
         """
         if self.partida_finalizada:
             return False, "La partida ya finalizó."
@@ -1034,8 +1085,18 @@ class Partida:
     def _segundos_restantes_refuerzo(self):
         """
         Descripcion:
-            Devuelve los segundos que le quedan al atacante para
-            colocar otra unidad cuando se quedó sin tropas en combate.
+            Devuelve los segundos que le quedan al atacante para colocar
+            otra unidad cuando se quedó sin tropas en combate.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
         """
         if not self.esperando_refuerzo_atacante or self.tiempo_inicio_espera_refuerzo is None:
             return None

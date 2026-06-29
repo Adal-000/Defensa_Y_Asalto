@@ -4,6 +4,7 @@
 
 import math
 import os
+import time
 import tkinter as tk
 from tkinter import messagebox
 
@@ -109,10 +110,28 @@ CLAVE_TORRE_POR_NOMBRE = {
 
 def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=None):
     """
-    Descripción:
-        Crea la ventana jugable del mapa. Mantiene la lógica sincronizada
-        con el servidor cuando hay red y usa la lógica local de app.py
-        cuando se abre sin conexión.
+    Descripcion:
+        Crea la ventana jugable del mapa. Mantiene la lógica
+        sincronizada con el servidor cuando hay red y usa la lógica
+        local de app.py cuando se abre sin conexión.
+    
+    Entradas:
+        root (object): Valor recibido por la funcion.
+        GoPlay (object): Valor recibido por la funcion.
+        cerrar_todo (object): Valor recibido por la funcion.
+        configurar_ventana (object): Valor recibido por la funcion.
+        obtener_datos_partida (object): Valor recibido por la funcion.
+        Valor opcional.
+    
+    Salidas:
+        None: Ejecuta la accion y puede modificar el estado interno, la
+        interfaz o los datos relacionados.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Requiere que los widgets, ventanas o callbacks usados por la
+        interfaz existan antes de ejecutarse.
     """
 
     window_mapa = tk.Toplevel(root)
@@ -174,6 +193,22 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     preferencias = app.obtener_configuracion()
 
     def obtener_estado_visible():
+        """
+        Descripcion:
+            Obtiene la informacion correspondiente a obtener estado
+            visible para que otras partes del programa puedan
+            utilizarla.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if modo_red:
             estado_red = cliente_red.obtener_ultimo_estado_local()
             if estado_red is not None:
@@ -182,9 +217,39 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return app.obtener_estado_partida()
 
     def mostrar_cuadricula_activa():
+        """
+        Descripcion:
+            Muestra o consulta el estado visible relacionado con mostrar
+            cuadricula activa.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         return bool(app.obtener_configuracion().get("mostrar_cuadricula", True))
 
     def mostrar_proyectiles_activos():
+        """
+        Descripcion:
+            Muestra o consulta el estado visible relacionado con mostrar
+            proyectiles activos.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         return bool(app.obtener_configuracion().get("mostrar_proyectiles", True))
 
     if modo_red:
@@ -216,12 +281,43 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     }
     # Rastreo de timestamps de habilidades para detectar disparo del rival
     ultimo_timestamp_habilidad = {"defensor": None, "atacante": None}
+    # Momento (reloj local, time.monotonic) en que CADA rol disparó su
+    # última habilidad especial. Se usa para mostrarle al usuario
+    # "hace cuántos segundos" se usó, sin depender de la red.
+    momento_disparo = {"defensor": None, "atacante": None}
+    # Estado del efecto visual de habilidad especial actualmente en
+    # pantalla. dibujar_zonas() borra TODO el canvas en cada refresco
+    # (polling/combate), así que la animación debe volver a pintarse
+    # cada vez que eso pase mientras siga activa; por eso se guarda
+    # aquí en vez de solo en variables locales de la función.
+    efecto_habilidad_activo = {
+        "rol": None,
+        "info": None,
+        "inicio": None,
+        "duracion_total": None,
+        "fase_marco_oculto": False,
+    }
 
     # -----------------------------------------------------------------
     # Utilidades generales
     # -----------------------------------------------------------------
 
     def ventana_activa():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a ventana activa dentro
+            del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if control["cerrando"]:
             return False
         try:
@@ -231,6 +327,24 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             return False
 
     def cancelar_after(clave):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a cancelar after dentro
+            del flujo del juego.
+        
+        Entradas:
+            clave (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if control.get(clave) is not None:
             try:
                 window_mapa.after_cancel(control[clave])
@@ -239,11 +353,44 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             control[clave] = None
 
     def detener_todo():
+        """
+        Descripcion:
+            Detiene el proceso asociado a detener todo.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         control["combate_local_activo"] = False
         for clave in ("after_polling", "after_timer", "after_combate", "after_volver", "after_ocultar_resultado"):
             cancelar_after(clave)
 
     def cerrar_mapa(volver_a_play=False):
+        """
+        Descripcion:
+            Cierra o libera los recursos asociados a cerrar mapa.
+        
+        Entradas:
+            volver_a_play (object): Valor recibido por la funcion. Valor
+            opcional.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if control["cerrando"]:
             return
         control["cerrando"] = True
@@ -278,13 +425,62 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             GoPlay()
 
     def GoPlayR():
+        """
+        Descripcion:
+            Maneja la navegacion de la interfaz hacia la pantalla o
+            accion asociada a GoPlayR.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         cerrar_mapa(volver_a_play=True)
 
     def cerrar_ventana():
+        """
+        Descripcion:
+            Cierra o libera los recursos asociados a cerrar ventana.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         cerrar_mapa()
         cerrar_todo()
 
     def escribir_evento(texto):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a escribir evento dentro
+            del flujo del juego.
+        
+        Entradas:
+            texto (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not texto or not ventana_activa():
             return
         try:
@@ -300,6 +496,24 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     # -----------------------------------------------------------------
 
     def buscar_archivo_por_nombre(carpeta, palabra):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a buscar archivo por
+            nombre dentro del flujo del juego.
+        
+        Entradas:
+            carpeta (object): Valor recibido por la funcion.
+            palabra (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not os.path.isdir(carpeta):
             return None
         palabra = palabra.lower()
@@ -310,6 +524,23 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return None
 
     def buscar_primer_png(carpeta):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a buscar primer png dentro
+            del flujo del juego.
+        
+        Entradas:
+            carpeta (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not os.path.isdir(carpeta):
             return None
         for raiz, _, archivos in os.walk(carpeta):
@@ -319,6 +550,29 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return None
 
     def cargar_photoimage(ruta, ancho_max=None, alto_max=None, ajustar_exactamente=False):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a cargar photoimage dentro
+            del flujo del juego.
+        
+        Entradas:
+            ruta (object): Valor recibido por la funcion.
+            ancho_max (object): Valor recibido por la funcion. Valor
+            opcional.
+            alto_max (object): Valor recibido por la funcion. Valor
+            opcional.
+            ajustar_exactamente (object): Valor recibido por la funcion.
+            Valor opcional.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not ruta or not os.path.exists(ruta):
             return None
 
@@ -355,6 +609,25 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             return None
 
     def obtener_carpeta_faccion(tipo, faccion):
+        """
+        Descripcion:
+            Obtiene la informacion correspondiente a obtener carpeta
+            faccion para que otras partes del programa puedan
+            utilizarla.
+        
+        Entradas:
+            tipo (object): Valor recibido por la funcion.
+            faccion (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         base = os.path.join(RUTA_IMAGENES, tipo)
         candidatos = CARPETAS_FACCION.get(faccion, (faccion,))
         for candidato in candidatos:
@@ -369,6 +642,23 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return base
 
     def obtener_faccion_por_rol(rol):
+        """
+        Descripcion:
+            Obtiene la informacion correspondiente a obtener faccion por
+            rol para que otras partes del programa puedan utilizarla.
+        
+        Entradas:
+            rol (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         datos_red = obtener_ultimos_datos_red()
         facciones = datos_red.get("facciones_lobby", {}) if isinstance(datos_red, dict) else {}
 
@@ -384,18 +674,69 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return faccion_jugador
 
     def clave_unidad(unidad):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a clave unidad dentro del
+            flujo del juego.
+        
+        Entradas:
+            unidad (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         clave = unidad.get("clave") or ""
         if clave:
             return clave
         return CLAVE_UNIDAD_POR_NOMBRE.get(str(unidad.get("nombre", "")).lower(), "soldado")
 
     def clave_torre(torre):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a clave torre dentro del
+            flujo del juego.
+        
+        Entradas:
+            torre (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         clave = torre.get("clave") or ""
         if clave in ("normal", "pesada", "especial"):
             return clave
         return CLAVE_TORRE_POR_NOMBRE.get(str(torre.get("nombre", "")).lower(), "normal")
 
     def imagen_unidad(unidad):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a imagen unidad dentro del
+            flujo del juego.
+        
+        Entradas:
+            unidad (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         clave = clave_unidad(unidad)
         faccion = obtener_faccion_por_rol("atacante")
         llave = ("unidad", faccion, clave)
@@ -420,6 +761,23 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return imagenes[llave]
 
     def imagen_torre(torre):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a imagen torre dentro del
+            flujo del juego.
+        
+        Entradas:
+            torre (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         clave = clave_torre(torre)
         faccion = obtener_faccion_por_rol("defensor")
         llave = ("torre", faccion, clave)
@@ -442,6 +800,21 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return imagenes[llave]
 
     def imagen_base():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a imagen base dentro del
+            flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         faccion = obtener_faccion_por_rol("defensor")
         llave = ("base", faccion)
         if llave in imagenes:
@@ -452,6 +825,21 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return imagenes[llave]
 
     def imagen_muro():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a imagen muro dentro del
+            flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         llave = ("muro",)
         if llave not in imagenes:
             ruta = buscar_primer_png(os.path.join(RUTA_IMAGENES, "muros"))
@@ -459,6 +847,21 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return imagenes[llave]
 
     def imagen_fondo_mapa():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a imagen fondo mapa dentro
+            del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         llave = ("fondo_mapa",)
         if llave in imagenes:
             return imagenes[llave]
@@ -478,6 +881,24 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     # -----------------------------------------------------------------
 
     def obtener_ultimos_datos_red():
+        """
+        Descripcion:
+            Obtiene la informacion correspondiente a obtener ultimos
+            datos red para que otras partes del programa puedan
+            utilizarla.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+        """
         if not modo_red:
             return {}
         try:
@@ -491,32 +912,147 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return {}
 
     def _obtener_estado():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a  obtener estado dentro
+            del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         if modo_red:
             estado = cliente_red.obtener_ultimo_estado_local()
             return estado if estado else {}
         return app.obtener_estado_partida()
 
     def _accion_comprar_torre(clave, fila, columna):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a  accion comprar torre
+            dentro del flujo del juego.
+        
+        Entradas:
+            clave (object): Valor recibido por la funcion.
+            fila (object): Valor recibido por la funcion.
+            columna (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         if modo_red:
             return cliente_red.comprar_torre(clave, fila, columna)
         return app.comprar_torre(clave, fila, columna)
 
     def _accion_comprar_muro(fila, columna):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a  accion comprar muro
+            dentro del flujo del juego.
+        
+        Entradas:
+            fila (object): Valor recibido por la funcion.
+            columna (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         if modo_red:
             return cliente_red.comprar_muro(fila, columna)
         return app.comprar_muro(fila, columna)
 
     def _accion_comprar_unidad(clave, fila, columna):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a  accion comprar unidad
+            dentro del flujo del juego.
+        
+        Entradas:
+            clave (object): Valor recibido por la funcion.
+            fila (object): Valor recibido por la funcion.
+            columna (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         if modo_red:
             return cliente_red.comprar_unidad(clave, fila, columna)
         return app.comprar_unidad(clave, fila, columna)
 
     def _accion_iniciar_combate(numero_ronda):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a  accion iniciar combate
+            dentro del flujo del juego.
+        
+        Entradas:
+            numero_ronda (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         if modo_red:
             return cliente_red.iniciar_combate()
         return app.resolver_preparacion_agotada()
 
     def _accion_usar_habilidad_especial():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a  accion usar habilidad
+            especial dentro del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         if modo_red:
             return cliente_red.usar_habilidad_especial()
         return app.usar_habilidad_especial(rol_jugador)
@@ -526,6 +1062,25 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     # -----------------------------------------------------------------
 
     def actualizar_marcador(estado=None):
+        """
+        Descripcion:
+            Actualiza la informacion o el componente asociado a
+            actualizar marcador.
+        
+        Entradas:
+            estado (object): Valor recibido por la funcion. Valor
+            opcional.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         estado = estado or _obtener_estado()
         ronda = estado.get("numero_ronda", estado_ui["ronda"])
         vic_def = estado.get("rondas_ganadas_defensor", estado_ui["victorias_defensor"])
@@ -536,6 +1091,22 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         )
 
     def actualizar_temporizador_label():
+        """
+        Descripcion:
+            Actualiza la informacion o el componente asociado a
+            actualizar temporizador label.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         fase = estado_ui["fase"]
         if estado_ui["partida_finalizada"]:
             etiqueta_temporizador.config(text="Partida finalizada", fg="#444444")
@@ -557,6 +1128,28 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             etiqueta_temporizador.config(text="Preparación", fg="#333333")
 
     def mostrar_caja_resultado(ganador_ronda, partida_finalizada=False, ganador_partida=None):
+        """
+        Descripcion:
+            Muestra o consulta el estado visible relacionado con mostrar
+            caja resultado.
+        
+        Entradas:
+            ganador_ronda (object): Valor recibido por la funcion.
+            partida_finalizada (object): Valor recibido por la funcion.
+            Valor opcional.
+            ganador_partida (object): Valor recibido por la funcion.
+            Valor opcional.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not ventana_activa():
             return
 
@@ -588,12 +1181,46 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             control["after_volver"] = window_mapa.after(2500, lambda: cerrar_mapa(volver_a_play=True))
         else:
             def ocultar_resultado():
+                """
+                Descripcion:
+                    Ejecuta la logica correspondiente a ocultar
+                    resultado dentro del flujo del juego.
+                
+                Entradas:
+                    Ninguna.
+                
+                Salidas:
+                    None: Ejecuta la accion y puede modificar el estado
+                    interno, la interfaz o los datos relacionados.
+                
+                Restricciones:
+                    - Requiere que los widgets, ventanas o callbacks
+                    usados por la interfaz existan antes de ejecutarse.
+                """
                 if ventana_activa():
                     etiqueta_resultado.place_forget()
                     etiqueta_resultado.config(text="", bg=COLOR_PANEL, fg=COLOR_PANEL)
             control["after_ocultar_resultado"] = window_mapa.after(1300, ocultar_resultado)
 
     def detectar_resultado(estado):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a detectar resultado
+            dentro del flujo del juego.
+        
+        Entradas:
+            estado (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         vic_def = int(estado.get("rondas_ganadas_defensor", 0))
         vic_ata = int(estado.get("rondas_ganadas_atacante", 0))
         puntuacion = (vic_def, vic_ata)
@@ -615,13 +1242,26 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     def sincronizar_fase_y_temporizador(estado):
         """
         Descripcion:
-            Unico punto que decide en que fase visual esta la partida
-            y cuantos segundos de preparación quedan. Usa siempre el
-            campo "segundos_restantes_preparacion" que calcula el
-            backend (la clase Partida, ya sea local o a traves del
-            servidor), nunca un contador propio de la interfaz. Esto
-            evita que el reloj del defensor y el del atacante se vean
-            distintos entre los dos dispositivos.
+            Unico punto que decide en que fase visual esta la partida y
+            cuantos segundos de preparación quedan. Usa siempre el campo
+            "segundos_restantes_preparacion" que calcula el backend (la
+            clase Partida, ya sea local o a traves del servidor), nunca
+            un contador propio de la interfaz. Esto evita que el reloj
+            del defensor y el del atacante se vean distintos entre los
+            dos dispositivos.
+        
+        Entradas:
+            estado (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
         """
         ronda = int(estado.get("numero_ronda", 1))
         fase_logica = estado.get("fase_ronda", FASE_ATAQUE_ATACANTE)
@@ -669,10 +1309,41 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             iniciar_reloj_preparacion()
 
     def iniciar_reloj_preparacion():
+        """
+        Descripcion:
+            Inicia el proceso asociado a iniciar reloj preparacion.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         cancelar_after("after_timer")
         control["after_timer"] = window_mapa.after(1000, tick_reloj_preparacion)
 
     def tick_reloj_preparacion():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a tick reloj preparacion
+            dentro del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not ventana_activa() or estado_ui["partida_finalizada"]:
             return
         if estado_ui["fase"] not in (FASE_ATAQUE_ATACANTE, FASE_CONSTRUCCION_DEFENSOR):
@@ -704,6 +1375,22 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     # -----------------------------------------------------------------
 
     def obtener_catalogo_compras():
+        """
+        Descripcion:
+            Obtiene la informacion correspondiente a obtener catalogo
+            compras para que otras partes del programa puedan
+            utilizarla.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if rol_jugador == "atacante":
             return [{"tipo": "unidad", **unidad} for unidad in app.obtener_catalogo_unidades()]
         compras = [{"tipo": "torre", **torre} for torre in app.obtener_catalogo_torres()]
@@ -720,6 +1407,23 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return compras
 
     def seleccionar_compra(compra):
+        """
+        Descripcion:
+            Registra la seleccion correspondiente a seleccionar compra.
+        
+        Entradas:
+            compra (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         seleccion_actual["tipo"] = compra["tipo"]
         seleccion_actual["clave"] = compra["clave"]
         seleccion_actual["nombre"] = compra["nombre"]
@@ -732,6 +1436,24 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             boton.config(relief="sunken" if compra_boton is compra else "raised")
 
     def posicion_permitida_por_rol(fila, columna):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a posicion permitida por
+            rol dentro del flujo del juego.
+        
+        Entradas:
+            fila (object): Valor recibido por la funcion.
+            columna (object): Valor recibido por la funcion.
+        
+        Salidas:
+            tuple: Conjunto de valores resultantes de la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if fila == FILA_BASE:
             return False, "La base no se puede ocupar."
         if rol_jugador == "defensor" and fila not in FILAS_DEFENSOR:
@@ -741,6 +1463,23 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return True, "Posición válida."
 
     def convertir_click_a_casilla(evento):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a convertir click a
+            casilla dentro del flujo del juego.
+        
+        Entradas:
+            evento (object): Valor recibido por la funcion.
+        
+        Salidas:
+            tuple: Conjunto de valores resultantes de la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         columna = evento.x // ANCHO_CELDA
         fila = evento.y // ALTO_CELDA
         if fila < 0 or fila >= FILAS_TABLERO or columna < 0 or columna >= COLUMNAS_TABLERO:
@@ -748,10 +1487,45 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return fila, columna
 
     def datos_faccion_por_rol(rol):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a datos faccion por rol
+            dentro del flujo del juego.
+        
+        Entradas:
+            rol (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         nombre_faccion = faccion_defensor if rol == "defensor" else faccion_atacante
         return facciones_por_nombre.get(nombre_faccion, {})
 
     def color_proyectil(nombre_torre, rol="defensor"):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a color proyectil dentro
+            del flujo del juego.
+        
+        Entradas:
+            nombre_torre (object): Valor recibido por la funcion.
+            rol (object): Valor recibido por la funcion. Valor opcional.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         datos_faccion = datos_faccion_por_rol(rol)
         color_base = datos_faccion.get("color_proyectil")
         if color_base:
@@ -766,6 +1540,27 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return "#f2c200"
 
     def cargar_imagen_mapa(ruta, ancho_max=58, alto_max=34):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a cargar imagen mapa
+            dentro del flujo del juego.
+        
+        Entradas:
+            ruta (object): Valor recibido por la funcion.
+            ancho_max (object): Valor recibido por la funcion. Valor
+            opcional.
+            alto_max (object): Valor recibido por la funcion. Valor
+            opcional.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not ruta or not os.path.exists(ruta):
             return None
         clave = (ruta, ancho_max, alto_max)
@@ -779,6 +1574,23 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return imagen
 
     def ruta_torre_faccion(nombre_torre):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a ruta torre faccion
+            dentro del flujo del juego.
+        
+        Entradas:
+            nombre_torre (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         nombre = nombre_torre.lower()
         datos_faccion = datos_faccion_por_rol("defensor")
         if "pesada" in nombre or "cañon" in nombre or "canon" in nombre:
@@ -788,6 +1600,23 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return datos_faccion.get("torre_normal")
 
     def ruta_unidad_faccion(nombre_unidad):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a ruta unidad faccion
+            dentro del flujo del juego.
+        
+        Entradas:
+            nombre_unidad (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         nombre = nombre_unidad.lower()
         datos_faccion = datos_faccion_por_rol("atacante")
         if "tanque" in nombre or "pesad" in nombre or "escudero" in nombre or "demoledor" in nombre:
@@ -797,15 +1626,71 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         return datos_faccion.get("soldado_base")
 
     def centro_casilla(fila, columna):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a centro casilla dentro
+            del flujo del juego.
+        
+        Entradas:
+            fila (object): Valor recibido por la funcion.
+            columna (object): Valor recibido por la funcion.
+        
+        Salidas:
+            tuple: Conjunto de valores resultantes de la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         return (
             columna * ANCHO_CELDA + ANCHO_CELDA // 2,
             fila * ALTO_CELDA + ALTO_CELDA // 2,
         )
 
     def distancia(fila_a, columna_a, fila_b, columna_b):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a distancia dentro del
+            flujo del juego.
+        
+        Entradas:
+            fila_a (object): Valor recibido por la funcion.
+            columna_a (object): Valor recibido por la funcion.
+            fila_b (object): Valor recibido por la funcion.
+            columna_b (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         return abs(fila_a - fila_b) + abs(columna_a - columna_b)
 
     def animar_proyectiles(estado):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a animar proyectiles
+            dentro del flujo del juego.
+        
+        Entradas:
+            estado (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not mostrar_proyectiles_activos() or not ventana_activa():
             return
         proyectiles = []
@@ -840,6 +1725,22 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
         if proyectiles:
             def borrar_proyectiles():
+                """
+                Descripcion:
+                    Ejecuta la logica correspondiente a borrar
+                    proyectiles dentro del flujo del juego.
+                
+                Entradas:
+                    Ninguna.
+                
+                Salidas:
+                    None: Ejecuta la accion y puede modificar el estado
+                    interno, la interfaz o los datos relacionados.
+                
+                Restricciones:
+                    - Requiere que los widgets, ventanas o callbacks
+                    usados por la interfaz existan antes de ejecutarse.
+                """
                 if not ventana_activa():
                     return
                 try:
@@ -850,15 +1751,121 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
             window_mapa.after(650, borrar_proyectiles)
 
+    DURACION_DESTELLO_HABILIDAD = 0.15
+    DURACION_MARCO_HABILIDAD = 3.2
+    DURACION_TOTAL_HABILIDAD = 4.4  # vs. 0.65s-1s de un proyectil normal
+    TAG_EFECTO_HABILIDAD = "efecto_habilidad_especial"
+
     def animar_habilidad_especial(rol_que_dispara, info_habilidad):
         """
-        Muestra el efecto visual de la habilidad especial sobre el tablero:
-        - Overlay coloreado sobre las filas afectadas (semitransparente)
-        - Explosiones/efectos en cada casilla objetivo
-        - Texto grande con el nombre de la habilidad centrado
-        Dura 1 segundo y luego desaparece y refresca la vista.
+        Descripcion:
+            Activa el efecto visual de la habilidad especial sobre el
+            tablero, claramente distinto de un disparo normal de torre o
+            unidad, y registra el momento del disparo para poder mostrar
+            después "hace cuántos segundos" se usó. El dibujo en sí lo
+            hace _redibujar_efecto_habilidad_si_activo(), que se llama
+            en cada actualizar_vista() para sobrevivir a que
+            dibujar_zonas() borre todo el canvas en cada refresco
+            (polling/combate).
+        
+        Entradas:
+            rol_que_dispara (object): Valor recibido por la funcion.
+            info_habilidad (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
         """
-        if not ventana_activa() or cuadro_mapa is None:
+        momento_disparo[rol_que_dispara] = time.monotonic()
+        efecto_habilidad_activo["rol"] = rol_que_dispara
+        efecto_habilidad_activo["info"] = info_habilidad
+        efecto_habilidad_activo["inicio"] = time.monotonic()
+        efecto_habilidad_activo["duracion_total"] = DURACION_TOTAL_HABILIDAD
+        _redibujar_efecto_habilidad_si_activo()
+        # Sigue revisando el efecto incluso si nada más vuelve a llamar
+        # actualizar_vista() durante un rato (por ejemplo, en preparación
+        # sin polling de red), para que el marco parpadee y se borre solo.
+        _tick_efecto_habilidad()
+
+    def _tick_efecto_habilidad():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a  tick efecto habilidad
+            dentro del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
+        if not ventana_activa():
+            return
+        inicio = efecto_habilidad_activo["inicio"]
+        duracion_total = efecto_habilidad_activo["duracion_total"]
+        if inicio is None or duracion_total is None:
+            return
+        _redibujar_efecto_habilidad_si_activo()
+        transcurrido = time.monotonic() - inicio
+        if transcurrido < duracion_total + 0.3:
+            window_mapa.after(180, _tick_efecto_habilidad)
+
+    def _redibujar_efecto_habilidad_si_activo():
+        """
+        Descripcion:
+            Vuelve a dibujar el efecto de habilidad especial sobre el
+            canvas si todavía está dentro de su ventana de tiempo. Se
+            debe llamar después de cualquier
+            dibujar_zonas()/delete("all") para que la animación no se
+            pierda en el siguiente refresco de red o de combate local.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
+        if cuadro_mapa is None or not ventana_activa():
+            return
+        try:
+            cuadro_mapa.delete(TAG_EFECTO_HABILIDAD)
+        except tk.TclError:
+            control["cerrando"] = True
+            return
+
+        rol_que_dispara = efecto_habilidad_activo["rol"]
+        info_habilidad = efecto_habilidad_activo["info"]
+        inicio = efecto_habilidad_activo["inicio"]
+        if rol_que_dispara is None or info_habilidad is None or inicio is None:
+            return
+
+        transcurrido = time.monotonic() - inicio
+        if transcurrido >= efecto_habilidad_activo["duracion_total"]:
+            efecto_habilidad_activo["rol"] = None
+            efecto_habilidad_activo["info"] = None
+            efecto_habilidad_activo["inicio"] = None
             return
 
         color = info_habilidad.get("color", "#999999")
@@ -876,101 +1883,142 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         columna_origen = COLUMNAS_TABLERO // 2
         x_origen, y_origen = centro_casilla(fila_origen, columna_origen)
 
-        elementos = []
+        etiquetas = (TAG_EFECTO_HABILIDAD,)
 
-        # Overlay de zona afectada (rectángulo coloreado semitransparente)
-        if filas_objetivo:
-            fila_min = min(filas_objetivo)
-            fila_max = max(filas_objetivo)
-            y_top = fila_min * ALTO_CELDA
-            y_bot = (fila_max + 1) * ALTO_CELDA
-            elementos.append(cuadro_mapa.create_rectangle(
-                0, y_top, ANCHO_TABLERO, y_bot,
-                fill=color, outline=color, width=4, stipple="gray50",
-            ))
+        # --- Etapa 1 (primeros instantes): destello blanco de aviso ---
+        if transcurrido < DURACION_DESTELLO_HABILIDAD:
+            cuadro_mapa.create_rectangle(
+                0, 0, ANCHO_TABLERO, ALTO_TABLERO,
+                fill="#ffffff", outline="", stipple="gray25", tags=etiquetas,
+            )
 
-        # Efectos por casilla
-        for fila_obj in filas_objetivo:
-            for columna in range(COLUMNAS_TABLERO):
-                x_destino, y_destino = centro_casilla(fila_obj, columna)
+        # --- Marco grueso de color alrededor de TODO el tablero ---
+        # Parpadea durante la mayor parte del efecto. Esto es exclusivo
+        # de las habilidades especiales: ningún proyectil normal de
+        # torre/unidad dibuja un marco así.
+        mostrar_marco = (
+            transcurrido < DURACION_MARCO_HABILIDAD
+            and int(transcurrido / 0.22) % 2 == 0
+        )
+        if mostrar_marco:
+            grosor_marco = 10
+            cuadro_mapa.create_rectangle(
+                grosor_marco // 2, grosor_marco // 2,
+                ANCHO_TABLERO - grosor_marco // 2, ALTO_TABLERO - grosor_marco // 2,
+                outline=color, width=grosor_marco, tags=etiquetas,
+            )
+            cuadro_mapa.create_rectangle(
+                grosor_marco // 2 + 6, grosor_marco // 2 + 6,
+                ANCHO_TABLERO - grosor_marco // 2 - 6, ALTO_TABLERO - grosor_marco // 2 - 6,
+                outline="#ffffff", width=3, tags=etiquetas,
+            )
 
-                if tipo_efecto == "gas":
-                    radio = 26
-                    elementos.append(cuadro_mapa.create_oval(
-                        x_destino - radio, y_destino - radio // 2,
-                        x_destino + radio, y_destino + radio // 2,
-                        fill=color, outline="#004400", width=2, stipple="gray50",
-                    ))
-                elif tipo_efecto == "flechas":
-                    elementos.append(cuadro_mapa.create_line(
-                        x_origen, y_origen, x_destino, y_destino,
-                        fill=color, width=3, arrow=tk.LAST,
-                    ))
-                elif tipo_efecto == "granadas":
-                    medio_x = (x_origen + x_destino) / 2
-                    medio_y = min(y_origen, y_destino) - 40
-                    elementos.append(cuadro_mapa.create_line(
-                        x_origen, y_origen, medio_x, medio_y, x_destino, y_destino,
-                        fill=color, width=3, smooth=True,
-                    ))
-                    elementos.append(cuadro_mapa.create_oval(
-                        x_destino - 14, y_destino - 14, x_destino + 14, y_destino + 14,
-                        fill="#ff7a00", outline=color, width=2,
-                    ))
-                    elementos.append(cuadro_mapa.create_oval(
-                        x_destino - 6, y_destino - 6, x_destino + 6, y_destino + 6,
-                        fill="#ffee00", outline="",
-                    ))
-                else:
-                    # artilleria, mortero, fuego y generico
-                    radio = 18
-                    elementos.append(cuadro_mapa.create_oval(
-                        x_destino - radio, y_destino - radio,
-                        x_destino + radio, y_destino + radio,
-                        fill=color, outline="#111111", width=2,
-                    ))
-                    elementos.append(cuadro_mapa.create_oval(
-                        x_destino - radio // 2, y_destino - radio // 2,
-                        x_destino + radio // 2, y_destino + radio // 2,
-                        fill="#ffffff", outline="",
-                    ))
+        # Los efectos de impacto (overlay + explosiones + texto) solo se
+        # muestran en la primera parte de la animación; el resto del
+        # tiempo solo queda el marco parpadeante para avisar que hubo
+        # un ataque especial reciente sin tapar el tablero.
+        if transcurrido < DURACION_MARCO_HABILIDAD * 0.7:
+            # Overlay de zona afectada (rectángulo coloreado semitransparente)
+            if filas_objetivo:
+                fila_min = min(filas_objetivo)
+                fila_max = max(filas_objetivo)
+                y_top = fila_min * ALTO_CELDA
+                y_bot = (fila_max + 1) * ALTO_CELDA
+                cuadro_mapa.create_rectangle(
+                    0, y_top, ANCHO_TABLERO, y_bot,
+                    fill=color, outline=color, width=4, stipple="gray50", tags=etiquetas,
+                )
 
-        # Texto central grande con nombre de la habilidad
-        cx = ANCHO_TABLERO // 2
-        cy = ALTO_TABLERO // 2
-        # sombra
-        elementos.append(cuadro_mapa.create_rectangle(
-            cx - 180, cy - 28, cx + 180, cy + 28,
-            fill="#000000", outline="", stipple="gray50",
-        ))
-        elementos.append(cuadro_mapa.create_text(
-            cx + 2, cy + 2, text=f"¡{nombre_habilidad}!",
-            fill="#000000", font=("Arial", 20, "bold"),
-        ))
-        elementos.append(cuadro_mapa.create_text(
-            cx, cy, text=f"¡{nombre_habilidad}!",
-            fill=color, font=("Arial", 20, "bold"),
-        ))
+            # Efectos por casilla
+            for fila_obj in filas_objetivo:
+                for columna in range(COLUMNAS_TABLERO):
+                    x_destino, y_destino = centro_casilla(fila_obj, columna)
 
-        # Forzar refresco visual inmediato
+                    if tipo_efecto == "gas":
+                        radio = 26
+                        cuadro_mapa.create_oval(
+                            x_destino - radio, y_destino - radio // 2,
+                            x_destino + radio, y_destino + radio // 2,
+                            fill=color, outline="#004400", width=2, stipple="gray50", tags=etiquetas,
+                        )
+                    elif tipo_efecto == "flechas":
+                        cuadro_mapa.create_line(
+                            x_origen, y_origen, x_destino, y_destino,
+                            fill=color, width=3, arrow=tk.LAST, tags=etiquetas,
+                        )
+                    elif tipo_efecto == "granadas":
+                        medio_x = (x_origen + x_destino) / 2
+                        medio_y = min(y_origen, y_destino) - 40
+                        cuadro_mapa.create_line(
+                            x_origen, y_origen, medio_x, medio_y, x_destino, y_destino,
+                            fill=color, width=3, smooth=True, tags=etiquetas,
+                        )
+                        cuadro_mapa.create_oval(
+                            x_destino - 14, y_destino - 14, x_destino + 14, y_destino + 14,
+                            fill="#ff7a00", outline=color, width=2, tags=etiquetas,
+                        )
+                        cuadro_mapa.create_oval(
+                            x_destino - 6, y_destino - 6, x_destino + 6, y_destino + 6,
+                            fill="#ffee00", outline="", tags=etiquetas,
+                        )
+                    else:
+                        # artilleria, mortero, fuego y generico
+                        radio = 18
+                        cuadro_mapa.create_oval(
+                            x_destino - radio, y_destino - radio,
+                            x_destino + radio, y_destino + radio,
+                            fill=color, outline="#111111", width=2, tags=etiquetas,
+                        )
+                        cuadro_mapa.create_oval(
+                            x_destino - radio // 2, y_destino - radio // 2,
+                            x_destino + radio // 2, y_destino + radio // 2,
+                            fill="#ffffff", outline="", tags=etiquetas,
+                        )
+
+            # Texto central grande con nombre de la habilidad y halo de fondo
+            cx = ANCHO_TABLERO // 2
+            cy = ALTO_TABLERO // 2
+            etiqueta_quien = "¡DEFENSOR!" if rol_que_dispara == "defensor" else "¡ATACANTE!"
+            texto_completo = f"💥 {etiqueta_quien} usa {nombre_habilidad} 💥"
+            cuadro_mapa.create_rectangle(
+                cx - 230, cy - 34, cx + 230, cy + 34,
+                fill="#000000", outline=color, width=3, stipple="gray50", tags=etiquetas,
+            )
+            cuadro_mapa.create_text(
+                cx + 2, cy + 2, text=texto_completo,
+                fill="#000000", font=("Arial", 18, "bold"), tags=etiquetas,
+            )
+            cuadro_mapa.create_text(
+                cx, cy, text=texto_completo,
+                fill=color, font=("Arial", 18, "bold"), tags=etiquetas,
+            )
+
+        # Asegura que el efecto quede por encima de torres/unidades/muros
+        # recién redibujados por dibujar_zonas()/dibujar_estado().
         try:
-            window_mapa.update_idletasks()
+            cuadro_mapa.tag_raise(TAG_EFECTO_HABILIDAD)
         except tk.TclError:
-            pass
-
-        def borrar_efecto():
-            if not ventana_activa():
-                return
-            try:
-                for item in elementos:
-                    cuadro_mapa.delete(item)
-                actualizar_vista()
-            except tk.TclError:
-                control["cerrando"] = True
-
-        window_mapa.after(2500, borrar_efecto)
+            control["cerrando"] = True
 
     def comprar_en_casilla(evento):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a comprar en casilla
+            dentro del flujo del juego.
+        
+        Entradas:
+            evento (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if estado_ui["partida_finalizada"]:
             return
         if seleccion_actual["clave"] is None:
@@ -1009,6 +2057,23 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
                 cliente_red.obtener_estado()
                 window_mapa.after(80, actualizar_vista)
     def nombre_fase_preparacion(estado):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a nombre fase preparacion
+            dentro del flujo del juego.
+        
+        Entradas:
+            estado (object): Valor recibido por la funcion.
+        
+        Salidas:
+            str: Texto generado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         fase = estado.get("fase_ronda", "")
         if fase == FASE_ATAQUE_ATACANTE:
             return "Preparación atacante: coloca tropas"
@@ -1020,10 +2085,23 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
     def alternar_combate_click():
         """
-        Boton manual "Forzar combate": solo tiene efecto util durante
-        las fases de preparacion (salta el tiempo restante). Durante
-        el combate no hace nada porque el combate ya avanza solo,
-        tanto en red (servidor) como en local (after de Tkinter).
+        Descripcion:
+            Boton manual "Forzar combate": solo tiene efecto util
+            durante las fases de preparacion (salta el tiempo restante).
+            Durante el combate no hace nada porque el combate ya avanza
+            solo, tanto en red (servidor) como en local (after de
+            Tkinter).
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
         """
         if estado_ui["partida_finalizada"]:
             return
@@ -1042,11 +2120,22 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     def usar_habilidad_click():
         """
         Descripcion:
-            Maneja el clic del boton de habilidad especial. Cada
-            jugador solo tiene un boton, correspondiente a su propio
-            rol; la facción (y por lo tanto el efecto, costo y daño)
-            la determina la clase Partida según lo elegido en el
-            lobby, nunca la interfaz.
+            Maneja el clic del boton de habilidad especial. Cada jugador
+            solo tiene un boton, correspondiente a su propio rol; la
+            facción (y por lo tanto el efecto, costo y daño) la
+            determina la clase Partida según lo elegido en el lobby,
+            nunca la interfaz.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
         """
         if estado_ui["partida_finalizada"]:
             return
@@ -1066,14 +2155,91 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             if modo_red:
                 window_mapa.after(150, lambda: (cliente_red.obtener_estado(), actualizar_vista()))
 
+    def _formatear_hace_tiempo(segundos):
+        """
+        Descripcion:
+            Convierte segundos transcurridos en un texto corto y
+            legible.
+        
+        Entradas:
+            segundos (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
+        if segundos is None:
+            return "nunca usada"
+        segundos = max(0, int(segundos))
+        if segundos < 60:
+            return f"hace {segundos}s"
+        minutos = segundos // 60
+        resto = segundos % 60
+        return f"hace {minutos}m {resto}s"
+
+    def _segundos_desde_ultimo_uso(rol):
+        """
+        Descripcion:
+            Calcula cuanto tiempo ha pasado desde el ultimo disparo de
+            la habilidad especial de ese rol. Prioriza el
+            timestamp_disparo que llega del servidor/logica
+            (time.time(), confiable incluso si el jugador entra a una
+            partida ya en curso); si no hay ninguno en el estado
+            todavia, usa el reloj local como respaldo.
+        
+        Entradas:
+            rol (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
+        estado_actual = _obtener_estado()
+        clave = "habilidad_defensor" if rol == "defensor" else "habilidad_atacante"
+        info = estado_actual.get(clave, {})
+        ts_servidor = info.get("timestamp_disparo")
+        if ts_servidor is not None:
+            return time.time() - ts_servidor
+        ts_local = momento_disparo.get(rol)
+        if ts_local is not None:
+            return time.monotonic() - ts_local
+        return None
+
     def actualizar_boton_habilidad():
         """
         Descripcion:
-            Refresca el texto y el estado (habilitado/deshabilitado)
-            del boton de habilidad especial con la informacion mas
-            reciente del estado de la partida: nombre real de la
-            habilidad de la facción del jugador, costo y segundos de
-            enfriamiento restantes.
+            Refresca el texto y el estado (habilitado/deshabilitado) del
+            boton de habilidad especial con la informacion mas reciente
+            del estado de la partida: nombre real de la habilidad de la
+            facción del jugador, costo y segundos de enfriamiento
+            restantes. El "hace cuántos segundos" de la última habilidad
+            usada (propia y del rival) se muestra en la segunda línea
+            del marcador superior, ver actualizar_panel_estado().
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
         """
         if boton_habilidad is None:
             return
@@ -1104,6 +2270,22 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         )
 
     def dibujar_zonas():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a dibujar zonas dentro del
+            flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         cuadro_mapa.delete("all")
         fondo = imagen_fondo_mapa()
         if fondo is not None:
@@ -1134,6 +2316,29 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         cuadro_mapa.create_text(10, ALTO_CELDA * 9, text="Zona atacante", angle=90, anchor="w", fill="#b05a00", font=("Arial", 10, "bold"))
 
     def dibujar_barra_vida(x, y, vida, vida_maxima, ancho=48):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a dibujar barra vida
+            dentro del flujo del juego.
+        
+        Entradas:
+            x (object): Valor recibido por la funcion.
+            y (object): Valor recibido por la funcion.
+            vida (object): Valor recibido por la funcion.
+            vida_maxima (object): Valor recibido por la funcion.
+            ancho (object): Valor recibido por la funcion. Valor
+            opcional.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         vida_maxima = max(1, int(vida_maxima))
         vida = max(0, int(vida))
         ancho_vida = int((vida / vida_maxima) * ancho)
@@ -1141,6 +2346,24 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         cuadro_mapa.create_rectangle(x - ancho // 2, y, x - ancho // 2 + ancho_vida, y + 6, fill="#43a047", outline="")
 
     def dibujar_estado(estado):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a dibujar estado dentro
+            del flujo del juego.
+        
+        Entradas:
+            estado (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         vida_base = estado.get("vida_base", 0)
         vida_maxima_base = estado.get("vida_maxima_base", 1)
         ancho_vida = int((vida_base / max(1, vida_maxima_base)) * (ANCHO_TABLERO - 40))
@@ -1180,10 +2403,32 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             cuadro_mapa.create_text(x, y + 15, text=str(unidad["vida"]), font=("Arial", 8, "bold"), fill="white")
 
     def actualizar_panel_estado(estado):
+        """
+        Descripcion:
+            Actualiza la informacion o el componente asociado a
+            actualizar panel estado.
+        
+        Entradas:
+            estado (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
+        texto_habilidad_defensor = _formatear_hace_tiempo(_segundos_desde_ultimo_uso("defensor"))
+        texto_habilidad_atacante = _formatear_hace_tiempo(_segundos_desde_ultimo_uso("atacante"))
         etiqueta_marcador.config(
             text=(
                 f"Rol: {rol_jugador.upper()} | Fase: {estado.get('fase_ronda', 'preparación')} | Ronda {estado.get('numero_ronda', 1)} | "
-                f"Base {estado.get('vida_base', 0)}/{estado.get('vida_maxima_base', 0)}"
+                f"Base {estado.get('vida_base', 0)}/{estado.get('vida_maxima_base', 0)}\n"
+                f"💥 Habilidad defensor: {texto_habilidad_defensor}   |   "
+                f"💥 Habilidad atacante: {texto_habilidad_atacante}"
             )
         )
         segundos_refuerzo = estado.get("segundos_refuerzo_atacante")
@@ -1201,10 +2446,26 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
 
     def _detectar_y_animar_habilidad_rival(estado):
         """
-        Detecta si el rival usó su habilidad especial comparando el
-        timestamp_disparo del estado con el último conocido. Si cambió,
-        activa la animación en esta pantalla también (sin aplicar daño,
-        ya que el servidor ya lo hizo).
+        Descripcion:
+            Detecta si el rival usó su habilidad especial comparando el
+            timestamp_disparo del estado con el último conocido. Si
+            cambió, activa la animación en esta pantalla también (sin
+            aplicar daño, ya que el servidor ya lo hizo).
+        
+        Entradas:
+            estado (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
         """
         for rol_rival in ("defensor", "atacante"):
             if rol_rival == rol_jugador:
@@ -1223,17 +2484,42 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
                     animar_habilidad_especial(rol_rival, info)
 
     def actualizar_vista():
+        """
+        Descripcion:
+            Actualiza la informacion o el componente asociado a
+            actualizar vista.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         estado = _obtener_estado()
         if not estado:
             return
         ultimo_estado["datos"] = estado
         dibujar_zonas()
         dibujar_estado(estado)
+        _redibujar_efecto_habilidad_si_activo()
         actualizar_panel_estado(estado)
         actualizar_marcador(estado)
         detectar_resultado(estado)
         sincronizar_fase_y_temporizador(estado)
         animar_proyectiles(estado)
+        # Vuelve a subir el efecto de habilidad por encima de los
+        # proyectiles normales recién dibujados, para que un disparo
+        # de torre/unidad nunca tape el aviso de la habilidad especial.
+        if cuadro_mapa is not None and ventana_activa():
+            try:
+                cuadro_mapa.tag_raise(TAG_EFECTO_HABILIDAD)
+            except tk.TclError:
+                control["cerrando"] = True
         actualizar_boton_habilidad()
         _detectar_y_animar_habilidad_rival(estado)
 
@@ -1242,6 +2528,21 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     # -----------------------------------------------------------------
 
     def iniciar_combate_local():
+        """
+        Descripcion:
+            Inicia el proceso asociado a iniciar combate local.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if modo_red or estado_ui["partida_finalizada"]:
             return
         estado = app.obtener_estado_partida()
@@ -1252,6 +2553,22 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
         ejecutar_pulso_combate_local()
 
     def ejecutar_pulso_combate_local():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a ejecutar pulso combate
+            local dentro del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not ventana_activa() or not control["combate_local_activo"]:
             return
         resultado = app.ejecutar_combate()
@@ -1266,11 +2583,42 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
             boton_turno.config(text="Esperando preparación", bg="#ffb74d")
 
     def iniciar_polling():
+        """
+        Descripcion:
+            Inicia el proceso asociado a iniciar polling.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not modo_red:
             return
         tick_polling()
 
     def tick_polling():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a tick polling dentro del
+            flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not ventana_activa() or not modo_red:
             return
         try:
@@ -1373,6 +2721,24 @@ def mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida=No
     # (la primera carga de un PNG puede tomar unos ms; hacerlo aquí
     #  evita el parpadeo/retraso visible al colocar la primera unidad o torre)
     def _precargar_imagenes():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a  precargar imagenes
+            dentro del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         for faccion in (faccion_defensor, faccion_atacante):
             imagen_base()
             imagen_muro()

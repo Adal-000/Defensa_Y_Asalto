@@ -18,9 +18,25 @@ COLOR_SUAVE = "#b8c7d9"
 
 def config(root, GoMain, cerrar_todo, configurar_ventana):
     """
-    Descripción:
-        Crea la ventana de configuración con valores predeterminados
-        de conexión para abrir Play.
+    Descripcion:
+        Crea la ventana de configuración con valores predeterminados de
+        conexión para abrir Play.
+    
+    Entradas:
+        root (object): Valor recibido por la funcion.
+        GoMain (object): Valor recibido por la funcion.
+        cerrar_todo (object): Valor recibido por la funcion.
+        configurar_ventana (object): Valor recibido por la funcion.
+    
+    Salidas:
+        None: Ejecuta la accion y puede modificar el estado interno, la
+        interfaz o los datos relacionados.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Requiere que los widgets, ventanas o callbacks usados por la
+        interfaz existan antes de ejecutarse.
     """
 
     window3 = tk.Toplevel(root)
@@ -35,10 +51,47 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
     def GoMainR():
         # Salir de Configuración ya NO detiene la música: solo el
         # botón "Detener" de esta misma ventana la apaga.
+        """
+        Descripcion:
+            Maneja la navegacion de la interfaz hacia la pantalla o
+            accion asociada a GoMainR.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         window3.destroy()
         GoMain()
 
     def crear_tarjeta(x, y, ancho, alto, titulo):
+        """
+        Descripcion:
+            Crea y configura el elemento asociado a crear tarjeta para
+            usarlo dentro del juego o la interfaz.
+        
+        Entradas:
+            x (object): Valor recibido por la funcion.
+            y (object): Valor recibido por la funcion.
+            ancho (object): Valor recibido por la funcion.
+            alto (object): Valor recibido por la funcion.
+            titulo (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         tarjeta = tk.Frame(window3, bg=COLOR_TARJETA, highlightbackground=COLOR_BORDE, highlightthickness=2)
         tarjeta.place(x=x, y=y, width=ancho, height=alto)
         tk.Label(tarjeta, text=titulo, bg=COLOR_PRIMARIO, fg="white", font=("Arial", 16, "bold"), pady=8).pack(fill="x")
@@ -46,6 +99,21 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
 
 
     def seleccionar_musica():
+        """
+        Descripcion:
+            Registra la seleccion correspondiente a seleccionar musica.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         ruta = filedialog.askopenfilename(
             title="Selecciona música",
             filetypes=(
@@ -58,6 +126,22 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
             etiqueta_estado.config(text="Música seleccionada. Pulsa Reproducir para escucharla.", fg=COLOR_BORDE)
 
     def reproducir_musica():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a reproducir musica dentro
+            del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         ruta = musica_var.get().strip()
         if not ruta:
             messagebox.showwarning("Música", "Primero selecciona un archivo de música.")
@@ -73,10 +157,41 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
         etiqueta_estado.config(text="Reproduciendo música. Sigue sonando en todas las ventanas.", fg="#8ee08e")
 
     def detener_musica():
+        """
+        Descripcion:
+            Detiene el proceso asociado a detener musica.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         app.detener_musica()
         etiqueta_estado.config(text="Música detenida.", fg=COLOR_SUAVE)
 
     def aplicar_configuracion():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a aplicar configuracion
+            dentro del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         try:
             puerto = int(puerto_var.get())
         except ValueError:
@@ -95,6 +210,22 @@ def config(root, GoMain, cerrar_todo, configurar_ventana):
         etiqueta_estado.config(text="Configuración aplicada para esta sesión.", fg="#8ee08e")
 
     def restablecer_configuracion():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a restablecer
+            configuracion dentro del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         valores = app.restablecer_configuracion()
         ip_var.set(valores["ip_servidor_predeterminada"])
         puerto_var.set(str(valores["puerto_predeterminado"]))

@@ -82,6 +82,30 @@ class ClienteConectado:
     """
 
     def __init__(self, conexion, direccion, usuario, rol, archivo_lectura=None):
+        """
+        Descripcion:
+            Inicializa la instancia y asigna los valores necesarios para
+            que el objeto pueda utilizarse correctamente.
+        
+        Entradas:
+            conexion (object): Valor recibido por la funcion.
+            direccion (object): Valor recibido por la funcion.
+            usuario (object): Valor recibido por la funcion.
+            rol (object): Valor recibido por la funcion.
+            archivo_lectura (object): Valor recibido por la funcion.
+            Valor opcional.
+        
+        Salidas:
+            None: Inicializa los atributos de la instancia.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         self.conexion = conexion
         self.direccion = direccion
         self.usuario = usuario
@@ -145,6 +169,34 @@ class ServidorPartida:
     def __init__(self, host=HOST_PREDETERMINADO, puerto=PUERTO_PREDETERMINADO,
                  intervalo_combate=INTERVALO_COMBATE_SEGUNDOS,
                  validar_usuarios=True, ruta_jugadores=None):
+        """
+        Descripcion:
+            Inicializa la instancia y asigna los valores necesarios para
+            que el objeto pueda utilizarse correctamente.
+        
+        Entradas:
+            host (object): Valor recibido por la funcion. Valor
+            opcional.
+            puerto (object): Valor recibido por la funcion. Valor
+            opcional.
+            intervalo_combate (object): Valor recibido por la funcion.
+            Valor opcional.
+            validar_usuarios (object): Valor recibido por la funcion.
+            Valor opcional.
+            ruta_jugadores (object): Valor recibido por la funcion.
+            Valor opcional.
+        
+        Salidas:
+            None: Inicializa los atributos de la instancia.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         self.host = host
         self.puerto = puerto
         self.intervalo_combate = intervalo_combate
@@ -488,6 +540,23 @@ class ServidorPartida:
         )
 
     def _usuarios_por_rol(self):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a  usuarios por rol dentro
+            del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         return {
             rol: cliente.usuario
             for rol, cliente in self.clientes_por_rol.items()
@@ -495,12 +564,46 @@ class ServidorPartida:
         }
 
     def _roles_faltantes(self):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a  roles faltantes dentro
+            del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         return [
             rol for rol, cliente in self.clientes_por_rol.items()
             if cliente is None or not cliente.conectado
         ]
 
     def _mensaje_sala(self):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a  mensaje sala dentro del
+            flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         faltantes = self._roles_faltantes()
         if not faltantes:
             return "Sala lista: defensor y atacante conectados."
@@ -512,6 +615,25 @@ class ServidorPartida:
             Construye un bloque de datos estandar para todas las
             respuestas del servidor, incluyendo los usuarios por rol
             para que ambos dispositivos vean la misma sala.
+        
+        Entradas:
+            cliente (object): Valor recibido por la funcion. Valor
+            opcional.
+            accion (object): Valor recibido por la funcion. Valor
+            opcional.
+            resultado_combate (object): Valor recibido por la funcion.
+            Valor opcional.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
         """
         usuarios_por_rol = self._usuarios_por_rol()
         roles_faltantes = self._roles_faltantes()
@@ -550,6 +672,27 @@ class ServidorPartida:
 
 
     def _validar_asignacion_rol(self, usuario, rol_solicitado=""):
+        """
+        Descripcion:
+            Valida las condiciones necesarias para  validar asignacion
+            rol.
+        
+        Entradas:
+            usuario (object): Valor recibido por la funcion.
+            rol_solicitado (object): Valor recibido por la funcion.
+            Valor opcional.
+        
+        Salidas:
+            tuple: Conjunto de valores resultantes de la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         usuario_normalizado = str(usuario).strip().lower()
         for cliente in self.clientes_por_rol.values():
             if cliente is not None and cliente.conectado and cliente.usuario.strip().lower() == usuario_normalizado:

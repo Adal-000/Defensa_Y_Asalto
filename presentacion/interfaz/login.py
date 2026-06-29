@@ -18,8 +18,27 @@ COLOR_EXITO = "#9be28f"
 
 def login(root, GoMain, cerrar_todo, configurar_ventana, establecer_usuario_actual):
     """
-    Descripción:
-        Crea la ventana de inicio de sesión y registro con estilo de juego.
+    Descripcion:
+        Crea la ventana de inicio de sesión y registro con estilo de
+        juego.
+    
+    Entradas:
+        root (object): Valor recibido por la funcion.
+        GoMain (object): Valor recibido por la funcion.
+        cerrar_todo (object): Valor recibido por la funcion.
+        configurar_ventana (object): Valor recibido por la funcion.
+        establecer_usuario_actual (object): Valor recibido por la
+        funcion.
+    
+    Salidas:
+        None: Ejecuta la accion y puede modificar el estado interno, la
+        interfaz o los datos relacionados.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Requiere que los widgets, ventanas o callbacks usados por la
+        interfaz existan antes de ejecutarse.
     """
 
     window_login = tk.Toplevel(root)
@@ -61,18 +80,90 @@ def login(root, GoMain, cerrar_todo, configurar_ventana, establecer_usuario_actu
     etiqueta_mensaje.pack(pady=(8, 8))
 
     def estilo_boton(boton, color_base, color_hover):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a estilo boton dentro del
+            flujo del juego.
+        
+        Entradas:
+            boton (object): Valor recibido por la funcion.
+            color_base (object): Valor recibido por la funcion.
+            color_hover (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         boton.bind("<Enter>", lambda _evento: boton.config(bg=color_hover, relief="sunken"))
         boton.bind("<Leave>", lambda _evento: boton.config(bg=color_base, relief="raised"))
 
     def mostrar_mensaje(mensaje, color=COLOR_ERROR):
+        """
+        Descripcion:
+            Muestra o consulta el estado visible relacionado con mostrar
+            mensaje.
+        
+        Entradas:
+            mensaje (object): Valor recibido por la funcion.
+            color (object): Valor recibido por la funcion. Valor
+            opcional.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         etiqueta_mensaje.config(text=mensaje, fg=color)
 
     def limpiar_campos():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a limpiar campos dentro
+            del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         campo_usuario.delete(0, tk.END)
         campo_contrasena.delete(0, tk.END)
         campo_usuario.focus_set()
 
     def obtener_campos_validos():
+        """
+        Descripcion:
+            Obtiene la informacion correspondiente a obtener campos
+            validos para que otras partes del programa puedan
+            utilizarla.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         usuario = campo_usuario.get().strip()
         contrasena = campo_contrasena.get().strip()
 
@@ -91,6 +182,22 @@ def login(root, GoMain, cerrar_todo, configurar_ventana, establecer_usuario_actu
         return usuario, contrasena
 
     def intentar_iniciar_sesion():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a intentar iniciar sesion
+            dentro del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         datos = obtener_campos_validos()
         if datos is None:
             return
@@ -120,6 +227,22 @@ def login(root, GoMain, cerrar_todo, configurar_ventana, establecer_usuario_actu
             campo_contrasena.focus_set()
 
     def intentar_registrarse():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a intentar registrarse
+            dentro del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         datos = obtener_campos_validos()
         if datos is None:
             return

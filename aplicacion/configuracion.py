@@ -18,12 +18,39 @@ _configuracion_actual = CONFIGURACION_PREDETERMINADA.copy()
 
 
 def obtener_configuracion():
-    """Devuelve una copia de la configuracion actual."""
+    """
+    Descripcion:
+        Devuelve una copia de la configuracion actual.
+    
+    Entradas:
+        Ninguna.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        Ninguna.
+    """
     return _configuracion_actual.copy()
 
 
 def actualizar_configuracion(**opciones):
-    """Actualiza opciones conocidas y devuelve la configuracion completa."""
+    """
+    Descripcion:
+        Actualiza opciones conocidas y devuelve la configuracion
+        completa.
+    
+    Entradas:
+        **opciones (object): Valor recibido por la funcion. Argumentos
+        nombrados adicionales.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+    """
     for clave, valor in opciones.items():
         if clave in _configuracion_actual:
             _configuracion_actual[clave] = valor
@@ -31,7 +58,19 @@ def actualizar_configuracion(**opciones):
 
 
 def restablecer_configuracion():
-    """Restaura los valores de configuracion predeterminados."""
+    """
+    Descripcion:
+        Restaura los valores de configuracion predeterminados.
+    
+    Entradas:
+        Ninguna.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        Ninguna.
+    """
     _configuracion_actual.clear()
     _configuracion_actual.update(CONFIGURACION_PREDETERMINADA)
     return obtener_configuracion()
