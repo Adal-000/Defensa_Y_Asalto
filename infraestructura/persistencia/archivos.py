@@ -126,15 +126,23 @@ def buscar_jugador(nombre_usuario, ruta_archivo=RUTA_ARCHIVO_JUGADORES):
 def _preparar_texto_credencial(valor):
     """
     Descripcion:
-        Convierte una credencial a texto y elimina espacios sobrantes
-        al inicio y al final. Esto evita registros como " ana " y
-        mantiene el manejo de datos uniforme entre registro y login.
-
+        Convierte una credencial a texto y elimina espacios sobrantes al
+        inicio y al final. Esto evita registros como " ana " y mantiene
+        el manejo de datos uniforme entre registro y login.
+    
     Entradas:
-        valor: dato recibido desde la interfaz o desde una prueba.
-
+        valor (object): Valor recibido por la funcion.
+    
     Salidas:
-        str: texto limpio.
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Requiere una conexion, sala o mensaje valido cuando la
+        operacion dependa de la red.
+        - Funcion de apoyo interno; no se recomienda llamarla
+        directamente desde otros modulos.
     """
     if valor is None:
         return ""

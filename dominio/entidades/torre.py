@@ -39,6 +39,35 @@ class Torre:
 
     def __init__(self, nombre, costo, vida, dano, alcance, habilidad,
                  turnos_habilidad, fila=0, columna=0):
+        """
+        Descripcion:
+            Inicializa la instancia y asigna los valores necesarios para
+            que el objeto pueda utilizarse correctamente.
+        
+        Entradas:
+            nombre (object): Valor recibido por la funcion.
+            costo (object): Valor recibido por la funcion.
+            vida (object): Valor recibido por la funcion.
+            dano (object): Valor recibido por la funcion.
+            alcance (object): Valor recibido por la funcion.
+            habilidad (object): Valor recibido por la funcion.
+            turnos_habilidad (object): Valor recibido por la funcion.
+            fila (object): Valor recibido por la funcion. Valor
+            opcional.
+            columna (object): Valor recibido por la funcion. Valor
+            opcional.
+        
+        Salidas:
+            None: Inicializa los atributos de la instancia.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Debe ejecutarse sobre objetos del dominio creados
+            correctamente.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         self.nombre = nombre
         self.costo = costo
         self.vida = vida

@@ -31,6 +31,32 @@ class Muro:
     """
 
     def __init__(self, costo=60, vida=220, fila=0, columna=0):
+        """
+        Descripcion:
+            Inicializa la instancia y asigna los valores necesarios para
+            que el objeto pueda utilizarse correctamente.
+        
+        Entradas:
+            costo (object): Valor recibido por la funcion. Valor
+            opcional.
+            vida (object): Valor recibido por la funcion. Valor
+            opcional.
+            fila (object): Valor recibido por la funcion. Valor
+            opcional.
+            columna (object): Valor recibido por la funcion. Valor
+            opcional.
+        
+        Salidas:
+            None: Inicializa los atributos de la instancia.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Debe ejecutarse sobre objetos del dominio creados
+            correctamente.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         self.nombre = "Muro"
         self.costo = costo
         self.vida = vida

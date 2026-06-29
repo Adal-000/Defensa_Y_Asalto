@@ -25,16 +25,23 @@ ALTO_VENTANA = 700
 
 def configurar_ventana(ventana, nombre):
     """
-    Descripción:
+    Descripcion:
         Configura una ventana con tamaño fijo, centrada en pantalla y
         con un título específico.
-
+    
     Entradas:
-        ventana: ventana creada con Tk o Toplevel.
-        nombre: título de la ventana.
-
+        ventana (object): Valor recibido por la funcion.
+        nombre (object): Valor recibido por la funcion.
+    
     Salidas:
-        No retorna ningún valor.
+        None: Ejecuta la accion y puede modificar el estado interno, la
+        interfaz o los datos relacionados.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Requiere que los widgets, ventanas o callbacks usados por la
+        interfaz existan antes de ejecutarse.
     """
     pantalla_ancho = ventana.winfo_screenwidth()
     pantalla_alto = ventana.winfo_screenheight()
@@ -49,14 +56,19 @@ def configurar_ventana(ventana, nombre):
 
 def main():
     """
-    Descripción:
+    Descripcion:
         Inicia la aplicación gráfica completa.
-
+    
     Entradas:
         Ninguna.
-
+    
     Salidas:
-        No retorna ningún valor. Ejecuta el mainloop de Tkinter.
+        None: Ejecuta la accion y puede modificar el estado interno, la
+        interfaz o los datos relacionados.
+    
+    Restricciones:
+        - Requiere que los widgets, ventanas o callbacks usados por la
+        interfaz existan antes de ejecutarse.
     """
     root = tk.Tk()
     root.withdraw()
@@ -71,19 +83,99 @@ def main():
     estado_sesion = {"usuario_actual": None}
 
     def establecer_usuario_actual(nombre_usuario):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a establecer usuario
+            actual dentro del flujo del juego.
+        
+        Entradas:
+            nombre_usuario (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         estado_sesion["usuario_actual"] = nombre_usuario
 
     def obtener_usuario_actual():
+        """
+        Descripcion:
+            Obtiene la informacion correspondiente a obtener usuario
+            actual para que otras partes del programa puedan utilizarla.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         return estado_sesion["usuario_actual"]
 
     def cerrar_todo():
+        """
+        Descripcion:
+            Cierra o libera los recursos asociados a cerrar todo.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         app.detener_musica()
         root.destroy()
 
     def GoLogin():
+        """
+        Descripcion:
+            Maneja la navegacion de la interfaz hacia la pantalla o
+            accion asociada a GoLogin.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         login(root, GoMain, cerrar_todo, configurar_ventana, establecer_usuario_actual)
 
     def GoMain():
+        """
+        Descripcion:
+            Maneja la navegacion de la interfaz hacia la pantalla o
+            accion asociada a GoMain.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         ventana_main(
             root,
             GoPerfil,
@@ -95,18 +187,98 @@ def main():
         )
 
     def GoPerfil():
+        """
+        Descripcion:
+            Maneja la navegacion de la interfaz hacia la pantalla o
+            accion asociada a GoPerfil.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         perfil(root, GoMain, GoPuntajes, cerrar_todo, configurar_ventana, obtener_usuario_actual)
 
     def GoPuntajes():
+        """
+        Descripcion:
+            Maneja la navegacion de la interfaz hacia la pantalla o
+            accion asociada a GoPuntajes.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         puntajes(root, GoPerfil, cerrar_todo, configurar_ventana, obtener_usuario_actual)
 
     def GoPlay():
+        """
+        Descripcion:
+            Maneja la navegacion de la interfaz hacia la pantalla o
+            accion asociada a GoPlay.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_actual)
 
     def GoMapa():
+        """
+        Descripcion:
+            Maneja la navegacion de la interfaz hacia la pantalla o
+            accion asociada a GoMapa.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         mapa(root, GoPlay, cerrar_todo, configurar_ventana, obtener_datos_partida)
 
     def GoConfig():
+        """
+        Descripcion:
+            Maneja la navegacion de la interfaz hacia la pantalla o
+            accion asociada a GoConfig.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         config(root, GoMain, cerrar_todo, configurar_ventana)
 
     GoLogin()

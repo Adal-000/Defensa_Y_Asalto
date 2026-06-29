@@ -37,50 +37,162 @@ DATOS_PARTIDA = {
 
 def obtener_datos_partida():
     """
-    Devuelve los datos básicos de la partida seleccionada.
-    Se usa desde root.py o desde el mapa.
+    Descripcion:
+        Devuelve los datos básicos de la partida seleccionada. Se usa
+        desde root.py o desde el mapa.
+    
+    Entradas:
+        Ninguna.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        - Requiere que los widgets, ventanas o callbacks usados por la
+        interfaz existan antes de ejecutarse.
     """
     return DATOS_PARTIDA.copy()
 
 
 class AdaptadorClienteTkinter:
     """
-    Descripción:
+    Descripcion:
         Encapsula el cliente de red para que Tkinter procese los
         mensajes recibidos desde el hilo de escucha usando una cola.
+    
+    Entradas:
+        Ninguna.
+    
+    Salidas:
+        No retorna nada. Define la clase AdaptadorClienteTkinter para
+        ser instanciada o utilizada por otros modulos.
+    
+    Restricciones:
+        - Requiere que los widgets, ventanas o callbacks usados por la
+        interfaz existan antes de ejecutarse.
     """
 
     def __init__(self, cola_mensajes):
+        """
+        Descripcion:
+            Inicializa la instancia y asigna los valores necesarios para
+            que el objeto pueda utilizarse correctamente.
+        
+        Entradas:
+            cola_mensajes (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Inicializa los atributos de la instancia.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         self.cola_mensajes = cola_mensajes
         self.cliente = ClientePartida(callback_mensaje=self._recibir_mensaje)
 
     def _recibir_mensaje(self, mensaje):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a  recibir mensaje dentro
+            del flujo del juego.
+        
+        Entradas:
+            mensaje (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         self.cola_mensajes.put(mensaje)
 
     def conectar(self, host, usuario, rol, puerto):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a conectar dentro del
+            flujo del juego.
+        
+        Entradas:
+            host (object): Valor recibido por la funcion.
+            usuario (object): Valor recibido por la funcion.
+            rol (object): Valor recibido por la funcion.
+            puerto (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         return self.cliente.conectar(host, usuario, puerto=puerto, rol=rol)
 
     def cerrar(self):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a cerrar dentro del flujo
+            del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         self.cliente.cerrar()
 
 
 def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_actual):
     """
-    Descripción:
+    Descripcion:
         Crea una sola ventana de sala en red. Maneja correctamente el
         ciclo de vida de ventanas, servidor y cliente según quién creó
-        la sala y quién se unió.
-
-    Flujo al CREAR sala y pulsar Volver:
-        - Si nadie se unió: cierra servidor, cierra cliente, vuelve a main.
-        - Si había alguien unido: cierra servidor (lo expulsa),
-          ambos vuelven a main. El que se unió recibe aviso de sala cerrada.
-
-    Flujo al UNIRSE a sala y pulsar Volver:
-        - El cliente se desconecta del servidor.
-        - El creador recibe aviso de que el contrincante salió,
-          se le quita la facción elegida si tenía una y vuelve al estado
-          de espera (como si nadie se hubiera unido todavía).
+        la sala y quién se unió. Flujo al CREAR sala y pulsar Volver: -
+        Si nadie se unió: cierra servidor, cierra cliente, vuelve a
+        main. - Si había alguien unido: cierra servidor (lo expulsa),
+        ambos vuelven a main. El que se unió recibe aviso de sala
+        cerrada. Flujo al UNIRSE a sala y pulsar Volver: - El cliente se
+        desconecta del servidor. - El creador recibe aviso de que el
+        contrincante salió, se le quita la facción elegida si tenía una
+        y vuelve al estado de espera (como si nadie se hubiera unido
+        todavía).
+    
+    Entradas:
+        root (object): Valor recibido por la funcion.
+        GoMain (object): Valor recibido por la funcion.
+        GoMapa (object): Valor recibido por la funcion.
+        cerrar_todo (object): Valor recibido por la funcion.
+        configurar_ventana (object): Valor recibido por la funcion.
+        obtener_usuario_actual (object): Valor recibido por la funcion.
+    
+    Salidas:
+        None: Ejecuta la accion y puede modificar el estado interno, la
+        interfaz o los datos relacionados.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Requiere que los widgets, ventanas o callbacks usados por la
+        interfaz existan antes de ejecutarse.
     """
 
     window2 = tk.Toplevel(root)
@@ -129,6 +241,22 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     # ------------------------------------------------------------------ #
 
     def obtener_ip_local_visible():
+        """
+        Descripcion:
+            Obtiene la informacion correspondiente a obtener ip local
+            visible para que otras partes del programa puedan
+            utilizarla.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         try:
             socket_prueba = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             socket_prueba.connect(("8.8.8.8", 80))
@@ -139,19 +267,84 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             return "127.0.0.1"
 
     def obtener_clave_sala():
+        """
+        Descripcion:
+            Obtiene la informacion correspondiente a obtener clave sala
+            para que otras partes del programa puedan utilizarla.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         return str(estado_red["puerto"])
 
     def obtener_datos_sala():
+        """
+        Descripcion:
+            Obtiene la informacion correspondiente a obtener datos sala
+            para que otras partes del programa puedan utilizarla.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         clave = obtener_clave_sala()
         if clave not in LOBBY_LOCAL:
             LOBBY_LOCAL[clave] = {"facciones": {}, "listos": set()}
         return LOBBY_LOCAL[clave]
 
     def limpiar_sala_local():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a limpiar sala local
+            dentro del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         clave = obtener_clave_sala()
         LOBBY_LOCAL.pop(clave, None)
 
     def registrar_estado_local(listo=False):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a registrar estado local
+            dentro del flujo del juego.
+        
+        Entradas:
+            listo (object): Valor recibido por la funcion. Valor
+            opcional.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not estado_red["conectado"] or not estado_red["rol"]:
             return
         sala = obtener_datos_sala()
@@ -165,10 +358,48 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             sala["listos"].discard(estado_red["rol"])
 
     def enviar_accion_lobby(accion, **datos):
+        """
+        Descripcion:
+            Envia la informacion o accion correspondiente a enviar
+            accion lobby.
+        
+        Entradas:
+            accion (object): Valor recibido por la funcion.
+            **datos (object): Valor recibido por la funcion. Argumentos
+            nombrados adicionales.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if adaptador.cliente.conectado:
             adaptador.cliente.enviar_accion(accion, **datos)
 
     def sincronizar_lobby_remoto(datos):
+        """
+        Descripcion:
+            Sincroniza los datos relacionados con sincronizar lobby
+            remoto entre la interfaz, la logica o la red.
+        
+        Entradas:
+            datos (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         facciones_ocupadas.clear()
         facciones_ocupadas.update(datos.get("facciones_lobby", {}))
         listos_remotos.clear()
@@ -178,13 +409,60 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         sala["listos"] = set(listos_remotos)
 
     def hay_dos_jugadores():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a hay dos jugadores dentro
+            del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            bool: True si la condicion evaluada se cumple, False en caso
+            contrario.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         return estado_red["jugadores_conectados"] >= 2
 
     def roles_necesarios_listos():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a roles necesarios listos
+            dentro del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         sala = obtener_datos_sala()
         return {"defensor", "atacante"}.issubset(sala["listos"])
 
     def facciones_validas_en_sala():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a facciones validas en
+            sala dentro del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            bool: True si la condicion evaluada se cumple, False en caso
+            contrario.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         sala = obtener_datos_sala()
         facciones = sala["facciones"]
         if not {"defensor", "atacante"}.issubset(facciones):
@@ -192,6 +470,24 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         return facciones["defensor"] != facciones["atacante"]
 
     def faccion_esta_ocupada_por_otro(nombre_faccion):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a faccion esta ocupada por
+            otro dentro del flujo del juego.
+        
+        Entradas:
+            nombre_faccion (object): Valor recibido por la funcion.
+        
+        Salidas:
+            bool: True si la condicion evaluada se cumple, False en caso
+            contrario.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         sala = obtener_datos_sala()
         for rol, faccion in sala["facciones"].items():
             if rol != estado_red["rol"] and faccion == nombre_faccion:
@@ -203,7 +499,23 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     # ------------------------------------------------------------------ #
 
     def _cancelar_afters():
-        """Cancela todos los callbacks after pendientes."""
+        """
+        Descripcion:
+            Cancela todos los callbacks after pendientes.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         for clave in ("after_id", "after_conexion_id", "retorno_id"):
             if control_ventana[clave] is not None:
                 try:
@@ -213,6 +525,24 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                 control_ventana[clave] = None
 
     def _vaciar_cola():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a  vaciar cola dentro del
+            flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         while not cola_mensajes.empty():
             try:
                 cola_mensajes.get_nowait()
@@ -220,12 +550,48 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
                 break
 
     def _cerrar_cliente():
-        """Desconecta el cliente (envía SALIR al servidor)."""
+        """
+        Descripcion:
+            Desconecta el cliente (envía SALIR al servidor).
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         adaptador.cliente.callback_mensaje = None
         adaptador.cerrar()
 
     def _detener_servidor():
-        """Detiene el servidor local si existe."""
+        """
+        Descripcion:
+            Detiene el servidor local si existe.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         servidor = servidor_local["instancia"]
         hilo = servidor_local["hilo"]
         servidor_local["instancia"] = None
@@ -236,6 +602,24 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             hilo.join(timeout=0.3)
 
     def _destruir_ventana():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a  destruir ventana dentro
+            del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         try:
             if window2.winfo_exists():
                 window2.destroy()
@@ -243,6 +627,21 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             pass
 
     def ventana_activa():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a ventana activa dentro
+            del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if control_ventana["cerrando"]:
             return False
         try:
@@ -253,12 +652,27 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
 
     def cerrar_sala_completa(ir_a_main=True, destruir_app=False):
         """
-        Cierra TODO: afters, cliente, servidor, sala local y ventana.
-        Luego navega según corresponda.
-
-        Parámetros:
+        Descripcion:
+            Cierra TODO: afters, cliente, servidor, sala local y
+            ventana. Luego navega según corresponda. Parámetros:
             ir_a_main (bool): Si True navega a GoMain al terminar.
             destruir_app (bool): Si True cierra toda la aplicación.
+        
+        Entradas:
+            ir_a_main (object): Valor recibido por la funcion. Valor
+            opcional.
+            destruir_app (object): Valor recibido por la funcion. Valor
+            opcional.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
         """
         if control_ventana["cerrando"]:
             return
@@ -278,8 +692,25 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
 
     def cerrar_solo_cliente(ir_a_main=True):
         """
-        Cierra cliente pero NO el servidor (caso: el que se unió vuelve).
-        El servidor sigue vivo y notifica al creador.
+        Descripcion:
+            Cierra cliente pero NO el servidor (caso: el que se unió
+            vuelve). El servidor sigue vivo y notifica al creador.
+        
+        Entradas:
+            ir_a_main (object): Valor recibido por la funcion. Valor
+            opcional.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
         """
         if control_ventana["cerrando"]:
             return
@@ -300,12 +731,23 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
 
     def GoMainR():
         """
-        Lógica del botón Volver según el rol:
-
-        - Creador del servidor: cierra servidor y cliente → ambos vuelven a main.
-          El que se unió (si había) recibe mensaje de servidor caído.
-        - El que se unió: desconecta solo al cliente.
-          El servidor notifica al creador que el contrincante salió.
+        Descripcion:
+            Lógica del botón Volver según el rol: - Creador del
+            servidor: cierra servidor y cliente → ambos vuelven a main.
+            El que se unió (si había) recibe mensaje de servidor caído.
+            - El que se unió: desconecta solo al cliente. El servidor
+            notifica al creador que el contrincante salió.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
         """
         es_creador = variable_modo_conexion.get() == "crear_servidor"
 
@@ -321,6 +763,22 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     # ------------------------------------------------------------------ #
 
     def GoMapaR():
+        """
+        Descripcion:
+            Maneja la navegacion de la interfaz hacia la pantalla o
+            accion asociada a GoMapaR.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         DATOS_PARTIDA["rol"] = estado_red["rol"]
         DATOS_PARTIDA["usuario"] = estado_red["usuario"]
         DATOS_PARTIDA["faccion"] = faccion_confirmada.get()
@@ -346,15 +804,27 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
 
     def volver_a_main_por_desconexion(mensaje):
         """
-        Llamado cuando el servidor notifica que la conexión se perdió
-        o que el contrincante abandonó.
-
-        Casos:
-        A) Éramos el que se unió y el creador cerró la sala:
-           Mostramos messagebox "La sala ha sido cerrada", volvemos a main.
-        B) Éramos el creador y el que se unió se desconectó:
-           Mostramos messagebox "El contrincante salió", reiniciamos UI
-           (quitamos facción, volvemos a espera).
+        Descripcion:
+            Llamado cuando el servidor notifica que la conexión se
+            perdió o que el contrincante abandonó. Casos: A) Éramos el
+            que se unió y el creador cerró la sala: Mostramos messagebox
+            "La sala ha sido cerrada", volvemos a main. B) Éramos el
+            creador y el que se unió se desconectó: Mostramos messagebox
+            "El contrincante salió", reiniciamos UI (quitamos facción,
+            volvemos a espera).
+        
+        Entradas:
+            mensaje (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
         """
         if control_ventana["cerrando"] or control_ventana.get("retorno_id") is not None:
             return
@@ -371,6 +841,22 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         if not es_creador:
             # Fuimos expulsados porque el servidor se cerró
             def ejecutar_retorno_unido():
+                """
+                Descripcion:
+                    Ejecuta la logica correspondiente a ejecutar retorno
+                    unido dentro del flujo del juego.
+                
+                Entradas:
+                    Ninguna.
+                
+                Salidas:
+                    None: Ejecuta la accion y puede modificar el estado
+                    interno, la interfaz o los datos relacionados.
+                
+                Restricciones:
+                    - Requiere que los widgets, ventanas o callbacks
+                    usados por la interfaz existan antes de ejecutarse.
+                """
                 control_ventana["retorno_id"] = None
                 if control_ventana["cerrando"]:
                     return
@@ -388,6 +874,22 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         else:
             # El contrincante abandonó → reiniciar UI, volver a espera
             def ejecutar_reinicio_creador():
+                """
+                Descripcion:
+                    Ejecuta la logica correspondiente a ejecutar
+                    reinicio creador dentro del flujo del juego.
+                
+                Entradas:
+                    Ninguna.
+                
+                Salidas:
+                    None: Ejecuta la accion y puede modificar el estado
+                    interno, la interfaz o los datos relacionados.
+                
+                Restricciones:
+                    - Requiere que los widgets, ventanas o callbacks
+                    usados por la interfaz existan antes de ejecutarse.
+                """
                 control_ventana["retorno_id"] = None
                 if control_ventana["cerrando"]:
                     return
@@ -397,11 +899,23 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
 
     def _reiniciar_ui_tras_salida_contrincante():
         """
-        Reinicia el estado de UI del creador cuando el contrincante se va:
-        - Quita facción elegida / seleccionada
-        - Quita estado 'listo'
-        - Actualiza etiquetas
-        - Muestra aviso
+        Descripcion:
+            Reinicia el estado de UI del creador cuando el contrincante
+            se va: - Quita facción elegida / seleccionada - Quita estado
+            'listo' - Actualiza etiquetas - Muestra aviso
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
         """
         if not ventana_activa():
             return
@@ -513,6 +1027,24 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     # ------------------------------------------------------------------ #
 
     def agregar_evento(texto):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a agregar evento dentro
+            del flujo del juego.
+        
+        Entradas:
+            texto (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if texto and ventana_activa():
             try:
                 if not caja_eventos.winfo_exists():
@@ -524,6 +1056,25 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             caja_eventos.yview(tk.END)
 
     def actualizar_info_facciones(texto=None):
+        """
+        Descripcion:
+            Actualiza la informacion o el componente asociado a
+            actualizar info facciones.
+        
+        Entradas:
+            texto (object): Valor recibido por la funcion. Valor
+            opcional.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not ventana_activa():
             return
         try:
@@ -551,15 +1102,76 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             caja_info_facciones.insert(tk.END, f"facción {rol}: {faccion}")
 
     def texto_boton_faccion(nombre_faccion, ocupada=False, seleccionada=False):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a texto boton faccion
+            dentro del flujo del juego.
+        
+        Entradas:
+            nombre_faccion (object): Valor recibido por la funcion.
+            ocupada (object): Valor recibido por la funcion. Valor
+            opcional.
+            seleccionada (object): Valor recibido por la funcion. Valor
+            opcional.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         datos_faccion = datos_facciones_por_nombre.get(nombre_faccion, {})
         codigo = datos_faccion.get("codigo", "")
         prefijo = "✓ " if seleccionada else "🔒 " if ocupada else ""
         return f"{prefijo}{codigo}\n{nombre_faccion}"
 
     def pintar_rectangulo(imagen, color, x1, y1, x2, y2):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a pintar rectangulo dentro
+            del flujo del juego.
+        
+        Entradas:
+            imagen (object): Valor recibido por la funcion.
+            color (object): Valor recibido por la funcion.
+            x1 (object): Valor recibido por la funcion.
+            y1 (object): Valor recibido por la funcion.
+            x2 (object): Valor recibido por la funcion.
+            y2 (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         imagen.put(color, to=(x1, y1, x2, y2))
 
     def crear_imagen_bandera(codigo):
+        """
+        Descripcion:
+            Crea y configura el elemento asociado a crear imagen bandera
+            para usarlo dentro del juego o la interfaz.
+        
+        Entradas:
+            codigo (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         ancho = 120
         alto = 72
         imagen = tk.PhotoImage(master=window2, width=ancho, height=alto)
@@ -600,6 +1212,22 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         return imagen
 
     def refrescar_botones():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a refrescar botones dentro
+            del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not ventana_activa():
             return
         for nombre_faccion, boton in botones_faccion.items():
@@ -625,6 +1253,23 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         actualizar_info_facciones()
 
     def seleccionar_faccion(nombre_faccion):
+        """
+        Descripcion:
+            Registra la seleccion correspondiente a seleccionar faccion.
+        
+        Entradas:
+            nombre_faccion (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not hay_dos_jugadores():
             texto_faccion.config(text="Esperando al contrincante", fg=COLOR_ALERTA)
             return
@@ -660,6 +1305,22 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     # ------------------------------------------------------------------ #
 
     def elegir_faccion_click():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a elegir faccion click
+            dentro del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not hay_dos_jugadores():
             texto_faccion.config(text="Esperando al contrincante", fg=COLOR_ALERTA)
             agregar_evento("No se puede elegir facción hasta que haya 2 jugadores.")
@@ -682,6 +1343,22 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         refrescar_botones()
 
     def cambiar_faccion_click():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a cambiar faccion click
+            dentro del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         seleccion_bloqueada.set(False)
         listo_para_mapa.set(False)
         faccion_confirmada.set("")
@@ -694,6 +1371,21 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         )
 
     def iniciar_combate_click():
+        """
+        Descripcion:
+            Inicia el proceso asociado a iniciar combate click.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if not hay_dos_jugadores():
             texto_faccion.config(text="Esperando al contrincante", fg=COLOR_ALERTA)
             return
@@ -715,6 +1407,23 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     # ------------------------------------------------------------------ #
 
     def buscar_puerto_disponible(puerto_preferido):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a buscar puerto disponible
+            dentro del flujo del juego.
+        
+        Entradas:
+            puerto_preferido (object): Valor recibido por la funcion.
+        
+        Salidas:
+            tuple: Conjunto de valores resultantes de la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         puertos_a_probar = [puerto_preferido] + list(range(5001, 5011)) + list(range(5050, 5061))
         revisados = []
         for puerto_candidato in puertos_a_probar:
@@ -731,6 +1440,24 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         return False, puerto_preferido, "No se encontró un puerto disponible."
 
     def iniciar_servidor_local(puerto):
+        """
+        Descripcion:
+            Inicia el proceso asociado a iniciar servidor local.
+        
+        Entradas:
+            puerto (object): Valor recibido por la funcion.
+        
+        Salidas:
+            tuple: Conjunto de valores resultantes de la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+        """
         if servidor_local["instancia"] is not None:
             return True, "Servidor local ya estaba iniciado."
         encontrado, puerto_final, mensaje = buscar_puerto_disponible(puerto)
@@ -748,6 +1475,29 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
         return True, f"Servidor creado. El segundo jugador debe conectarse a {ip_local}:{puerto_final}."
 
     def conectar_cliente(host, usuario, rol, puerto):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a conectar cliente dentro
+            del flujo del juego.
+        
+        Entradas:
+            host (object): Valor recibido por la funcion.
+            usuario (object): Valor recibido por la funcion.
+            rol (object): Valor recibido por la funcion.
+            puerto (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+        """
         estado_red["puerto"] = puerto
         estado_red["usuario"] = usuario
         etiqueta_datos_host.config(text=f"IP para compartir: {obtener_ip_local_visible()} | Puerto: {puerto}")
@@ -763,6 +1513,22 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             boton_conectar.config(state="normal")
 
     def conectar_click():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a conectar click dentro
+            del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         if control_ventana["conectando"] or estado_red["conectado"]:
             agregar_evento("Ya existe una conexión activa en esta sala.")
             return
@@ -790,6 +1556,22 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
             puerto = int(campo_puerto.get())
 
             def conectar_local_demorado():
+                """
+                Descripcion:
+                    Ejecuta la logica correspondiente a conectar local
+                    demorado dentro del flujo del juego.
+                
+                Entradas:
+                    Ninguna.
+                
+                Salidas:
+                    None: Ejecuta la accion y puede modificar el estado
+                    interno, la interfaz o los datos relacionados.
+                
+                Restricciones:
+                    - Requiere que los widgets, ventanas o callbacks
+                    usados por la interfaz existan antes de ejecutarse.
+                """
                 control_ventana["after_conexion_id"] = None
                 if control_ventana["cerrando"]:
                     return
@@ -836,6 +1618,24 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     # ------------------------------------------------------------------ #
 
     def procesar_mensajes_red():
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a procesar mensajes red
+            dentro del flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+            - Requiere una conexion, sala o mensaje valido cuando la
+            operacion dependa de la red.
+        """
         if not ventana_activa():
             return
         while not cola_mensajes.empty():
@@ -903,7 +1703,22 @@ def play(root, GoMain, GoMapa, cerrar_todo, configurar_ventana, obtener_usuario_
     # ------------------------------------------------------------------ #
 
     def cerrar_ventana():
-        """Al cerrar la X de la ventana cerramos todo y destruimos la app."""
+        """
+        Descripcion:
+            Al cerrar la X de la ventana cerramos todo y destruimos la
+            app.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         cerrar_sala_completa(ir_a_main=False, destruir_app=True)
 
     control_ventana["after_id"] = window2.after(300, procesar_mensajes_red)

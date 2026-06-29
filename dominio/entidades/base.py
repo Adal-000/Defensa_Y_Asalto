@@ -26,6 +26,26 @@ class Base:
     """
 
     def __init__(self, vida_inicial=450):
+        """
+        Descripcion:
+            Inicializa la instancia y asigna los valores necesarios para
+            que el objeto pueda utilizarse correctamente.
+        
+        Entradas:
+            vida_inicial (object): Valor recibido por la funcion. Valor
+            opcional.
+        
+        Salidas:
+            None: Inicializa los atributos de la instancia.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Debe ejecutarse sobre objetos del dominio creados
+            correctamente.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         self.vida_maxima = vida_inicial
         self.vida = vida_inicial
 

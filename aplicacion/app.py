@@ -239,6 +239,15 @@ def iniciar_fase_ataque():
     Descripcion:
         Finaliza la construccion del defensor y activa la compra y
         colocacion de unidades del atacante en la partida actual.
+    
+    Entradas:
+        Ninguna.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        Ninguna.
     """
     if _partida_actual is None:
         return False, "No hay una partida activa."
@@ -250,6 +259,15 @@ def iniciar_fase_combate():
     Descripcion:
         Inicia la fase de combate de la ronda actual si ya se colocaron
         unidades atacantes.
+    
+    Entradas:
+        Ninguna.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        Ninguna.
     """
     if _partida_actual is None:
         return False, "No hay una partida activa."
@@ -260,8 +278,17 @@ def resolver_preparacion_agotada():
     """
     Descripcion:
         Resuelve el final de los 15 segundos de preparación. Si no hay
-        unidades atacantes, el defensor gana la ronda; si ya hay unidades,
-        se inicia el combate en tiempo real.
+        unidades atacantes, el defensor gana la ronda; si ya hay
+        unidades, se inicia el combate en tiempo real.
+    
+    Entradas:
+        Ninguna.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        Ninguna.
     """
     if _partida_actual is None:
         return False, "No hay una partida activa."
@@ -473,17 +500,55 @@ def obtener_todos_puntajes():
 
 
 def obtener_configuracion():
-    """Devuelve las preferencias actuales de interfaz y conexion."""
+    """
+    Descripcion:
+        Devuelve las preferencias actuales de interfaz y conexion.
+    
+    Entradas:
+        Ninguna.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        Ninguna.
+    """
     return _obtener_configuracion()
 
 
 def actualizar_configuracion(**opciones):
-    """Actualiza preferencias conocidas de interfaz y conexion."""
+    """
+    Descripcion:
+        Actualiza preferencias conocidas de interfaz y conexion.
+    
+    Entradas:
+        **opciones (object): Valor recibido por la funcion. Argumentos
+        nombrados adicionales.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+    """
     return _actualizar_configuracion(**opciones)
 
 
 def restablecer_configuracion():
-    """Restaura las preferencias predeterminadas."""
+    """
+    Descripcion:
+        Restaura las preferencias predeterminadas.
+    
+    Entradas:
+        Ninguna.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        Ninguna.
+    """
     return _restablecer_configuracion()
 
 
@@ -512,22 +577,72 @@ def iniciar_musica_de_fondo():
 
 
 def reproducir_musica(ruta=None):
-    """Reproduce música de fondo (la indicada o la última usada)."""
+    """
+    Descripcion:
+        Reproduce música de fondo (la indicada o la última usada).
+    
+    Entradas:
+        ruta (object): Valor recibido por la funcion. Valor opcional.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+    """
     return _musica.reproducir(ruta)
 
 
 def detener_musica():
-    """Detiene la música de fondo. Es la única forma de apagarla."""
+    """
+    Descripcion:
+        Detiene la música de fondo. Es la única forma de apagarla.
+    
+    Entradas:
+        Ninguna.
+    
+    Salidas:
+        tuple: Conjunto de valores resultantes de la operacion.
+    
+    Restricciones:
+        Ninguna.
+    """
     _musica.detener()
     return True, "Música detenida."
 
 
 def musica_esta_reproduciendo():
-    """Indica si la música de fondo está sonando ahora mismo."""
+    """
+    Descripcion:
+        Indica si la música de fondo está sonando ahora mismo.
+    
+    Entradas:
+        Ninguna.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        Ninguna.
+    """
     return _musica.esta_reproduciendo()
 
 
 def obtener_ruta_musica_actual():
-    """Devuelve la ruta del archivo de música actual o predeterminada."""
+    """
+    Descripcion:
+        Devuelve la ruta del archivo de música actual o predeterminada.
+    
+    Entradas:
+        Ninguna.
+    
+    Salidas:
+        bool: True si la condicion evaluada se cumple, False en caso
+        contrario.
+    
+    Restricciones:
+        Ninguna.
+    """
     return _musica.obtener_ruta_actual() or _musica.RUTA_MUSICA_PREDETERMINADA
 

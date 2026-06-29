@@ -33,6 +33,30 @@ class Jugador:
 
     def __init__(self, nombre_usuario, contrasena, victorias_defensor=0,
                  victorias_atacante=0):
+        """
+        Descripcion:
+            Inicializa la instancia y asigna los valores necesarios para
+            que el objeto pueda utilizarse correctamente.
+        
+        Entradas:
+            nombre_usuario (object): Valor recibido por la funcion.
+            contrasena (object): Valor recibido por la funcion.
+            victorias_defensor (object): Valor recibido por la funcion.
+            Valor opcional.
+            victorias_atacante (object): Valor recibido por la funcion.
+            Valor opcional.
+        
+        Salidas:
+            None: Inicializa los atributos de la instancia.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Debe ejecutarse sobre objetos del dominio creados
+            correctamente.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         self.nombre_usuario = nombre_usuario
         self.contrasena = contrasena
         self.victorias_defensor = victorias_defensor
@@ -130,6 +154,23 @@ class Jugador:
         )
 
     def __repr__(self):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a   repr   dentro del
+            flujo del juego.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Debe ejecutarse sobre objetos del dominio creados
+            correctamente.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         return (f"Jugador(usuario={self.nombre_usuario!r}, "
                 f"victorias_defensor={self.victorias_defensor}, "
                 f"victorias_atacante={self.victorias_atacante})")

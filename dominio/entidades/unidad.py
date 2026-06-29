@@ -39,6 +39,35 @@ class Unidad:
 
     def __init__(self, nombre, costo, vida, dano, velocidad, habilidad,
                  turnos_habilidad, fila=0, columna=0):
+        """
+        Descripcion:
+            Inicializa la instancia y asigna los valores necesarios para
+            que el objeto pueda utilizarse correctamente.
+        
+        Entradas:
+            nombre (object): Valor recibido por la funcion.
+            costo (object): Valor recibido por la funcion.
+            vida (object): Valor recibido por la funcion.
+            dano (object): Valor recibido por la funcion.
+            velocidad (object): Valor recibido por la funcion.
+            habilidad (object): Valor recibido por la funcion.
+            turnos_habilidad (object): Valor recibido por la funcion.
+            fila (object): Valor recibido por la funcion. Valor
+            opcional.
+            columna (object): Valor recibido por la funcion. Valor
+            opcional.
+        
+        Salidas:
+            None: Inicializa los atributos de la instancia.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Debe ejecutarse sobre objetos del dominio creados
+            correctamente.
+            - Funcion de apoyo interno; no se recomienda llamarla
+            directamente desde otros modulos.
+        """
         self.nombre = nombre
         self.costo = costo
         self.vida = vida
@@ -265,8 +294,21 @@ def crear_unidad_soldado(fila=0, columna=0):
     Descripcion:
         Crea el "Soldado base": la unidad equilibrada del atacante.
         Sirve para presionar carriles sin ser ni muy barata ni muy
-        poderosa. Corresponde a las imagenes de la carpeta
-        "Soldado base" de cada faccion.
+        poderosa. Corresponde a las imagenes de la carpeta "Soldado
+        base" de cada faccion.
+    
+    Entradas:
+        fila (object): Valor recibido por la funcion. Valor opcional.
+        columna (object): Valor recibido por la funcion. Valor opcional.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Debe ejecutarse sobre objetos del dominio creados
+        correctamente.
     """
     return Unidad(
         nombre="Soldado base",
@@ -284,10 +326,23 @@ def crear_unidad_soldado(fila=0, columna=0):
 def crear_unidad_rapida(fila=0, columna=0):
     """
     Descripcion:
-        Crea el "Soldado rapido". Tiene menos vida y pega menos
-        fuerte, pero avanza mas rapido y obliga al defensor a cubrir
-        carriles abiertos. Corresponde a las imagenes de la carpeta
-        "Soldado rápido" de cada faccion.
+        Crea el "Soldado rapido". Tiene menos vida y pega menos fuerte,
+        pero avanza mas rapido y obliga al defensor a cubrir carriles
+        abiertos. Corresponde a las imagenes de la carpeta "Soldado
+        rápido" de cada faccion.
+    
+    Entradas:
+        fila (object): Valor recibido por la funcion. Valor opcional.
+        columna (object): Valor recibido por la funcion. Valor opcional.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Debe ejecutarse sobre objetos del dominio creados
+        correctamente.
     """
     return Unidad(
         nombre="Soldado rápido",
@@ -307,8 +362,21 @@ def crear_unidad_tanque(fila=0, columna=0):
     Descripcion:
         Crea el "Soldado tanque". Es el mas caro y el mas lento, pero
         resiste mas dano y pega mas fuerte, ademas de hacer dano extra
-        contra torres. Corresponde a las imagenes de la carpeta
-        "Soldado tanque" de cada faccion.
+        contra torres. Corresponde a las imagenes de la carpeta "Soldado
+        tanque" de cada faccion.
+    
+    Entradas:
+        fila (object): Valor recibido por la funcion. Valor opcional.
+        columna (object): Valor recibido por la funcion. Valor opcional.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Debe ejecutarse sobre objetos del dominio creados
+        correctamente.
     """
     return Unidad(
         nombre="Soldado tanque",
@@ -343,6 +411,20 @@ def crear_unidad_por_tipo(tipo_unidad, fila=0, columna=0):
         Funcion de fabrica que crea una unidad segun el tipo solicitado.
         El catalogo oficial usa soldado, rapido y tanque porque son las
         tres familias que existen en las imagenes del proyecto.
+    
+    Entradas:
+        tipo_unidad (object): Valor recibido por la funcion.
+        fila (object): Valor recibido por la funcion. Valor opcional.
+        columna (object): Valor recibido por la funcion. Valor opcional.
+    
+    Salidas:
+        object: Resultado calculado o recuperado por la operacion.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Debe ejecutarse sobre objetos del dominio creados
+        correctamente.
     """
     fabricante = FABRICANTES_UNIDADES.get(tipo_unidad)
     if fabricante is None:

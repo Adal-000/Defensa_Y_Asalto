@@ -19,9 +19,28 @@ COLOR_TEXTO_SUAVE = "#b8c7d9"
 def main(root, GoPerfil, GoPlay, GoConfig, cerrar_todo, configurar_ventana,
          obtener_usuario_actual):
     """
-    Descripción:
+    Descripcion:
         Crea la ventana principal del juego Defensa y Asalto con un
         aspecto más cercano a menú de videojuego.
+    
+    Entradas:
+        root (object): Valor recibido por la funcion.
+        GoPerfil (object): Valor recibido por la funcion.
+        GoPlay (object): Valor recibido por la funcion.
+        GoConfig (object): Valor recibido por la funcion.
+        cerrar_todo (object): Valor recibido por la funcion.
+        configurar_ventana (object): Valor recibido por la funcion.
+        obtener_usuario_actual (object): Valor recibido por la funcion.
+    
+    Salidas:
+        None: Ejecuta la accion y puede modificar el estado interno, la
+        interfaz o los datos relacionados.
+    
+    Restricciones:
+        - Los parametros recibidos deben respetar el tipo y el formato
+        esperado por la funcion.
+        - Requiere que los widgets, ventanas o callbacks usados por la
+        interfaz existan antes de ejecutarse.
     """
 
     window = tk.Toplevel(root)
@@ -29,22 +48,111 @@ def main(root, GoPerfil, GoPlay, GoConfig, cerrar_todo, configurar_ventana,
     window.configure(bg=COLOR_FONDO)
 
     def GoPerfilR():
+        """
+        Descripcion:
+            Maneja la navegacion de la interfaz hacia la pantalla o
+            accion asociada a GoPerfilR.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         window.destroy()
         GoPerfil()
 
     def GoPlayR():
+        """
+        Descripcion:
+            Maneja la navegacion de la interfaz hacia la pantalla o
+            accion asociada a GoPlayR.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         window.destroy()
         GoPlay()
 
     def GoConfigR():
+        """
+        Descripcion:
+            Maneja la navegacion de la interfaz hacia la pantalla o
+            accion asociada a GoConfigR.
+        
+        Entradas:
+            Ninguna.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         window.destroy()
         GoConfig()
 
     def aplicar_hover(boton, color_base, color_hover):
+        """
+        Descripcion:
+            Ejecuta la logica correspondiente a aplicar hover dentro del
+            flujo del juego.
+        
+        Entradas:
+            boton (object): Valor recibido por la funcion.
+            color_base (object): Valor recibido por la funcion.
+            color_hover (object): Valor recibido por la funcion.
+        
+        Salidas:
+            None: Ejecuta la accion y puede modificar el estado interno,
+            la interfaz o los datos relacionados.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         boton.bind("<Enter>", lambda _evento: boton.config(bg=color_hover, relief="sunken"))
         boton.bind("<Leave>", lambda _evento: boton.config(bg=color_base, relief="raised"))
 
     def crear_boton_menu(parent, texto, icono, color, comando):
+        """
+        Descripcion:
+            Crea y configura el elemento asociado a crear boton menu
+            para usarlo dentro del juego o la interfaz.
+        
+        Entradas:
+            parent (object): Valor recibido por la funcion.
+            texto (object): Valor recibido por la funcion.
+            icono (object): Valor recibido por la funcion.
+            color (object): Valor recibido por la funcion.
+            comando (object): Valor recibido por la funcion.
+        
+        Salidas:
+            object: Resultado calculado o recuperado por la operacion.
+        
+        Restricciones:
+            - Los parametros recibidos deben respetar el tipo y el
+            formato esperado por la funcion.
+            - Requiere que los widgets, ventanas o callbacks usados por
+            la interfaz existan antes de ejecutarse.
+        """
         boton = tk.Button(
             parent,
             text=f"{icono}\n{texto}",
