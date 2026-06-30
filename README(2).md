@@ -193,8 +193,8 @@ Colocar aquí las capturas del proyecto:
 
 Link del video:
 
-```text
-[PEGAR AQUÍ EL LINK DEL VIDEO DE 10+ MINUTOS]
+```
+PEGAR AQUÍ EL LINK DEL VIDEO DE 10+ MINUTOS
 ```
 
 ---
@@ -203,18 +203,12 @@ Link del video:
 
 Link del repositorio:
 
-```text
-[PEGAR AQUÍ EL LINK DEL REPOSITORIO]
+```
+PEGAR AQUÍ EL LINK DEL REPOSITORIO
 ```
 
 ---
 
-## Conclusiones individuales
-
-### Conclusión de Luis Daniel Espinoza Molina
+## Conclusiones
 
 El desarrollo del proyecto permitió aplicar conceptos de programación orientada a objetos, separación por capas, manejo de archivos, conexión por red y construcción de interfaces gráficas. Además, ayudó a comprender la importancia de dividir correctamente la lógica del juego, la interfaz y la persistencia de datos.
-
-### Conclusión del segundo integrante
-
-[ESCRIBIR AQUÍ LA CONCLUSIÓN INDIVIDUAL DEL SEGUNDO INTEGRANTE]
