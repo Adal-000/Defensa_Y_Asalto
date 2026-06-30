@@ -5,6 +5,8 @@ Las facciones solo cambian la apariencia del lobby y del mapa. No
 modifican dinero, daño, vida, velocidad, habilidades, rondas ni victoria.
 """
 
+# Esto es una lista de diccionarios, donde cada diccionario representa una facción visual.
+
 FACCIONES_VISUALES = [
     {
         "clave": "espana",
