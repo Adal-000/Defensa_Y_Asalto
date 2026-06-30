@@ -6,9 +6,9 @@ predeterminados de conexion durante la sesion.
 """
 
 CONFIGURACION_PREDETERMINADA = {
-    "tema": "claro", # No se usa
-    "mostrar_cuadricula": True, # No se usa
-    "mostrar_proyectiles": True, #No se usa
+    "tema": "claro", # tema predeterminado
+    "mostrar_cuadricula": True, # Obvio
+    "mostrar_proyectiles": True, # Obvio
     "ip_servidor_predeterminada": "127.0.0.1", # Direccion IP predeterminada para el servidor de juego ya sea local o remoto.
     "puerto_predeterminado": 5000, # Puerto predeterminado para la conexion al servidor de juego, VERIFICAR QUE ESTE DISPONIBLE
     "ruta_musica": "",
