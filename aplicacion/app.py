@@ -1,7 +1,6 @@
 """
 Descripcion:
-    Modulo de interfaz logica del Desarrollador 2. Expone las
-    funciones principales que el Desarrollador 1 debe llamar desde
+    Expone las funciones principales que debe llamar desde
     la interfaz grafica en Tkinter, sin que este necesite conocer
     los detalles internos de las clases Jugador, Torre, Unidad,
     Base, Partida o Combate.

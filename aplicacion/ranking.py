@@ -2,8 +2,8 @@
 Descripcion:
     Modulo encargado de generar los rankings de los mejores
     jugadores, tanto en el rol de defensor como en el rol de
-    atacante. La informacion generada aqui esta lista para que el
-    Desarrollador 1 la muestre en la interfaz grafica con Tkinter.
+    atacante. La informacion generada aqui esta lista para que 
+    la muestre en la interfaz grafica con Tkinter.
 """
 
 from infraestructura.persistencia.archivos import cargar_jugadores, RUTA_ARCHIVO_JUGADORES
